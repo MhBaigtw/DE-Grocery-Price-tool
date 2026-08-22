@@ -1,0 +1,25 @@
+# Dataset snapshots. Ignored for SIZE, not for licence: the maintainer has confirmed
+# redistribution is permitted and encouraged (see CLAUDE.md). ~1.4 GB of binary archives
+# is simply the wrong payload for git history. If we do publish a mirror, it should go
+# via release assets / object storage, not committed blobs -- a Phase 1+ decision.
+# Provenance (sha256 + timestamps) lives in docs/phase-0-findings.md and in each
+# snapshot's manifest.json, so a snapshot is identifiable without being stored here.
+data/snapshots/
+
+# DuckDB analysis databases: derived, regenerable from a snapshot.
+*.duckdb
+*.duckdb.wal
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.duckdb_spill/
