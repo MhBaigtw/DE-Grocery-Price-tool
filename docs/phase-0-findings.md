@@ -1230,8 +1230,8 @@ python scripts/run_query.py analysis/phase0/B6_duplicate_rows.sql --all \
 |---|---|
 | `scripts/check_schema.py` | PASS — 2 tables, 15 columns match |
 | `scripts/test_check_schema.py` | **6 of 6** cases behaved as expected |
-| `scripts/check_manifest.py` | PASS — 44 tracked files, 11 manifest entries |
-| Query smoke test (every `.sql` in `analysis/phase0/` executes) | **35 of 35** run without error |
+| `scripts/check_manifest.py` | PASS — 53 tracked files, 15 manifest entries |
+| Query smoke test (every `.sql` in `analysis/phase0/` executes) | **39 of 39** run without error |
 
 The only tests that exist are the 6 schema-check cases. There is no test suite for the
 analysis queries themselves — they are verified by execution, not by assertion — so
