@@ -18,10 +18,12 @@ Read these in order to understand the project from scratch:
 3. **`docs/phase-0-brief.md`** — the Phase 0 assignment, so you can judge whether it was actually answered.
 4. **`docs/phase-0-findings.md`** — the deliverable. Start with §1 (the headline number), then §2 (bad news), then §8 (what the data can and cannot support). The middle sections are evidence for those three.
 5. **`analysis/phase0/`** — the queries behind every number. Read `B4_cross_vendor_upc_overlap.sql` first; it produces the number the project hinges on.
-6. **`docs/upstream-feedback.md`** — the ergonomics report sent to the dataset maintainer. Reads as a summary of what was expensive to consume, so it doubles as an index of the audit's sharpest findings.
-7. **`scripts/`** — how a snapshot is fetched, loaded, schema-checked, and queried.
-8. **`config/expected_schema.json`** — the schema contract those checks enforce.
-9. **`docs/FILES.md`** — this file, last. It is a map, not an introduction.
+6. **`docs/phase-1-brief.md`** and **`docs/phase-1-findings.md`** — Phase 1 builds representation (a computable price, an owned product identity). Its §1 is the first non-circular test of product identity, using two snapshots.
+7. **`analysis/phase1/`** — the Phase 1 queries. `P1_3_cross_snapshot_identity.sql` is the one that decides whether the owned key is easy or hard.
+8. **`docs/upstream-feedback.md`** — the ergonomics report sent to the dataset maintainer. Reads as a summary of what was expensive to consume, so it doubles as an index of the audit's sharpest findings.
+9. **`scripts/`** — how a snapshot is fetched, loaded, schema-checked, and queried.
+10. **`config/expected_schema.json`** — the schema contract those checks enforce.
+11. **`docs/FILES.md`** — this file, last. It is a map, not an introduction.
 
 ---
 
@@ -48,6 +50,24 @@ Read these in order to understand the project from scratch:
 **Breaks if removed:** The entire output of the phase is gone. The queries would survive but the interpretation, the judgement calls, and the go/no-go verdicts would not.
 **Depends on:** Every file in `analysis/phase0/`; the snapshot recorded in §0.
 **Notes:** Every figure cites the query that produces it. Judgement calls (B5's fuzzy-match eyeball, D3's shrinkflation sample, the PLU exclusion in B4, the 50%-of-median partial-day threshold) are labelled as judgement and show their sample — they are deliberately not dressed up as measurements. §8's "single largest risk" section names E8 as the defect most likely to silently corrupt Phase 1.
+
+### docs/phase-1-brief.md
+**Purpose:** The Phase 1 assignment — representation only: a computable price and an owned product identity. Explicitly forbids findings, fuzzy matching, and touching D1/D2/D4.
+**Breaks if removed:** Phase 1's scope boundary disappears, and the temptation to compute a finding while the representation is half-built returns. The "no findings" rule is the whole point.
+**Depends on:** `docs/phase-0-findings.md` — every section is justified by a Phase 0 number.
+**Notes:** Section 1 is deliberately a gate: if cross-snapshot identity were unstable, Section 4 would change shape entirely, so it is answered and reported before anything is built.
+
+### docs/phase-1-findings.md
+**Purpose:** What each Phase 1 section measured and decided, so the models are traceable to evidence rather than to judgement.
+**Breaks if removed:** The representation models become unexplained — a reader can see *what* was built but not *why* that shape. Section 1's identity-stability numbers are the justification for Section 4's key design.
+**Depends on:** `analysis/phase1/`, both snapshots.
+**Notes:** Records a methodological error of mine in §1.4 — a join on a non-unique key produced a false "upstream corrupted history" alarm — because the trap is a general hazard on this dataset, not a one-off. §1.5 isolates a defect (the `NNN$` cents-form price) that Phase 0 had lumped into an uncharacterised bucket.
+
+### analysis/phase1/
+**Purpose:** Numbered queries behind every Phase 1 number, same rule as `analysis/phase0/`: no figure exists without a committed query that regenerates it.
+**Breaks if removed:** Every number in `docs/phase-1-findings.md` becomes unverifiable.
+**Depends on:** `hammer.duckdb` and `hammer2.duckdb` (both gitignored, rebuilt via `scripts/load_snapshot.py`). Queries that span snapshots `ATTACH` the second database.
+**Notes:** `P1_4b` carries a method note explaining why it uses a multiset diff rather than a join — that is a correction to a real mistake and is left visible on purpose. Cross-snapshot queries assume `hammer2.duckdb` sits in the repo root; rebuild it with `python scripts/load_snapshot.py 20260824T132829Z --db hammer2.duckdb`.
 
 ### docs/FILES.md
 **Purpose:** This manifest, plus the reading order above.

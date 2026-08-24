@@ -28,7 +28,20 @@ newlines. **1,303,020 rows (1.81%) do not parse as a number.**
 |---|---|
 | Multibuy `N/$X.XX` | 679,923 |
 | Per-weight `X.XX/100g` | 360,365 |
-| Other (embedded newlines) | 262,732 |
+| **Cents-form `NNN$`** (e.g. `329$` for $3.29) | **~48,000** |
+| Other (embedded newlines) | remainder of 262,732 |
+
+**A fourth shape, isolated after a second snapshot.** `current_price` sometimes holds the
+price in **cents with a trailing dollar sign** — `329$` for $3.29, `1400$` for $14.00.
+It is **Loblaws only** (zero rows at every other vendor), affects `old_price` too (6,488
+rows), and has run continuously since **2025-10-22** at a steady ~175 rows/day — so it
+survived at least one post-processing rework. Snapshot-to-snapshot it is stable, not
+spreading: 47,992 rows on 2026-08-22, 48,342 on 2026-08-24, the growth being only the two
+new dates.
+
+It is recoverable by dividing by 100, and we will parse it. We mention it because a
+consumer who does *not* notice gets a silent 100× error rather than a missing value, which
+is worse than the multibuy case — `329$` looks like a plausible price for a case of wine.
 
 Concentration is the problem, not the headline percentage:
 

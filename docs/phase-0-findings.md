@@ -575,7 +575,7 @@ Sale signal in `other` = contains `sale` or `rollback` (Walmart's markdown word)
 | # | Finding | Coverage number | Verdict |
 |---|---|---|---|
 | **D1** | Price freeze (Nov 1 – Feb 5) | **2024-25: Metro 474 of 14,288 SKUs (3.32%) at ≥90% coverage; 20 with zero gaps — and the 474 is a frozen/packaged slice, not a sample (F2).** 2025-26: Metro 5,977 (54.23%); **0** with zero gaps, composition unchecked | **NO-GO for 2024-25 · *provisional* GO for 2025-26** |
-| **D2** | Sale honesty (price raised pre-sale) | 566,564 events; 279,599 with 14d continuous history; **273,873 usable** | **GO — for single-unit markdowns only.** All multibuy and per-weight promotions are excluded by construction (F5); product mix is representative (F6) |
+| **D2** | Sale honesty (price raised pre-sale) | 566,564 events; 279,599 with 14d continuous history; **273,873 usable *pre-parse*** | **GO.** Scope is currently single-unit markdowns — a **pre-parse limit, not a permanent one** (F5). Phase 1 §2.3 re-measures it after price parsing. Product mix is representative (F6) |
 | **D3** | Shrinkflation | Structural for the 86.2% with a sku; representable but **0 credible cases in 1,004 pairs** for the rest (F4) | **NO-GO** |
 | **D4** | Cross-vendor basket | **3,477** reliable-only GTINs with 90+ shared days; 1,560 with 365+ | **GO** |
 
@@ -646,9 +646,13 @@ analysis that needs numeric prices. Metro's low rate is the same catalogue-churn
 Caveat carried forward from C4: this counts `old_price` transitions only, so it
 **undercounts Loblaws sales by ~22.7%** (multibuy offers with no struck-out price).
 
-**Scope limit established in F5:** the usable sample contains **only single-unit
-markdowns**. Every multibuy and per-weight-priced promotion is excluded by construction,
-because such a price is non-scalar. Read F5 before publishing any D2 number.
+**Scope limit established in F5 — and it is a PRE-PARSE limit, not a permanent one:**
+as of Phase 0 the usable sample contains **only single-unit markdowns**, because every
+multibuy and per-weight-priced promotion has a non-scalar `current_price` and cannot
+survive a numeric cast. That is a property of *how the price is currently represented*,
+not of the underlying data: a `2/$7.00` offer carries a perfectly good unit price of
+$3.50 once parsed. **Phase 1 §2.3 parses these shapes and re-measures the exclusion.**
+Read F5 before publishing any D2 number, and check whether §2.3 has superseded it.
 
 *Source: `D2_sale_events_with_history.sql`.*
 
@@ -1248,13 +1252,35 @@ promotional type — multibuy at Metro, per-weight at Save-On-Foods and T&T — 
 they are also deeper and shorter than what survives.
 
 **What this means for the D2 finding.** "Was the price raised before the sale?" computed
-on D2's retained sample is a statement about **single-unit markdowns only**. It excludes
-multibuy offers entirely. That is a defensible scope — arguably multibuy deserves separate
-treatment anyway, since "2 for $7" has no single-unit before/after price to compare — but
-it must be **stated as a scope limit, not presented as a finding about promotions in
-general**. Any headline of the form "X% of Metro sales were preceded by a price increase"
-must read "X% of Metro *single-unit markdowns*", and must note that 925 multibuy events
-were excluded.
+on D2's retained sample is, *as things currently stand*, a statement about **single-unit
+markdowns only**. It excludes multibuy offers entirely.
+
+**This is a pre-parse limit, not a permanent scope decision.** The exclusion exists
+because `current_price` is stored as text that a numeric cast rejects — not because the
+information is missing. `2/$7.00` states a unit price of $3.50 as plainly as `3.50` does;
+we simply have not parsed it yet. **Phase 1 §2.3 parses these shapes and re-runs this
+exclusion count**, and the number below should be treated as an upper bound on the loss,
+not a fixed property of the dataset.
+
+Until that lands, any headline of the form "X% of Metro sales were preceded by a price
+increase" must read "X% of Metro *single-unit markdowns*" and must note that 925 multibuy
+events were excluded **pending parsing**.
+
+> #### Interpretation risk: the exclusion is not depth-neutral
+>
+> The excluded Metro events are **~8 pp deeper at the median** than the retained ones
+> (24.81% vs 16.69% off). So the pre-parse D2 sample is missing **the deepest markdowns**,
+> and it is missing them systematically rather than at random.
+>
+> That is the direction that **flatters retailers**. A "were prices raised before the
+> sale?" analysis run on this sample sees a shallower, tamer population of promotions than
+> the vendor actually ran, and any conclusion about promotional aggressiveness is
+> correspondingly conservative — understating, not overstating. An analyst who does not
+> know this would read a benign result as evidence of benign behaviour, when part of it is
+> an artifact of which rows survived a cast.
+>
+> This is the single most important reason §2.3 is worth doing before D2 is computed, and
+> not after.
 
 D2 stays a **GO**. Its scope is narrower than F1 implied.
 
@@ -1409,13 +1435,21 @@ claim must say *four of eight vendors*, and *Toronto pickup pricing*.
 **Sale-behaviour analysis of single-unit markdowns, at scale.** 273,873 sale events with
 a full 14 days of continuous pre-sale daily history and numeric prices throughout.
 
-**Scope limit, load-bearing (F5):** this sample contains **no multibuy promotions at all**
-— a multibuy price is non-scalar, so every "2 for $7" offer is excluded by construction
-(925 events at Metro), as is every per-weight-priced promotion at Save-On-Foods (1,512)
-and T&T (651). At Metro the excluded promotions are also ~8 pp deeper at the median
-(24.81% vs 16.69% off). Any published figure must therefore say *single-unit markdowns*,
-not *sales*, and report the excluded count. Product mix within the sample is
-representative (F6); it is promotion type that is not. This is the strongest thing in the dataset. "Was the
+**Scope limit, load-bearing — and PRE-PARSE (F5):** as of Phase 0 this sample contains
+**no multibuy promotions at all** — a multibuy price is non-scalar, so every "2 for $7"
+offer is excluded by construction (925 events at Metro), as is every per-weight-priced
+promotion at Save-On-Foods (1,512) and T&T (651).
+
+**This is a representation problem, not a data problem, and Phase 1 §2.3 addresses it.**
+The unit price is recoverable from the raw text in every one of those cases.
+
+**Interpretation risk while it stands:** the excluded Metro promotions are ~8 pp deeper at
+the median (24.81% vs 16.69% off), so the pre-parse sample is missing the deepest
+markdowns — the direction that **flatters retailers**. Any conclusion drawn now about
+promotional aggressiveness is systematically conservative, and that conservatism is an
+artifact of the cast, not a finding. Until §2.3 lands, published figures must say
+*single-unit markdowns*, not *sales*, and report the excluded count. Product mix within
+the sample is representative (F6); it is promotion type that is not. This is the strongest thing in the dataset. "Was the
 price raised before the sale" is answerable with a large sample — provided Loblaws
 multibuy offers are handled (E12) and non-scalar prices are parsed rather than dropped (E8).
 
