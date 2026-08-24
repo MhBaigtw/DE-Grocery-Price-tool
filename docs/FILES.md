@@ -69,6 +69,18 @@ Read these in order to understand the project from scratch:
 **Depends on:** `hammer.duckdb` and `hammer2.duckdb` (both gitignored, rebuilt via `scripts/load_snapshot.py`). Queries that span snapshots `ATTACH` the second database.
 **Notes:** `P1_4b` carries a method note explaining why it uses a multiset diff rather than a join — that is a correction to a real mistake and is left visible on purpose. Cross-snapshot queries assume `hammer2.duckdb` sits in the repo root; rebuild it with `python scripts/load_snapshot.py 20260824T132829Z --db hammer2.duckdb`.
 
+### models/
+**Purpose:** The representation layer. `price_parse_macros.sql` holds the price-parsing macros; `stg_price.sql` is the staging model that turns raw price text into a computable unit price for every row.
+**Breaks if removed:** Every downstream number reverts to `CAST(current_price AS DOUBLE)`, which silently drops 1.8% of rows concentrated in Metro and Save-On-Foods, and reads `329$` as $329.00 instead of $3.29.
+**Depends on:** `raw` and `product` in a loaded snapshot. Built by `scripts/build_models.py`.
+**Notes:** `offer_type` and `normalization` are deliberately separate columns — the first describes the commercial offer, the second the encoding repair — so "how many single-unit offers are there?" stays answerable without knowing every quirk. Per-weight prices are rescaled to per-100g/per-100ml for comparability, with the vendor's stated denominator preserved in `price_basis_stated`. Written as a single SELECT so it drops into dbt unchanged when Section 5 needs the test framework.
+
+### scripts/build_models.py
+**Purpose:** Materialises the models into a snapshot's DuckDB. Separate from `run_query.py` because it needs write access, and that one is deliberately read-only.
+**Breaks if removed:** `stg_price` cannot be built, and nothing downstream has a price to compute with.
+**Depends on:** `models/`, a loaded snapshot database.
+**Notes:** Asserts row count in == row count out and refuses to continue on a mismatch — silent row loss is the failure mode this catches. Defaults to a view; `--materialize table` trades ~2.1 GB of disk for query speed, which is what the current build uses because the regex parse over 71.8M rows made every downstream query cost minutes.
+
 ### docs/FILES.md
 **Purpose:** This manifest, plus the reading order above.
 **Breaks if removed:** `scripts/check_manifest.py` exits 2 and the repo loses its drift check.

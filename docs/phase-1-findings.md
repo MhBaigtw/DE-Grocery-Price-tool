@@ -220,4 +220,339 @@ scalar `current_price`. It is the same root request with a fourth concrete shape
 
 ## Section 2 — Price representation
 
-Not started. Awaiting sign-off on Section 1.
+**Status: complete.** Headline: **100.00% of `current_price` rows now have a computable
+unit price. The D2 exclusion fell from 6,421 events to 3, and all 925 Metro multibuy
+events are recovered.**
+
+### 2.1 Shape inventory
+
+Every distinct form `current_price` takes, collapsed to a signature (digits → `N`,
+letters → `a`). 23 shapes exist; 9 account for everything above a rounding error.
+
+| Shape | Rows | % | Vendors | Meaning |
+|---|---|---|---|---|
+| `N.N` | 69,758,160 | 98.055% | all 8 | scalar |
+| `N/$N.N` | 598,007 | 0.841% | Metro | multibuy `2/$7.00` |
+| `N.N/Na` | 270,127 | 0.380% | SaveOnFoods, Metro | per-weight `3.69/100g` |
+| `N.N a/a` | 203,003 | 0.285% | SaveOnFoods | average price `12.46 avg/ea` |
+| `N` | 162,187 | 0.228% | 2 | scalar integer |
+| `N.N/a` | 89,479 | 0.126% | TandT, SaveOnFoods, Metro | per-weight `36.90/kg` |
+| `N$` | 48,055 | 0.068% | **Loblaws** | **cents-form `329$` = $3.29** |
+| `a$N` | 12,466 | 0.018% | **Walmart** | **cents-form `Now$298` = $2.98** |
+| `N,N.N` | 353 | 0.001% | Walmart, Voila | thousands separator |
+
+`old_price` adds three more: `N¢` (`99¢`, Walmart, 586), `N.N/aN.N/a.`
+(`19.82/kg8.99/lb.` — two prices concatenated, Metro, 4,172), and `N.Na.a`
+(`17.61avg.kg`, Metro, 27,576).
+
+*Source: `P2_1_price_shape_inventory.sql`.*
+
+#### Correction to §1.5: the cents-form is not Loblaws-only
+
+§1.5 reported the cents-form defect as "Loblaws only". **That was wrong** — an artifact of
+testing only the bare `^[0-9]+\$$` pattern. Walmart has the same underlying defect wearing
+two different disguises:
+
+| Vendor | Shape | Rows | Field |
+|---|---|---|---|
+| Loblaws | `329$` | 48,055 | current_price |
+| Loblaws | `329$` | 6,488 | old_price |
+| **Walmart** | **`Now$298`** | **12,466** | current_price |
+| **Walmart** | **`99¢`** | **586** | old_price |
+
+Same root cause — a price rendered in cents without a decimal point — at two vendors, in
+four syntactic variants. All four are parsed.
+
+#### A second defect: `old_price` is not always a price
+
+**869,495 rows carry the literal string `was` in `old_price`** (Loblaws 861,728, No Frills
+7,775), plus 12 rows carrying a brand name (`Kelloggs`, `Mastro`, `from our chefs`). For
+Loblaws that is **33.1% of every row D2 treats as a sale.**
+
+This does **not** inflate D2's event count: 98.07% of those rows also carry a sale flag in
+`other`, so they are genuine sales whose struck-out price was lost in extraction. The
+event is real; only the old value is missing. But it does mean **Phase 0 C4's `old_price`
+coverage of 18.53% for Loblaws is overstated** — the share of Loblaws rows with a *usable*
+old price is closer to 12.4%.
+
+The parser classifies `was` as `unparsed` with the raw text retained, rather than letting
+it fall through as a price.
+
+*Source: `P2_1b_old_price_junk.sql`.*
+
+### 2.2 The model — `stg_price`
+
+One row per raw price observation. **71,809,333 in, 71,809,333 out**; the build script
+refuses to continue if those differ.
+
+| Column | Meaning |
+|---|---|
+| `offer_type` | `scalar` / `multibuy` / `per_weight` / `unparsed` / `blank` |
+| `unit_price` | price of one unit on the canonical basis |
+| `min_qty` | 1 for scalar, n for multibuy |
+| `price_basis` | `each` / `per_100g` / `per_100ml` |
+| `price_basis_stated` | the denominator the vendor actually quoted (`kg`, `lb`, `450g`, …) |
+| `normalization` | the encoding repair applied, or `none` |
+| `parse_confidence` | `exact` / `derived` / `inferred` / `none` |
+| `current_price_raw` | always retained, never discarded |
+
+**Design decision: `offer_type` and `normalization` are separate columns.** `offer_type`
+describes the *commercial offer* — what is sold and how many. `normalization` describes
+the *encoding repair* needed to get a number out of the text. A cents-form price like
+`329$` is commercially an ordinary single-unit offer that happens to be written oddly, so
+it gets `offer_type='scalar'` and `normalization='cents_div100'`.
+
+Per the instruction, the cents-form is a first-class parse case: it reaches `unparsed`
+never, is stripped to `329` never, and every repair is named and countable. Folding the
+encoding into `offer_type` would have made "how many single-unit offers are there?" —
+exactly D2's question — unanswerable without knowing every encoding quirk.
+
+**Design decision: per-weight prices are rescaled to a canonical basis.** Mass is
+expressed per 100 g and volume per 100 mL, so `$36.90/kg`, `$3.69/100g` and `$8.80/1000g`
+all become `3.69 per_100g` and are directly comparable.
+*Tradeoff, stated:* `unit_price` is then not always the number printed on the vendor's
+site. The alternative — one basis per denominator — preserves the printed number but
+pushes unit conversion into every downstream query, where it will be done inconsistently
+or not at all. Comparability is the column's entire purpose, so the conversion happens
+once, here, and `price_basis_stated` preserves what the shopper saw.
+
+**Materialisation:** a table, not a view. It began as a view (zero disk, cannot drift from
+source), but the regex parse over 71.8M rows made every downstream query cost minutes.
+2.1 GB of disk buys that time back on every subsequent query. `build_models.py
+--materialize view` still works if disk becomes tighter than time.
+
+#### Parse coverage
+
+| Field | Rows | scalar | multibuy | per_weight | unparsed | **computable** |
+|---|---|---|---|---|---|---|
+| `current_price` | 71,809,333 | 70,566,164 | 679,923 | 563,213 | **33** | **100.000%** |
+| `old_price` | 12,757,144 | 11,675,550 | 369 | 210,490 | 870,735 | 93.2% |
+
+**33 unparsed rows out of 71.8 million.** They are genuine garbage — product names in the
+price field, HTML fragments with embedded newlines, and one timestamp
+(`13.42026-02-01 09:2…`). They are retained with `offer_type='unparsed'` and their raw
+text, exactly as the brief requires, and they remain countable.
+
+`old_price`'s 870,735 unparsed is the `was` population above — correctly refused rather
+than silently priced.
+
+Repairs applied, each named and counted:
+
+| Normalization | Rows | Vendors | Price range after repair |
+|---|---|---|---|
+| `basis_rescaled` | 105,488 | Metro, T&T, Save-On-Foods | $0.0005 – $19.60 |
+| `cents_div100` | 47,707 | Loblaws | $1.00 – $84.17 |
+| `now_prefix_cents_div100` | 11,496 | Walmart | $0.38 – $25.97 |
+| `thousands_sep` | 353 | Walmart, Voila | $1,059 – $21,525 |
+
+The post-repair price ranges are the sanity check that matters: a `cents_div100` applied
+to the wrong shape would produce prices in the hundreds, and the observed $1.00–$84.17
+range is what groceries cost.
+
+*Source: `P2_2b_parse_coverage.sql`. Parser unit tests: `P2_2_parser_unit_tests.sql`,
+**22 of 22 cases pass**, including the two that matter most — `329$` → 3.29 (not 329.00)
+and `2/$7.00` → 3.50 (not 7.00).*
+
+### 2.3 D2 reconciliation — the point of the whole section
+
+Definitions held identical to F5; only the "is this price usable" test changes, from
+`try_cast IS NOT NULL` to `stg_price.unit_price IS NOT NULL`.
+
+| | Events |
+|---|---|
+| Evaluable events (unchanged) | 279,599 |
+| Lost **pre**-parse | **6,421** |
+| Lost **post**-parse | **3** |
+| **Recovered** | **6,418** |
+| **Usable now** | **279,596** |
+
+Per vendor:
+
+| Vendor | Evaluable | Lost pre-parse | Lost post-parse | **Recovered** |
+|---|---|---|---|---|
+| SaveOnFoods | 79,350 | 2,680 | 0 | **2,680** |
+| Metro | 23,472 | 1,787 | 1 | **1,786** |
+| Walmart | 8,031 | 709 | 0 | **709** |
+| TandT | 18,944 | 691 | 0 | **691** |
+| Loblaws | 43,253 | 548 | 2 | **546** |
+| Voila | 66,908 | 6 | 0 | 6 |
+| NoFrills | 38,218 | 0 | 0 | 0 |
+| Galleria | 1,423 | 0 | 0 | 0 |
+
+> ### Metro's 925 multibuy events: 925 recovered. 100.0%.
+
+The categorical exclusion F5 identified is gone. D2's sample is no longer restricted to
+single-unit markdowns, and the depth asymmetry that came with it — excluded events being
+~8 pp deeper at the median, the direction that flatters retailers — is resolved, because
+the deep multibuy markdowns are back in the sample.
+
+`docs/phase-0-findings.md` has been updated: the D2 caveat now reads as resolved rather
+than as a standing scope limit, in the verdict table, the D2 section, F5, and §8.
+
+*Source: `P2_3_d2_reconciliation.sql`.*
+
+### 2.5 Cents-form contamination inside D1's surviving freeze window
+
+D1's 2024-25 window is already a NO-GO. The **2025-26 window (2025-11-01 → 2026-02-05)**
+is the only one still standing, on a provisional GO — and the cents-form defect began
+2025-10-22, ten days before that window opens.
+
+| Measure | Value |
+|---|---|
+| Loblaws rows in window | 2,135,450 |
+| **cents-form `current_price`** | **15,789 (0.739%)**, across 96 dates |
+| **cents-form `old_price`** | **2,086 (0.098%)** |
+| Every other vendor | **0** |
+| Loblaws sale events starting in window | 14,357 |
+| **…touched by cents-form** | **194 (1.35%)** |
+
+**Why this matters more than 0.7% suggests.** A price freeze is a claim about prices *not
+changing*. An unparsed reader comparing `4.49` on 2025-10-31 against `449$` on 2025-11-01
+sees a **100× price increase on the first day of the freeze window**. The sample confirms
+exactly that pattern — `449$`, `479$`, `569$` all appearing on 2025-11-01 for products
+priced $4.49, $4.79 and $5.69 the day before.
+
+That is not a subtle bias; it is a spectacular false finding waiting to be published, and
+it sits inside the one D1 window still alive. **Parsed, it is a non-issue: all 15,789 rows
+resolve correctly.** Unparsed, D1 on Loblaws would have been worthless.
+
+Recorded in `docs/phase-0-findings.md` against D1's provisional GO.
+
+*Source: `P2_5_cents_form_in_freeze_window.sql`.*
+
+### 2.4 `price_per_unit` cross-check — **blocked on Section 3, and that is the finding**
+
+The brief frames 2.4 as "now that units and prices both parse, quantify the agreement".
+**Units do not parse yet — that is Section 3.1.** Running the comparison anyway produced
+numbers that look like a devastating indictment of upstream and are actually an indictment
+of my comparison:
+
+| Vendor | Comparable rows | Agree within 1% | Median abs % diff |
+|---|---|---|---|
+| Walmart | 16 | 0.00% | 9900% |
+| SaveOnFoods | 45,580 | 22.42% | 83.3% |
+| Voila | 17,494 | 38.38% | 83.3% |
+| Loblaws | 38,264 | 45.15% | 67.0% |
+| Metro | 32,200 | 45.43% | 9.75% |
+| NoFrills | 22,414 | 56.49% | 0.00% |
+
+*(4% deterministic sample of rows with a non-blank `price_per_unit`: 2,313,447 sampled,
+2,227,517 parsed, 155,972 comparable on a matching basis.)*
+
+**Do not read those percentages as disagreement rates.** Adjudicating ten of them shows
+the two fields measure **different quantities**:
+
+| Vendor | `price_per_unit` | upstream says | we say | What is actually going on |
+|---|---|---|---|---|
+| Loblaws | `$1.00/1ea` | 1.00 | 23.99 | ours is the **pack** price, upstream's is the **per-item** price |
+| Loblaws | `$399.00/100ea` | 399.00 | 3.99 | upstream quotes per *100* each |
+| SaveOnFoods | `$1.30 each` | 1.30 | 25.99 | same: pack vs item |
+| Voila | `$0.41/item` | 0.41 | 6.49 | same |
+| Metro | `$4.49 ea.$0.94 /100ml` | 4.49 | 4.00 | multibuy: ours is the unit price after division, upstream's is the single-unit shelf price |
+
+`price_per_unit` is `current_price ÷ pack_count`. `stg_price.unit_price` is the price of
+the *listing*. **Reconciling them requires `pack_count`, which comes from parsing `units`
+— Section 3.1.** Until that exists, any agreement rate computed here is comparing a
+6-pack's price against one can's price and calling the difference an error.
+
+**So 2.4 is deferred to Section 3, and the brief's ordering has a dependency it does not
+state.** Two things are worth recording now:
+
+1. **Where the bases genuinely match and no pack count is involved, agreement is good.**
+   No Frills shows a median absolute difference of **0.00%** across 22,414 comparable rows,
+   and Metro 9.75% — the latter inflated by multibuy rows where upstream quotes the shelf
+   price and we quote the divided price. Both are consistent with Phase 0 C2's finding
+   that `price_per_unit` is *better* than CLAUDE.md implies.
+2. **`price_per_unit` carries a pack count we do not otherwise have.** `$1.00/1ea` against
+   a $23.99 listing implies a 24-pack. That makes it a **cross-check on the unit parser**
+   in Section 3, not merely a field to validate — which is a more useful role than the
+   brief anticipated.
+
+*Source: `P2_4_price_per_unit_crosscheck.sql`. Reported as a sample, with n stated.*
+
+### 2.6 SKU-reuse risk heuristic — **risk measured, nothing built on it**
+
+Explicitly not a deliverable. Section 4's owned key rests on `(vendor, sku)` being a
+stable identity; §1.3 verified that across two snapshots two days apart, which cannot rule
+out a slower failure — a vendor retiring a SKU and later reusing the string for a
+different product. If that happens, one key silently splices two unrelated price series.
+
+Heuristic: for keys with an observation gap > 30 days, does the price level shift
+discontinuously on resumption? Compared against a baseline of normal 1–7 day gaps.
+
+| | Long gaps (>30d) | Baseline (1–7d) |
+|---|---|---|
+| Events | 118,430 | 58,826,990 |
+| Distinct keys | 76,824 | — |
+| Median gap | 73 days | — |
+| **Median price move** | **0.00%** | **0.00%** |
+| **Moves > 50%** | **3,845 (3.25%)** | **0.41%** |
+| Moves > 200% | 663 (0.56%) | — |
+
+**The signal is real but small.** Large price moves are **8× more likely** after a long gap
+than after a normal one (3.25% vs 0.41%). The median move is zero in both, so the typical
+long gap is entirely benign — it is the tail that differs.
+
+Per vendor, the >200% moves concentrate sharply:
+
+| Vendor | Gap events | Median gap | Moves > 200% |
+|---|---|---|---|
+| **Walmart** | 27,828 | 51 days | **416** |
+| Metro | 18,083 | 69 days | 95 |
+| Galleria | 5,639 | 106 days | 59 |
+| SaveOnFoods | 4,497 | 70 days | 55 |
+| Loblaws | 23,467 | 73 days | 16 |
+| NoFrills | 29,196 | 71 days | 15 |
+| TandT | 5,925 | 76 days | 7 |
+| Voila | 3,795 | 94 days | **0** |
+
+The sample makes the mechanism visible — and it is **not grocery repricing**:
+
+| Vendor | SKU | Gap | Before | After | Move |
+|---|---|---|---|---|---|
+| Metro | `4341` | 458 d | $16.90 | **$14,858.40** | 87,820% |
+| Walmart | `226PJRK24U5X` | 37 d | $4.37 | $1,074.00 | 24,477% |
+| Walmart | `3RGEXVPTBDWG` | 122 d | $0.99 | $170.90 | 17,163% |
+| Walmart | `6000205233379` | 615 d | $13.47 | $2,196.00 | 16,203% |
+
+Two things stand out. **Walmart's opaque marketplace IDs** (`226PJRK24U5X`) jump from
+grocery scale to appliance scale, which is what a reused marketplace listing slot looks
+like. And **Metro SKU `4341` is a four-digit PLU produce code** — exactly the shared,
+non-unique code space Phase 0 B4c identified, where reuse is expected rather than
+surprising.
+
+**Verdict, as a risk statement.** An upper bound of **663 gap events across 76,824 keys
+with gaps (0.56%)** show a discontinuity large enough to be consistent with SKU reuse.
+That is an upper bound, not an estimate: a genuine relisting at a new price, a seasonal
+item returning, or a unit-size change would all look identical here. The heuristic cannot
+separate them and no attempt is made to.
+
+**What this changes: nothing yet, deliberately.** It is not enough to complicate Section
+4's key, and acting on 0.56% by adding a splice-detection layer would be building
+machinery for a problem we have not confirmed exists. It is enough to justify two things
+in a later phase: excluding four/five-digit PLU-style SKUs from single-vendor time series,
+and treating Walmart marketplace IDs as a lower-confidence identity tier than grocery
+SKUs. Both are Phase 2 decisions.
+
+*Source: `P2_6_sku_reuse_heuristic.sql`.*
+
+---
+
+## Section 2 — what changed, in one place
+
+| Item | Before | After |
+|---|---|---|
+| `current_price` computable | 98.06% (naive cast) | **100.000%** |
+| Unparsed `current_price` rows | 1,303,020 | **33** |
+| D2 events lost to price shape | 6,421 | **3** |
+| Metro multibuy events in D2 | 0 of 925 | **925 of 925** |
+| Price shapes handled | 1 (scalar) | 9 named, 4 repair rules |
+| Cents-form vendors known | Loblaws | **Loblaws + Walmart**, 4 variants |
+| `old_price` junk identified | — | **869,495 rows of `was`** |
+
+**Not done in Section 2, and why:** 2.4's agreement quantification is deferred to Section
+3 because it needs `pack_count` from the unit parser, which does not exist yet.
+
+## Section 3 — Unit representation
+
+Not started. Awaiting sign-off on Section 2.

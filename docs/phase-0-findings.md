@@ -575,7 +575,7 @@ Sale signal in `other` = contains `sale` or `rollback` (Walmart's markdown word)
 | # | Finding | Coverage number | Verdict |
 |---|---|---|---|
 | **D1** | Price freeze (Nov 1 – Feb 5) | **2024-25: Metro 474 of 14,288 SKUs (3.32%) at ≥90% coverage; 20 with zero gaps — and the 474 is a frozen/packaged slice, not a sample (F2).** 2025-26: Metro 5,977 (54.23%); **0** with zero gaps, composition unchecked | **NO-GO for 2024-25 · *provisional* GO for 2025-26** |
-| **D2** | Sale honesty (price raised pre-sale) | 566,564 events; 279,599 with 14d continuous history; **273,873 usable *pre-parse*** | **GO.** Scope is currently single-unit markdowns — a **pre-parse limit, not a permanent one** (F5). Phase 1 §2.3 re-measures it after price parsing. Product mix is representative (F6) |
+| **D2** | Sale honesty (price raised pre-sale) | 566,564 events; 279,599 with 14d continuous history; **279,596 usable after Phase 1 parsing** | **GO, and the scope limit is GONE.** Phase 1 §2.3 recovered 6,418 of the 6,421 excluded events, including **all 925 Metro multibuy events (100%)**. Only 3 events remain unusable. Product mix is representative (F6) |
 | **D3** | Shrinkflation | Structural for the 86.2% with a sku; representable but **0 credible cases in 1,004 pairs** for the rest (F4) | **NO-GO** |
 | **D4** | Cross-vendor basket | **3,477** reliable-only GTINs with 90+ shared days; 1,560 with 365+ | **GO** |
 
@@ -619,6 +619,25 @@ Among the well-covered SKUs that do exist, the share holding a flat price all wi
 Say so plainly rather than reporting 15.19% of 474.** The 2025-26 window is workable at
 n=5,977, with the caveat that no Metro SKU has a gapless record.
 
+> #### Phase 1 §2.5: a defect sits inside the surviving 2025-26 window
+>
+> The cents-form price defect (`449$` meaning $4.49) began **2025-10-22 — ten days before
+> the 2025-26 freeze window opens** — and runs through it at ~175 Loblaws rows/day:
+> **15,789 cents-form `current_price` rows (0.739% of Loblaws rows in the window) across
+> 96 dates, plus 2,086 in `old_price`.** 194 of the 14,357 Loblaws sale events starting in
+> the window (1.35%) are touched. Every other vendor: zero.
+>
+> **Unparsed, this would have produced a spectacular false finding.** A reader comparing
+> `4.49` on 2025-10-31 against `449$` on 2025-11-01 sees a 100× price increase on day one
+> of a *price freeze* window. The observed data is exactly that pattern — `449$`, `479$`,
+> `569$` all appearing on 2025-11-01 for products priced $4.49, $4.79 and $5.69 the day
+> before.
+>
+> **Parsed, it is a non-issue:** all 15,789 rows resolve correctly through
+> `stg_price.normalization = 'cents_div100'`. D1's provisional GO for 2025-26 survives —
+> but only because the parse exists. Any D1 analysis must run on `stg_price`, never on
+> `raw.current_price`.
+
 *Source: `D1_price_freeze_coverage.sql`, `D1b_metro_freeze_diagnosis.sql`.*
 
 ### D2 — Sale honesty
@@ -646,13 +665,19 @@ analysis that needs numeric prices. Metro's low rate is the same catalogue-churn
 Caveat carried forward from C4: this counts `old_price` transitions only, so it
 **undercounts Loblaws sales by ~22.7%** (multibuy offers with no struck-out price).
 
-**Scope limit established in F5 — and it is a PRE-PARSE limit, not a permanent one:**
-as of Phase 0 the usable sample contains **only single-unit markdowns**, because every
-multibuy and per-weight-priced promotion has a non-scalar `current_price` and cannot
-survive a numeric cast. That is a property of *how the price is currently represented*,
-not of the underlying data: a `2/$7.00` offer carries a perfectly good unit price of
-$3.50 once parsed. **Phase 1 §2.3 parses these shapes and re-measures the exclusion.**
-Read F5 before publishing any D2 number, and check whether §2.3 has superseded it.
+> **RESOLVED by Phase 1 §2.3.** The scope limit below was a *pre-parse* artifact and no
+> longer applies. `stg_price` derives a unit price for 100.00% of `current_price` rows,
+> and the D2 exclusion fell from **6,421 events to 3**. All 925 Metro multibuy events are
+> recovered. The usable sample is **279,596 of 279,599**, and it is no longer restricted
+> to single-unit markdowns. The paragraph below is kept because the reasoning still
+> matters — it is why the parse was worth doing before D2 was computed.
+
+**Scope limit as it stood in Phase 0 — a PRE-PARSE limit, not a permanent one:**
+the usable sample contained **only single-unit markdowns**, because every multibuy and
+per-weight-priced promotion has a non-scalar `current_price` and could not survive a
+numeric cast. That was a property of *how the price was represented*, not of the
+underlying data: a `2/$7.00` offer carries a perfectly good unit price of $3.50 once
+parsed.
 
 *Source: `D2_sale_events_with_history.sql`.*
 
@@ -1255,16 +1280,14 @@ they are also deeper and shorter than what survives.
 on D2's retained sample is, *as things currently stand*, a statement about **single-unit
 markdowns only**. It excludes multibuy offers entirely.
 
-**This is a pre-parse limit, not a permanent scope decision.** The exclusion exists
-because `current_price` is stored as text that a numeric cast rejects — not because the
-information is missing. `2/$7.00` states a unit price of $3.50 as plainly as `3.50` does;
-we simply have not parsed it yet. **Phase 1 §2.3 parses these shapes and re-runs this
-exclusion count**, and the number below should be treated as an upper bound on the loss,
-not a fixed property of the dataset.
+**This was a pre-parse limit, not a permanent scope decision — and Phase 1 §2.3 has now
+lifted it.** The exclusion existed because `current_price` was stored as text that a
+numeric cast rejects, not because the information was missing. `2/$7.00` states a unit
+price of $3.50 as plainly as `3.50` does; it simply had not been parsed.
 
-Until that lands, any headline of the form "X% of Metro sales were preceded by a price
-increase" must read "X% of Metro *single-unit markdowns*" and must note that 925 multibuy
-events were excluded **pending parsing**.
+**Post-parse result: 6,421 excluded events → 3. All 925 Metro multibuy events recovered
+(100%).** The D2 sample is 279,596 of 279,599 evaluable events and is no longer restricted
+to single-unit markdowns.
 
 > #### Interpretation risk: the exclusion is not depth-neutral
 >
@@ -1279,8 +1302,13 @@ events were excluded **pending parsing**.
 > know this would read a benign result as evidence of benign behaviour, when part of it is
 > an artifact of which rows survived a cast.
 >
-> This is the single most important reason §2.3 is worth doing before D2 is computed, and
-> not after.
+> This was the single most important reason §2.3 was worth doing before D2 was computed
+> rather than after — and it is now **resolved**: the deep multibuy markdowns are back in
+> the sample, so the depth distribution no longer has a systematic hole on the aggressive
+> side. The lesson generalises past this instance: an exclusion created by a *parsing*
+> failure is rarely neutral with respect to the thing being measured, because the shapes
+> that fail to parse are usually the unusual offers — which is exactly where the
+> interesting behaviour lives.
 
 D2 stays a **GO**. Its scope is narrower than F1 implied.
 
@@ -1420,6 +1448,47 @@ so a private-label-scoped claim is untestable for them at any accuracy.
 
 *Source: `F7_private_label_error_analysis.sql`, `F3_private_label_detectability.sql`.*
 
+### F8. Cross-snapshot UPC drift — the measured justification for tier discipline
+
+Phase 0's argument for computing headline numbers from the reliable UPC tier rested on
+B5: an eyeball of 30 fuzzy matches, 26 of which looked right. That is a judgement on a
+sample of 30, and it was labelled as such.
+
+**Phase 1 replaced it with a measurement.** Comparing two independently published
+snapshots two days apart, across 161,290 shared `(vendor, sku)` keys:
+
+| Tier | Shared keys | UPC gained (blank → value) | UPC value changed | **Genuinely different GTIN** |
+|---|---|---|---|---|
+| **Reliable** — Metro, Galleria, Save-On-Foods, Walmart | 71,671 | **0** | **0** | **0** |
+| Fuzzy — Loblaws, No Frills, T&T, Voila | 89,619 | 10,318 | 945 | **128** |
+
+The 945 raw value changes decompose into 817 that are the same GTIN with different
+zero-padding (absorbed by B4's GTIN-14 normalisation) and **128 that are genuinely
+different product codes** — 64 at Loblaws and 64 at No Frills, the two banners sharing a
+private-label catalogue.
+
+**What this establishes.** Upstream is actively re-running its fuzzy UPC matching between
+publications. In **two days** it added 10,318 UPCs and re-pointed 128 to different
+products. The reliable tier did not move at all — not one key, in either direction.
+
+**Therefore a cross-vendor number computed from fuzzy-tier UPCs is not reproducible.**
+Re-running the same query against next week's snapshot will return a different answer, and
+the difference will be invisible unless someone diffs the snapshots. That breaks honesty
+rule 3 ("every published number is reproducible") not through any fault in our SQL but
+because the join key itself is being rewritten underneath us.
+
+This is a **stronger argument than B5**, and it supersedes it as the primary reason for
+tier discipline. B5 said fuzzy matches are *sometimes wrong*; F8 says fuzzy matches are
+*not stable*, which is worse — a wrong-but-stable key at least yields a reproducible
+number that can be corrected later. Reliable-tier-only headline numbers are not a
+conservative preference; they are the only ones that survive a re-run.
+
+Two days is a short window and a longer one may show more drift, not less. Nothing here
+suggests the reliable tier will stay perfectly still forever — only that it did not move
+at all while the fuzzy tier moved measurably.
+
+*Source: `analysis/phase1/P1_3_cross_snapshot_identity.sql` (Phase 1 §1.3).*
+
 ---
 
 ## 8. What this dataset can and cannot support
@@ -1435,21 +1504,19 @@ claim must say *four of eight vendors*, and *Toronto pickup pricing*.
 **Sale-behaviour analysis of single-unit markdowns, at scale.** 273,873 sale events with
 a full 14 days of continuous pre-sale daily history and numeric prices throughout.
 
-**Scope limit, load-bearing — and PRE-PARSE (F5):** as of Phase 0 this sample contains
-**no multibuy promotions at all** — a multibuy price is non-scalar, so every "2 for $7"
-offer is excluded by construction (925 events at Metro), as is every per-weight-priced
-promotion at Save-On-Foods (1,512) and T&T (651).
+**Scope limit RESOLVED by Phase 1 §2.3.** In Phase 0 this sample contained no multibuy
+promotions at all, because a multibuy price is non-scalar and could not survive a cast —
+925 events at Metro, 1,512 at Save-On-Foods, 651 at T&T. That was a representation
+problem, not a data problem, and parsing fixed it: **6,421 excluded events → 3**, with all
+925 Metro multibuy events recovered.
 
-**This is a representation problem, not a data problem, and Phase 1 §2.3 addresses it.**
-The unit price is recoverable from the raw text in every one of those cases.
-
-**Interpretation risk while it stands:** the excluded Metro promotions are ~8 pp deeper at
-the median (24.81% vs 16.69% off), so the pre-parse sample is missing the deepest
-markdowns — the direction that **flatters retailers**. Any conclusion drawn now about
-promotional aggressiveness is systematically conservative, and that conservatism is an
-artifact of the cast, not a finding. Until §2.3 lands, published figures must say
-*single-unit markdowns*, not *sales*, and report the excluded count. Product mix within
-the sample is representative (F6); it is promotion type that is not. This is the strongest thing in the dataset. "Was the
+**Why it mattered, recorded because the pattern will recur:** the excluded promotions were
+~8 pp deeper at the median (24.81% vs 16.69% off), so the pre-parse sample was missing the
+deepest markdowns — the direction that **flatters retailers**. Any conclusion drawn from
+it about promotional aggressiveness would have been systematically conservative, and that
+conservatism would have been an artifact of a cast rather than a fact about grocers. The
+sample is now 279,596 events with the deep markdowns restored. Product mix is
+representative (F6), and promotion type no longer is not. This is the strongest thing in the dataset. "Was the
 price raised before the sale" is answerable with a large sample — provided Loblaws
 multibuy offers are handled (E12) and non-scalar prices are parsed rather than dropped (E8).
 
@@ -1479,8 +1546,10 @@ empty, so the two groups the claim names cannot be separated at all. Voila at 0.
 effectively the same.
 
 **Any five-vendor comparison at the reliable tier.** Zero GTINs reach 5+ vendors without
-a fuzzy-matched vendor. Breadth beyond four vendors requires accepting fuzzy matches, and
-B5 found a clear mismatch in a sample of 30.
+a fuzzy-matched vendor. Breadth beyond four vendors requires accepting fuzzy matches — and
+those are not merely sometimes wrong (B5) but **not stable between publications** (F8):
+10,318 UPCs added and 128 re-pointed in two days, against zero movement in the reliable
+tier. A fuzzy-tier number is not reproducible.
 
 **Anything national, provincial, or "Canadian."** One Toronto neighbourhood, pickup price.
 
