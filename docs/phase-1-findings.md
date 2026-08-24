@@ -340,10 +340,21 @@ Repairs applied, each named and counted:
 
 | Normalization | Rows | Vendors | Price range after repair |
 |---|---|---|---|
-| `basis_rescaled` | 105,488 | Metro, T&T, Save-On-Foods | $0.0005 – $19.60 |
-| `cents_div100` | 47,707 | Loblaws | $1.00 – $84.17 |
-| `now_prefix_cents_div100` | 11,496 | Walmart | $0.38 – $25.97 |
+| `basis_rescaled` | 105,540 | Metro, T&T, Save-On-Foods | $0.0005 – $19.60 |
+| `cents_div100` | **47,992** | Loblaws | $1.00 – $84.17 |
+| `now_prefix_cents_div100` | **11,506** | Walmart | $0.38 – $25.97 |
 | `thousands_sep` | 353 | Walmart, Voila | $1,059 – $21,525 |
+
+> **Corrected after §2.5.** The first version of this table reported 47,707 and 11,496 —
+> the counts from an INNER join to `product`, which silently drops the 878,559 rows that
+> resolve to no product row (Phase 0 E2). Those are totals over a subset reported as
+> totals over everything: a denominator error, and exactly the kind honesty rule 4 exists
+> to catch. The query now LEFT joins and reports the orphan count separately. The
+> **100.00% parse coverage figure was never affected** — it was computed on `stg_price`
+> directly, with no join.
+>
+> For the same reason the per-vendor table above sums to 70,930,774, not 71,809,333: the
+> orphan rows have no vendor to attribute to.
 
 The post-repair price ranges are the sanity check that matters: a `cents_div100` applied
 to the wrong shape would produce prices in the hundreds, and the observed $1.00–$84.17
@@ -360,17 +371,21 @@ Definitions held identical to F5; only the "is this price usable" test changes, 
 
 | | Events |
 |---|---|
-| Evaluable events (unchanged) | 279,599 |
+| Evaluable events | 279,593 |
 | Lost **pre**-parse | **6,421** |
 | Lost **post**-parse | **3** |
 | **Recovered** | **6,418** |
-| **Usable now** | **279,596** |
+| **Usable now** | **~279,590** |
+
+> Figures restated after the §2.5 correctness fix. The recovery count (6,418) and the
+> Metro multibuy recovery (925 of 925) are unchanged; the totals moved by 6 events due to
+> a single hash collision in my own workaround, not the data. See §2.6.
 
 Per vendor:
 
 | Vendor | Evaluable | Lost pre-parse | Lost post-parse | **Recovered** |
 |---|---|---|---|---|
-| SaveOnFoods | 79,350 | 2,680 | 0 | **2,680** |
+| SaveOnFoods | 79,344 | 2,680 | 0 | **2,680** |
 | Metro | 23,472 | 1,787 | 1 | **1,786** |
 | Walmart | 8,031 | 709 | 0 | **709** |
 | TandT | 18,944 | 691 | 0 | **691** |
@@ -536,6 +551,235 @@ SKUs. Both are Phase 2 decisions.
 
 *Source: `P2_6_sku_reuse_heuristic.sql`.*
 
+### 2.5 Correctness sweep — **it found a fifth variant, and that one was silently wrong**
+
+Coverage said 100.00%. Coverage says a number came out; it says nothing about whether the
+number is right. The four cents-form variants in §2.1 were found by *looking twice* —
+reading a shape census, noticing `a$N`, asking what it was. That method finds the defects
+someone thought to look for.
+
+**The method that finds the fifth without looking:** a magnitude error in a price parser
+has a signature. Within one product's own history the price jumps by exactly a power of
+ten and back. Real prices do not do that. So: within each `(vendor, sku)`, flag adjacent
+observations (≤3 days apart, same `price_basis`) whose ratio sits near 100×, 0.01×, 10× or
+0.1×.
+
+#### What it caught
+
+| Vendor | Flagged pairs | x100 | x0.01 | x10 | x0.1 | **Per million pairs** |
+|---|---|---|---|---|---|---|
+| **Walmart** | **104,640** | 52,991 | 51,617 | 21 | 11 | **22,145** |
+| NoFrills | 29 | 4 | 4 | 5 | 16 | 3.4 |
+| Galleria | 14 | 0 | 0 | 9 | 5 | 2.5 |
+| Voila | 18 | 4 | 3 | 4 | 7 | 1.7 |
+| TandT | 3 | 0 | 0 | 0 | 3 | 0.6 |
+| Loblaws | 7 | 3 | 3 | 1 | 0 | 0.6 |
+| Metro | 3 | 1 | 2 | 0 | 0 | 0.5 |
+| SaveOnFoods | 2 | 0 | 0 | 1 | 1 | 0.3 |
+
+Walmart sat **four orders of magnitude above every other vendor**. That is not a price
+pattern; that is a parser bug.
+
+The sample showed the mechanism immediately: the same SKU reads `298` one day (parsed as
+**$298.00**) and `Now$298` the next (parsed correctly as **$2.98**).
+
+#### The fifth variant: Walmart bare-integer cents
+
+Walmart writes some prices as a **bare integer in cents with no marker at all**. `298`
+means $2.98. There is no `$`, no `Now`, nothing to distinguish it from a dollar amount —
+so it parsed cleanly, produced a plausible number, and was wrong by 100×. **This is the
+defect class the sweep exists to catch: not a parse failure, a parse success at the wrong
+magnitude.** Nothing in the coverage report could ever have shown it.
+
+#### Adjudication, before writing any rule
+
+Rather than assume "Walmart bare integer = cents", each bare-integer row was checked
+against the same SKU's nearest non-bare price within 7 days:
+
+| Walmart magnitude | Adjudicable rows | Matches **dollars** | Matches **cents** | Verdict |
+|---|---|---|---|---|
+| < 10 | 1,631 | **1,189** | 0 | dollars |
+| 10–99 | 3,008 | 1,767 | 1,048 | **genuinely ambiguous** |
+| 100–999 | 58,267 | **0** | 56,567 | cents |
+| 1000+ | 8,271 | **0** | 7,878 | cents |
+
+Galleria also has 26,306 bare integers, but only 131 are adjudicable and they split 21/21
+— **no evidence, so no rule.** Galleria keeps the literal reading. Assuming the two
+vendors shared one defect would have introduced a new error while fixing another.
+
+#### The rule, and its cost
+
+`normalization = 'bare_integer_cents'` for Walmart bare integers ≥ 100: **79,478 rows**,
+now reading $1.00–$69.96 instead of $100–$6,996.
+
+The 10–99 band is **not converted**. The evidence is genuinely mixed there, so those rows
+keep the literal reading and get `parse_confidence = 'ambiguous'` — flagged, never
+guessed. **20,555 Walmart rows** carry that flag.
+
+**This is a vendor-specific rule and therefore a maintenance liability.** It is justified
+because the evidence is one-sided rather than suggestive — 0 of 66,538 rows ≥100 matched a
+dollars reading — and because the alternative is knowingly leaving 79,478 rows wrong by
+100×. The magnitude bands are not arbitrary: each is where the evidence changes sign.
+
+#### Did the fix hold? Re-sweep
+
+| | Before fix | After fix |
+|---|---|---|
+| Flagged pairs | **104,716** | **1,825** |
+| Walmart | 104,640 | 1,749 |
+
+**A 98.3% reduction.** The residual 1,825 is itself informative:
+
+- **~1,700 Walmart pairs are the 10–99 ambiguous band** — the rows deliberately flagged
+  rather than converted. The sweep confirming they still flip 98.00 ↔ 0.98 is the system
+  working: the uncertainty is marked, not hidden.
+- **7 Voila pairs are a sixth defect.** Voila SKUs read `19.26` one day and `1,926.25` the
+  next, so Voila's thousands-separator form is *also* cents. Walmart's thousands-separator
+  values (`4,898.99`) are marketplace electronics and appear genuine, so this is not a
+  general rule about the shape. **23 Voila rows** — too few to justify a third
+  vendor-specific *conversion* rule, so they are flagged `ambiguous` on the same principle
+  as the Walmart band. Documented rather than silently converted.
+
+**Total flagged `ambiguous`: 20,578 rows** (Walmart 20,555, Voila 23). These have a
+`unit_price` that may be wrong by 100×, and downstream must filter on
+`parse_confidence <> 'ambiguous'` for any magnitude-sensitive analysis.
+
+**What this changes in the Section 2 numbers:** the D2 recovery figure (6,418) is
+unchanged, because those rows always parsed — just wrongly. Coverage stays 100.00%. What
+changed is that **79,478 rows now carry the right value instead of a plausible wrong one**,
+and 20,578 carry an honest warning instead of false confidence.
+
+*Source: `P2_7_magnitude_sweep.sql`, `P2_9_bare_integer_adjudication.sql`.*
+
+### 2.6 Ordering of the fixes, stated
+
+**Question: were the Walmart `Now$NNN` and `NN¢` variants fixed before or after the
+100.00% and 6,418 figures were computed?**
+
+**Before.** Verified from git rather than from memory: `models/price_parse_macros.sql` has
+exactly one committed version, and it contains `p_is_now_cents` and `p_is_cent_sym` from
+the first line of it. The sequence was: P2.1 shape census surfaced the `a$N` and `N¢`
+signatures → examples retrieved (`Now$298`, `99¢`) → P2.1b quantified them → **then** the
+macros were written with all four variants → model built → coverage and recovery computed.
+
+No recomputation was needed for those two. **The bare-integer variant found in §2.5 is a
+different matter** — it was found *after*, and both figures were recomputed against the
+fixed build. The current numbers are:
+
+| Figure | Value | Changed by the §2.5 fix? |
+|---|---|---|
+| `current_price` computable | 100.000% | no |
+| Unparsed rows | 33 | no |
+| D2 events recovered | **6,418** | no |
+| Metro multibuy recovered | **925 of 925** | no |
+| D2 evaluable events | 279,599 → **279,593** | yes, by 6 |
+| D2 usable events | 279,596 → **279,590** | yes, by 6 |
+| Sale events total | 566,564 → **566,558** | yes, by 6 |
+
+**The 6-event drift is not from the price fix — it is a hash collision, and it is mine.**
+To work around a DuckDB 1.5.5 statistics bug, the queries key on
+`hash(vendor || '|' || sku)` rather than the string pair. There is **exactly 1 collision
+in 161,300 keys**, which merges two products into one series and costs 6 sale events.
+Measured, not estimated. It is a 0.0006% effect on a number reported to 6 significant
+figures, so the honest statement is that D2's usable sample is **~279,590**, and the last
+digit should not be leaned on.
+
+### 2.7 `old_price`: value versus presence
+
+D2 is not one analysis. Its sub-questions need `old_price` differently, and the 869,495
+`'was'` rows are usable for some and useless for others.
+
+| D2 sub-analysis | Needs old_price as… | Affected by `'was'`? |
+|---|---|---|
+| **Was the price raised before the sale?** *(the one that matters)* | **flag only** — locate the event; the pre-sale level comes from `current_price` over the prior 14 days | **No** |
+| How often does this product go on sale? | flag only | No |
+| Time since previous sale | flag only | No |
+| Is it "always on sale"? | flag only | No |
+| **How deep was the discount?** | **numeric value** | **Yes** |
+| Did the discount deepen over the sale run? | numeric value | Yes |
+| Sale price vs cross-vendor comparison | numeric value | Yes |
+
+**The pre-sale-inflation test — the one that matters — needs `old_price` only as a flag.**
+It locates the sale event; the pre-sale price level comes from `current_price` across the
+preceding 14 days, which parses at 100%. So the `'was'` rows do not touch it.
+
+Row-level coverage, presence vs usable value:
+
+| Vendor | Rows | old_price **present** | old_price **usable value** | Present but valueless |
+|---|---|---|---|---|
+| **Loblaws** | 14,013,669 | 18.53% | **12.38%** | **33.18%** |
+| NoFrills | 11,024,382 | 13.98% | 13.91% | 0.50% |
+| SaveOnFoods | 7,093,027 | 33.07% | 33.07% | 0.00% |
+| Metro | 8,203,156 | 29.53% | 29.52% | 0.00% |
+| Voila | 12,937,809 | 19.05% | 19.05% | 0.00% |
+| Walmart | 6,372,804 | 11.53% | 11.53% | 0.00% |
+| TandT | 5,393,781 | 6.19% | 6.19% | 0.00% |
+| Galleria | 5,892,146 | 0.92% | 0.92% | 0.00% |
+
+#### D2's Loblaws exposure, stated
+
+The row-level figure (33.18% of Loblaws sale rows carry no usable value) **does not
+translate to a 33% loss at the event level**, because a sale event spans several days and
+needs only one day with a value:
+
+| Vendor | D2 evaluable events | With a usable `old_price` value | **Flag-only** |
+|---|---|---|---|
+| **Loblaws** | 43,253 | **39,274 (90.80%)** | **3,979 (9.20%)** |
+| NoFrills | 38,218 | 38,014 (99.47%) | 204 |
+| Every other vendor | — | **100.00%** | 0 |
+
+**So D2's Loblaws exposure is:**
+
+- **Pre-sale-inflation test: 43,253 of 43,253 events usable — zero exposure.** It needs
+  the flag, not the value.
+- **Any discount-depth analysis: 39,274 of 43,253 usable (90.80%), losing 3,979 events.**
+  That loss is Loblaws-specific and must be reported with its denominator whenever depth
+  is quoted, because no other vendor loses anything.
+
+The practical consequence: **a cross-vendor discount-depth comparison silently
+under-samples Loblaws by 9.2%** unless the exclusion is stated. Given Loblaws is the
+largest vendor by row count, that is worth carrying forward rather than discovering later.
+
+*Source: `P2_8_old_price_value_vs_presence.sql`.*
+
+### Reproducibility of the materialisation — asserted, not claimed
+
+`stg_price` is a **cache, not an artifact**. Every value is a pure function of (a) the
+immutable snapshot under `data/snapshots/<id>/`, verified by sha256, and (b) the committed
+SQL in `models/`. Nothing is hand-edited, nothing accumulates across builds — the model is
+dropped and recreated in full each run.
+
+`scripts/verify_reproducible.py` checks this rather than asserting it: it recomputes the
+model definition as a view over `raw` and compares an order-independent checksum per
+column against the materialised table.
+
+```
+cached rows     : 71,809,333
+recomputed rows : 71,809,333
+  ok  src_rowid ... ok  other_raw      (21 columns)
+
+OK - stg_price matches its definition across 21 columns.
+     The materialisation is a cache and can be deleted safely.
+```
+
+The verifier attaches the database **read-only** and creates its macros in a separate
+in-memory catalog — a verifier that can modify what it verifies is not a verifier.
+
+Rebuilding from nothing:
+
+```bash
+python scripts/load_snapshot.py 20260822T134045Z --db hammer.duckdb
+python scripts/build_models.py --db hammer.duckdb --materialize table
+python scripts/verify_reproducible.py --db hammer.duckdb
+```
+
+**One build bug found and fixed while establishing this.** `build_models.py` issued
+`DROP VIEW IF EXISTS` before `DROP TABLE IF EXISTS`; DuckDB *raises* rather than no-ops
+when the type mismatches, so the first rebuild after the §2.5 fix failed — and, worse,
+the subsequent queries ran happily against the **stale** table while the log showed a
+failure several screens earlier. The script now checks the existing object's type before
+dropping. A build step that can silently leave old data in place is exactly the failure
+mode Section 5's reconciliation tests are meant to catch, arriving early.
 ---
 
 ## Section 2 — what changed, in one place
@@ -546,13 +790,19 @@ SKUs. Both are Phase 2 decisions.
 | Unparsed `current_price` rows | 1,303,020 | **33** |
 | D2 events lost to price shape | 6,421 | **3** |
 | Metro multibuy events in D2 | 0 of 925 | **925 of 925** |
-| Price shapes handled | 1 (scalar) | 9 named, 4 repair rules |
-| Cents-form vendors known | Loblaws | **Loblaws + Walmart**, 4 variants |
+| Price shapes handled | 1 (scalar) | 9 named, **5 repair rules** |
+| Cents-form vendors known | Loblaws | **Loblaws + Walmart**, **5 variants** |
+| Rows silently wrong by 100× | **79,478** (undetected) | **0** |
+| Rows flagged `ambiguous` | — | **20,578** (honest uncertainty) |
 | `old_price` junk identified | — | **869,495 rows of `was`** |
+| Materialisation verified reproducible | — | **21 of 21 columns** |
 
 **Not done in Section 2, and why:** 2.4's agreement quantification is deferred to Section
-3 because it needs `pack_count` from the unit parser, which does not exist yet.
+3, which now has an additional job: `price_per_unit`'s implied `pack_count` becomes a
+**cross-check on the unit parser**, not a field to be validated against it.
 
 ## Section 3 — Unit representation
 
-Not started. Awaiting sign-off on Section 2.
+Not started. The §2.5 correctness sweep found a defect that required rebuilding the model
+and recomputing every Section 2 figure, so those are reported first rather than building
+Section 3 on numbers that had just moved.

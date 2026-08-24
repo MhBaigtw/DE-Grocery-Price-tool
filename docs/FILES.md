@@ -81,6 +81,12 @@ Read these in order to understand the project from scratch:
 **Depends on:** `models/`, a loaded snapshot database.
 **Notes:** Asserts row count in == row count out and refuses to continue on a mismatch — silent row loss is the failure mode this catches. Defaults to a view; `--materialize table` trades ~2.1 GB of disk for query speed, which is what the current build uses because the regex parse over 71.8M rows made every downstream query cost minutes.
 
+### scripts/verify_reproducible.py
+**Purpose:** Asserts that the materialised `stg_price` is a cache rather than an artifact — every value a pure function of the immutable snapshot plus the committed SQL.
+**Breaks if removed:** The 2.1 GB materialisation becomes a thing you have to trust rather than something you can check, and a stale build could diverge from its definition unnoticed.
+**Depends on:** `models/`, a built snapshot database.
+**Notes:** Attaches the database READ-ONLY and creates its macros in a separate in-memory catalog — a verifier that can modify what it verifies is not a verifier. Compares an order-independent checksum per column, so it catches content drift, not just row counts.
+
 ### docs/FILES.md
 **Purpose:** This manifest, plus the reading order above.
 **Breaks if removed:** `scripts/check_manifest.py` exits 2 and the repo loses its drift check.

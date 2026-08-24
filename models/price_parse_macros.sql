@@ -170,3 +170,65 @@ CREATE OR REPLACE MACRO p_confidence(x) AS
       OR p_is_cent_sym(x) OR p_is_multibuy(x)             THEN 'derived'
     WHEN p_is_perweight(x) AND p_basis(x) IS NOT NULL     THEN 'inferred'
     ELSE 'none' END;
+
+-- ---------------------------------------------------------------- vendor-specific repair
+-- WALMART BARE-INTEGER CENTS. Found by the P2.7 magnitude sweep, adjudicated in P2.9.
+--
+-- Walmart writes some prices as a bare integer in CENTS with no marker at all: '298'
+-- meaning $2.98. The same SKU often reads 'Now$298' on the adjacent day, which is how the
+-- sweep caught it. Before this rule, 129,456 rows parsed "successfully" at up to 100x
+-- their true value -- the worst kind of defect, because nothing looked wrong.
+--
+-- THIS IS A VENDOR-SPECIFIC RULE AND THEREFORE A MAINTENANCE LIABILITY. It is justified
+-- here because the evidence is one-sided rather than suggestive: of 66,538 Walmart bare
+-- integers >= 100 that could be checked against the same SKU's neighbouring non-bare
+-- price, ZERO matched a dollars reading and 64,445 matched cents. The alternative to the
+-- rule is knowingly leaving 79,478 rows wrong by 100x.
+--
+-- The magnitude bands are NOT arbitrary -- each is where the evidence changes:
+--   >= 100  cents      0 of 66,538 matched dollars. Unambiguous.
+--   10..99  AMBIGUOUS  1,767 matched dollars, 1,048 matched cents. Genuinely mixed, so
+--                      the literal reading is kept and the row is flagged rather than
+--                      guessed. Never silently coerce.
+--   < 10    dollars    1,189 matched dollars, 0 matched cents.
+-- Galleria also has bare integers (26,306) but only 131 are adjudicable and they split
+-- 21/21 -- no evidence, so no rule. Galleria keeps the literal reading.
+CREATE OR REPLACE MACRO p_is_bare_int(x) AS regexp_matches(p_clean(x), '^[0-9]+$');
+
+CREATE OR REPLACE MACRO p_wm_cents(vendor, x) AS
+  (vendor = 'Walmart' AND p_is_bare_int(x)
+   AND try_cast(p_clean(x) AS DOUBLE) >= 100);
+
+CREATE OR REPLACE MACRO p_wm_ambiguous(vendor, x) AS
+  (vendor = 'Walmart' AND p_is_bare_int(x)
+   AND try_cast(p_clean(x) AS DOUBLE) >= 10
+   AND try_cast(p_clean(x) AS DOUBLE) < 100);
+
+-- Vendor-aware wrappers. stg_price uses these; the vendor-blind macros above remain the
+-- definition for every shape that does not need vendor context.
+CREATE OR REPLACE MACRO p_unit_price_v(vendor, x) AS
+  CASE WHEN p_wm_cents(vendor, x) THEN try_cast(p_clean(x) AS DOUBLE) / 100.0
+       ELSE p_unit_price(x) END;
+
+CREATE OR REPLACE MACRO p_normalization_v(vendor, x) AS
+  CASE WHEN p_wm_cents(vendor, x) THEN 'bare_integer_cents'
+       ELSE p_normalization(x) END;
+
+-- VOILA THOUSANDS-SEPARATOR PRICES are also suspect. The P2.7 re-sweep found Voila SKUs
+-- reading 19.26 one day and '1,926.25' the next -- i.e. the comma form is cents, and the
+-- thousands_sep repair yields 100x the true price. Walmart's thousands_sep values
+-- (4,898.99 and similar) are marketplace electronics and appear genuine, so this is NOT a
+-- general rule about the shape.
+--
+-- 23 Voila rows is not enough to justify a third vendor-specific CONVERSION rule -- rules
+-- have a maintenance cost and each one is a place for a future defect to hide. So these
+-- are FLAGGED, not converted: the literal reading is kept and parse_confidence says it
+-- cannot be trusted. Downstream filters on confidence; nothing is silently guessed.
+CREATE OR REPLACE MACRO p_voila_thousands(vendor, x) AS
+  (vendor = 'Voila' AND p_is_thousands(x));
+
+CREATE OR REPLACE MACRO p_confidence_v(vendor, x) AS
+  CASE WHEN p_wm_cents(vendor, x)       THEN 'derived'
+       WHEN p_wm_ambiguous(vendor, x)   THEN 'ambiguous'
+       WHEN p_voila_thousands(vendor, x) THEN 'ambiguous'
+       ELSE p_confidence(x) END;
