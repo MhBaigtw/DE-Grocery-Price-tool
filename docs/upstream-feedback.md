@@ -59,10 +59,47 @@ just a documented note that this happens and how often. Silence is the costly pa
 
 ---
 
-## 2. Your documentation says `product.id` changes daily. In this snapshot it never does.
+## 2. Fix the Walmart field misalignment: product name is landing in `units`, price text in `brand`
+
+**Friction.** Three distinct problems in one field:
+
+- **`units` is literally the string `error`** for **409 products** across Walmart,
+  No Frills, Voila and Loblaws. An error token was written into a data field.
+- **Walmart's `units` frequently contains the product name, not the size.** We first
+  read this as stray marketing copy, but `concatted` — whose format is
+  `vendor~product_name@units^brand` — shows it is **field misalignment in the Walmart
+  extractor**: the units slot holds a verbatim copy of the product name, and the brand
+  slot sometimes holds price text with embedded newlines. For example:
+  `Walmart~SkinnyPop Skinnypack Gluten Free Popcorn@SkinnyPop Skinnypack Gluten Free Popcorn^$5.57
+current price $5.57
+$5.16/100g`.
+  This single cause explains both the 51.38% unit parse rate and part of the 32.48%
+  blank-brand rate.
+- **257 products contain a non-breaking space (U+00A0)** inside `units` (Metro 235,
+  Walmart 22).
+
+**What it cost us.** A deliberately simple unit parser reaches 99%+ on five vendors but
+only **51.38% on Walmart** — and the gap is almost entirely marketing copy, not parser
+weakness. Our parse rate across all vendors is 88.12% of products that have a units
+string; Walmart alone accounts for most of the shortfall.
+
+The non-breaking space deserves special mention because it is genuinely nasty: it is
+visually identical to a space, and `\s` in most regex engines does **not** match it. So
+`2<nbsp>l` silently fails to parse while `2 l` succeeds, with no visible difference in any
+console or spreadsheet. We only found it by hex-dumping values that "obviously should have
+parsed."
+
+**Smallest fix.** Three cheap, independent wins: (a) write NULL instead of `error`;
+(b) `.replace(' ', ' ')` on extraction; (c) for Walmart, treat the size field as
+absent rather than filling it with the nearest available attribute string. (c) is the
+biggest win and probably the most work; (a) and (b) are close to free.
+
+---
+
+## 3. Your documentation says `product.id` changes daily. In this snapshot it never does.
 
 **This is a documentation defect, and we are listing it separately from the feature
-request in §3 because the two need different fixes: §3 is "please add a guarantee", this
+request in §4 because the two need different fixes: §4 is "please add a guarantee", this
 is "please correct a statement that is currently false."**
 
 **Friction.** The column documentation states, for both `product.id` and
@@ -120,20 +157,20 @@ Either resolves it. The current text is the only option that is actively mislead
 
 ---
 
-## 3. Ship an explicit `product_key` column
+## 4. Ship an explicit `product_key` column
 
-**This is the feature request that follows from §2.** §2 asks you to correct a false
+**This is the feature request that follows from §3.** §3 asks you to correct a false
 statement; this asks for something that does not exist yet. They are separable — you could
-do §2 alone and we would be most of the way there.
+do §3 alone and we would be most of the way there.
 
-**Friction.** Even granting everything in §2, downstream consumers currently have to
+**Friction.** Even granting everything in §3, downstream consumers currently have to
 *derive* product identity by concatenating `vendor` and `sku` themselves, and to handle
 the blank-sku fallback themselves. Everyone doing this independently will do it slightly
 differently — different case handling, different treatment of the 25,728 blank-sku rows
 (13.8% of the catalogue), different decisions about whether `Loblaws20064552_EA` and
 `Loblaws 20064552_EA` are the same thing.
 
-**What it cost us.** Less than §2 — the derivation is easy once you know the rule. The
+**What it cost us.** Less than §3 — the derivation is easy once you know the rule. The
 cost is not difficulty, it is *divergence*: two analyses of your dataset that reach
 different numbers because they keyed products differently are worse for the project's
 credibility than either being slightly wrong on its own.
@@ -149,12 +186,12 @@ instead of a breaking one. Our own identity layer is derived and owned on our si
 precisely so that an upstream id type change stays an ingest-layer detail — but we should
 not have to have made that call blind.
 
-**Where we disagree with ourselves:** if you only ever do one of §2 or §3, do §2. A
+**Where we disagree with ourselves:** if you only ever do one of §3 or §4, do §3. A
 correct sentence about what exists beats a new column with the old warning still attached.
 
 ---
 
-## 4. Fix or document the ~878K price rows that join to nothing
+## 5. Fix or document the ~878K price rows that join to nothing
 
 **Friction.** 878,559 `raw` rows (**1.22%**) have a `product_id` with no matching
 `product.id`. They are prices with no vendor, no name, no sku, no UPC.
@@ -186,7 +223,7 @@ which looks like a truncated field in that day's extract.
 
 ---
 
-## 5. The documented small-basket end date is a month off
+## 6. The documented small-basket end date is a month off
 
 **Friction.** The docs say the small-basket period ran **Feb 28 – Jul 10/11 2024**. The
 data says the regime change is **2024-06-10/11**:
@@ -209,7 +246,7 @@ either wrongly exclude 2024-06-11 → 2024-07-10, or wrongly treat it as small-b
 
 ---
 
-## 6. Normalise UPCs to a fixed width, or say that they are not normalised
+## 7. Normalise UPCs to a fixed width, or say that they are not normalised
 
 **Friction.** UPC values appear at 4, 5, 6, 8, 10, 11, 12, 13 and 14 digits. The 11-digit
 values (14,901 products) are almost always UPC-A with the leading zero stripped, so
@@ -229,43 +266,6 @@ into a packaged-goods identifier space. Both are defensible; neither is signpost
 **Smallest fix.** Either store UPCs zero-padded to 14 digits, or add one line to the docs:
 "UPC values are stored as extracted and are not width-normalised; 4–5 digit values are PLU
 produce codes, not UPCs." The documentation fix alone removes most of the risk.
-
----
-
-## 7. `units` contains non-unit content for some vendors
-
-**Friction.** Three distinct problems in one field:
-
-- **`units` is literally the string `error`** for **409 products** across Walmart,
-  No Frills, Voila and Loblaws. An error token was written into a data field.
-- **Walmart's `units` frequently contains the product name, not the size.** We first
-  read this as stray marketing copy, but `concatted` — whose format is
-  `vendor~product_name@units^brand` — shows it is **field misalignment in the Walmart
-  extractor**: the units slot holds a verbatim copy of the product name, and the brand
-  slot sometimes holds price text with embedded newlines. For example:
-  `Walmart~SkinnyPop Skinnypack Gluten Free Popcorn@SkinnyPop Skinnypack Gluten Free Popcorn^$5.57
-current price $5.57
-$5.16/100g`.
-  This single cause explains both the 51.38% unit parse rate and part of the 32.48%
-  blank-brand rate.
-- **257 products contain a non-breaking space (U+00A0)** inside `units` (Metro 235,
-  Walmart 22).
-
-**What it cost us.** A deliberately simple unit parser reaches 99%+ on five vendors but
-only **51.38% on Walmart** — and the gap is almost entirely marketing copy, not parser
-weakness. Our parse rate across all vendors is 88.12% of products that have a units
-string; Walmart alone accounts for most of the shortfall.
-
-The non-breaking space deserves special mention because it is genuinely nasty: it is
-visually identical to a space, and `\s` in most regex engines does **not** match it. So
-`2<nbsp>l` silently fails to parse while `2 l` succeeds, with no visible difference in any
-console or spreadsheet. We only found it by hex-dumping values that "obviously should have
-parsed."
-
-**Smallest fix.** Three cheap, independent wins: (a) write NULL instead of `error`;
-(b) `.replace(' ', ' ')` on extraction; (c) for Walmart, treat the size field as
-absent rather than filling it with the nearest available attribute string. (c) is the
-biggest win and probably the most work; (a) and (b) are close to free.
 
 ---
 
@@ -341,18 +341,30 @@ built on:
 | Rank | Item | Consumer cost if unfixed | Effort to fix | Why this rank |
 |---|---|---|---|---|
 | 1 | Scalar `current_price` (§1) | **Silent 2× price errors, or silent loss of 7.6% of your best vendor** | Medium | Only item here that produces confidently wrong numbers rather than missing ones |
-| 2 | **`product.id` doc contradiction (§2)** | **Consumers either over-engineer around a non-problem, or learn to ignore your warnings — right before a breaking change** | **One sentence** | Best effort-to-value ratio in the document. Ranked above the feature request because a *wrong* statement is more harmful than a *missing* one |
-| 3 | Stable product key (§3) | Every consumer re-derives identity defensively | Low | The guarantee itself, once §2 says what is true today |
-| 4 | Orphan rows (§4) | Every join needs a denominator caveat | Low (doc) / High (fix) | The doc fix alone captures most of the value |
-| 5 | Small-basket date (§5) | A month of good data wrongly discarded | **Trivial** | Pure documentation error, near-zero cost |
-| 6 | UPC width + PLU (§6) | Cross-vendor matches silently split | Low | Affects the number most consumers care about most |
-| 7 | `units` field misalignment (§7) | Unit parsing caps at ~51% for Walmart | Low–Medium | Now diagnosed as field assignment, not stray text — see the note below |
+| 2 | **Walmart field misalignment (§2)** | **Two fields corrupted at once: `units` unusable for half of Walmart, `brand` partly filled with price text** | Medium | Live data corruption, still being written daily. One root cause explains two separate symptoms, so one fix retires two findings |
+| 3 | `product.id` doc contradiction (§3) | Consumers over-engineer around a non-problem, or learn to ignore your warnings right before a breaking change | **One sentence** | Best effort-to-value ratio here — but it is a stale sentence, not corrupted data. A wrong description costs less than wrong values |
+| 4 | Stable product key (§4) | Every consumer re-derives identity defensively | Low | The guarantee itself, once §3 says what is true today |
+| 5 | Orphan rows (§5) | Every join needs a denominator caveat | Low (doc) / High (fix) | The doc fix alone captures most of the value |
+| 6 | Small-basket date (§6) | A month of good data wrongly discarded | **Trivial** | Pure documentation error, near-zero cost |
+| 7 | UPC width + PLU (§7) | Cross-vendor matches silently split | Low | Affects the number most consumers care about most |
 | 8 | Duplicates (§8) | Consumers invent divergent tie-breaks | Medium | Real, but already documented and expected |
 | 9 | Batched smaller items (§9) | Friction, not error | Low each | Individually minor; collectively a nice afternoon |
 
-If only two things change, we would pick **§2** (one sentence, removes an entire class of
-downstream work) and **§1** (the only item that makes downstream numbers actively wrong
-rather than merely absent).
+**On the top three.** §1 and §2 are both *live corruption* — every extract you publish
+from here on carries them. §3 is a sentence that is out of date. Ranking a documentation
+fix above a data-corruption fix would be optimising for our reading convenience over your
+data's correctness, so §2 sits above §3 even though §3 is a hundred times cheaper to fix.
+
+**Why §2 moved up.** We initially filed the Walmart `units` problem as "marketing copy in
+a size field" and ranked it seventh. Reading `concatted` showed that was the wrong
+diagnosis: it is a **field-assignment bug**, and it accounts for both the 51.38% unit
+parse rate *and* part of the 32.48% blank-brand rate. Two symptoms we had been treating as
+unrelated turned out to be one cause, which raises both its impact and the value of fixing
+it. That is also why it is worth your time over the cheaper items: it is the only entry
+where one change retires two findings.
+
+If only two things change, we would pick **§1** and **§2** — the two that are actively
+corrupting values. **§3** is the one to do anyway, because it costs a sentence.
 
 ---
 

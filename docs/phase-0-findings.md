@@ -575,7 +575,7 @@ Sale signal in `other` = contains `sale` or `rollback` (Walmart's markdown word)
 | # | Finding | Coverage number | Verdict |
 |---|---|---|---|
 | **D1** | Price freeze (Nov 1 – Feb 5) | **2024-25: Metro 474 of 14,288 SKUs (3.32%) at ≥90% coverage; 20 with zero gaps — and the 474 is a frozen/packaged slice, not a sample (F2).** 2025-26: Metro 5,977 (54.23%); **0** with zero gaps, composition unchecked | **NO-GO for 2024-25 · *provisional* GO for 2025-26** |
-| **D2** | Sale honesty (price raised pre-sale) | 566,564 events; 279,599 with 14d continuous history; **273,873 after removing E8 price-dirty events (F1)** | **GO** |
+| **D2** | Sale honesty (price raised pre-sale) | 566,564 events; 279,599 with 14d continuous history; **273,873 usable** | **GO — for single-unit markdowns only.** All multibuy and per-weight promotions are excluded by construction (F5); product mix is representative (F6) |
 | **D3** | Shrinkflation | Structural for the 86.2% with a sku; representable but **0 credible cases in 1,004 pairs** for the rest (F4) | **NO-GO** |
 | **D4** | Cross-vendor basket | **3,477** reliable-only GTINs with 90+ shared days; 1,560 with 365+ | **GO** |
 
@@ -645,6 +645,10 @@ analysis that needs numeric prices. Metro's low rate is the same catalogue-churn
 
 Caveat carried forward from C4: this counts `old_price` transitions only, so it
 **undercounts Loblaws sales by ~22.7%** (multibuy offers with no struck-out price).
+
+**Scope limit established in F5:** the usable sample contains **only single-unit
+markdowns**. Every multibuy and per-weight-priced promotion is excluded by construction,
+because such a price is non-scalar. Read F5 before publishing any D2 number.
 
 *Source: `D2_sale_events_with_history.sql`.*
 
@@ -1000,7 +1004,13 @@ computed honestly.
 
 ## 7c. Follow-ups: E8 vs D2, and the Metro freeze cohort
 
-### F1. Does E8 contaminate D2? **No exclusion. 2.05% attrition. Not biased.**
+### F1. Does E8 contaminate D2? **No exclusion. ~2% attrition. Vendor mix stable.**
+
+> **F1's original conclusion of "not biased" was wrong, and F5 below corrects it.**
+> F1 tested vendor *share* and found it stable. That is a real result but it is the wrong
+> axis: attrition can be perfectly proportional across vendors and still remove one entire
+> *kind* of promotion from every one of them. It does. See F5.
+
 
 **Nothing was excluded.** D2 keys entirely off `old_price` presence and never references
 `current_price`, so no sale event was dropped by E8. **566,564 events and 279,599
@@ -1032,7 +1042,10 @@ Per vendor, the loss rate is very uneven:
 | NoFrills | 38,218 | 0 | 38,218 | 0.00% |
 | Galleria | 1,423 | 0 | 1,423 | 0.00% |
 
-**Is the sample biased, or merely smaller? Merely smaller.** The loss *rate* is skewed —
+**Is the vendor MIX distorted? No.** (This was originally written as "biased, or merely
+smaller? Merely smaller" — an overreach, since vendor mix is only one axis of bias. F5
+tests the axis that matters and reaches the opposite conclusion.) The loss *rate* is
+skewed —
 Metro loses proportionally 7× more than Loblaws and infinitely more than No Frills — but
 because the absolute loss is small, the vendor composition barely moves:
 
@@ -1047,9 +1060,11 @@ because the absolute loss is small, the vendor composition barely moves:
 | NoFrills | 13.67% | 13.95% | +0.29 pp |
 | Voila | 23.93% | 24.43% | +0.50 pp |
 
-No vendor's share of the sample moves by more than **0.5 percentage points**. **D2 remains
-a GO at n = 273,873.** Report that number, not 279,599, as the sample for any analysis
-that needs numeric prices.
+No vendor's share of the sample moves by more than **0.5 percentage points**.
+
+**This is true and it is not sufficient.** Vendor composition is preserved; promotion
+composition is not. F5 re-runs the test on promotion character and finds a categorical
+exclusion that this table cannot see.
 
 One caveat that is *not* about E8: Metro's evaluable rate is 21.22% of its own events —
 the catalogue-churn problem from D1/E11, which costs Metro far more than E8 does.
@@ -1112,6 +1127,13 @@ should be read as provisional until it is.
 
 ### F3. Can private label be told from national brand? **For 4 vendors yes, 1 partly, 3 no.**
 
+> **Read the percentages below correctly.** 92.45% / 94.31% / 90.64% / 89.39% are
+> **brand-field non-null coverage** — the share of products carrying any brand string at
+> all. They are **not** classification accuracy. They state the ceiling on what any
+> classifier could reach, and say nothing about whether the private/national split
+> assigned within that population is right. F7 measures the second thing separately.
+
+
 Metro's freeze claim is scoped to "all private label and national brand grocery products",
 so the distinction is load-bearing.
 
@@ -1138,6 +1160,240 @@ impossible at 0.81%.** Walmart is partial and additionally polluted (see E15).
 
 *Source: `F3_private_label_detectability.sql`.*
 
+### F5. The D2 bias test, on the right axis: **D2 is biased within-vendor**
+
+F1 asked whether the drops changed the vendor mix. They do not. The question that matters
+is whether the dropped events are a *random slice* of each vendor's promotions or a
+*distinct type*. They are a distinct type, and the effect is categorical rather than
+marginal.
+
+**Cohort definition note.** F5 flags an event dirty if any day of the whole sale run is
+non-scalar; F1 checked only the sale-start day plus the pre-window. F5's rule is stricter,
+so it flags **6,421** events against F1's **5,726**. Both totals reconcile to the same
+279,599 evaluable events. F1's rule is the better fit for D2's actual question — you need
+clean prices in the pre-window and at the sale's start — so **273,873 remains the headline
+usable n**; under the stricter whole-run rule it is 273,178. The bias finding below is
+unaffected by which rule is used.
+
+#### (a) Multibuy and per-weight promotions are not under-represented in the drops — they are *only* in the drops
+
+| Vendor | Cohort | Events | Multibuy | % multibuy | Per-weight | % per-weight |
+|---|---|---|---|---|---|---|
+| **Metro** | dropped | 1,787 | 925 | **51.76%** | 226 | 12.65% |
+| **Metro** | retained | 21,685 | 0 | **0.00%** | 0 | 0.00% |
+| **SaveOnFoods** | dropped | 2,680 | 0 | 0.00% | 1,512 | **56.42%** |
+| **SaveOnFoods** | retained | 76,670 | 0 | 0.00% | 0 | **0.00%** |
+| **TandT** | dropped | 691 | 0 | 0.00% | 651 | **94.21%** |
+| **TandT** | retained | 18,253 | 0 | 0.00% | 0 | **0.00%** |
+| Loblaws | dropped | 548 | 0 | 0.00% | 0 | 0.00% |
+| Walmart | dropped | 709 | 0 | 0.00% | 0 | 0.00% |
+| Voila | dropped | 6 | 0 | 0.00% | 0 | 0.00% |
+
+The retained columns are zero **by construction**: a multibuy or per-weight price is
+non-scalar, so it can never survive the filter. That is exactly the point. This is not
+over-representation — it is **total exclusion of a promotional mechanic**:
+
+- **Every multibuy promotion at Metro is absent from D2.** 925 of Metro's 1,787 dropped
+  events are "2 for $7"-style offers.
+- **Every per-weight-priced promotion at Save-On-Foods and T&T is absent from D2** (1,512
+  and 651 events respectively — 94.21% of T&T's drops).
+- Loblaws, Walmart and Voila drop for the third E8 shape (embedded HTML), which is a data
+  defect rather than a promotion type, so their drops are closer to random.
+
+#### (b) The excluded Metro promotions are systematically *deeper*
+
+Depth is computable for retained events directly, and for dropped multibuy events by
+deriving the unit price (`2/$7.00` → `$3.50`):
+
+| Vendor | Cohort | Depth computable | % of cohort | Mean % off | **Median % off** |
+|---|---|---|---|---|---|
+| **Metro** | **dropped** | 920 | 51.5% | 24.93% | **24.81%** |
+| **Metro** | retained | 20,015 | 92.3% | 19.95% | **16.69%** |
+| Loblaws | retained | 37,436 | 87.7% | 17.39% | 14.49% |
+| SaveOnFoods | retained | 76,565 | 99.9% | 22.44% | 21.63% |
+| TandT | retained | 16,889 | 92.5% | 23.44% | 22.36% |
+| Voila | retained | 66,850 | 99.9% | 22.21% | 20.04% |
+| Walmart | retained | 7,266 | 99.2% | 22.92% | 20.95% |
+
+**Metro's excluded promotions are ~8 percentage points deeper at the median** (24.81% vs
+16.69%). Depth is not computable for the other vendors' dropped events (per-weight and
+HTML shapes yield no valid comparison), so this is measured for Metro only — but Metro is
+where the multibuy exclusion is concentrated.
+
+#### (c) The excluded promotions are also shorter, at three vendors
+
+Run length needs no price, so it is the cleanest like-for-like axis:
+
+| Vendor | Cohort | Mean run days | Median | p90 |
+|---|---|---|---|---|
+| **TandT** | dropped | **7.24** | 7.0 | **8.0** |
+| **TandT** | retained | **11.49** | 11.0 | **20.0** |
+| **Loblaws** | dropped | 12.53 | 7.0 | 28.0 |
+| **Loblaws** | retained | 19.33 | 7.0 | 35.0 |
+| **Metro** | dropped | 14.48 | 7.0 | 33.0 |
+| **Metro** | retained | 17.72 | 8.0 | 35.0 |
+| SaveOnFoods | dropped | 20.37 | 14.0 | 42.0 |
+| SaveOnFoods | retained | 19.47 | 14.0 | 35.0 |
+| Walmart | dropped | 23.82 | 25.0 | 47.0 |
+| Walmart | retained | 22.02 | 25.0 | 31.0 |
+
+T&T's dropped promotions are barely half the length of its retained ones (p90 8 days vs
+20). Loblaws and Metro show the same direction. Save-On-Foods and Walmart show no
+meaningful difference.
+
+#### Verdict, stated directly
+
+**D2 is biased within-vendor, not merely smaller.** The dropped events are a distinct
+promotional type — multibuy at Metro, per-weight at Save-On-Foods and T&T — and at Metro
+they are also deeper and shorter than what survives.
+
+**What this means for the D2 finding.** "Was the price raised before the sale?" computed
+on D2's retained sample is a statement about **single-unit markdowns only**. It excludes
+multibuy offers entirely. That is a defensible scope — arguably multibuy deserves separate
+treatment anyway, since "2 for $7" has no single-unit before/after price to compare — but
+it must be **stated as a scope limit, not presented as a finding about promotions in
+general**. Any headline of the form "X% of Metro sales were preceded by a price increase"
+must read "X% of Metro *single-unit markdowns*", and must note that 925 multibuy events
+were excluded.
+
+D2 stays a **GO**. Its scope is narrower than F1 implied.
+
+*Source: `F5_d2_within_vendor_bias.sql`.*
+
+### F6. Does D2's Metro slice carry D1's frozen-and-packaged skew? **No.**
+
+The hypothesis was well founded: Metro's D2-evaluable rate is 21.22% (23,472 of 110,604),
+and the gate looks like the same continuous-presence mechanism F2 proved distorts D1's
+474. **It is not.** Composition is close to neutral.
+
+Category, evaluable vs all Metro events (skew ratio = share of evaluable ÷ share of all;
+1.00 is perfectly representative):
+
+| Category | Evaluable | All events | % of evaluable | % of all | **Skew** |
+|---|---|---|---|---|---|
+| Meat & fish | 3,120 | 12,073 | 13.29% | 10.92% | **1.22** |
+| Bread & bakery | 1,384 | 6,010 | 5.90% | 5.43% | 1.09 |
+| Dairy | 4,926 | 22,012 | 20.99% | 19.90% | 1.05 |
+| **Frozen** | 885 | 4,020 | 3.77% | 3.63% | **1.04** |
+| Eggs | 206 | 942 | 0.88% | 0.85% | 1.03 |
+| Produce | 3,077 | 14,786 | 13.11% | 13.37% | 0.98 |
+| Beverages | 3,165 | 15,431 | 13.48% | 13.95% | 0.97 |
+| Pantry staples | 2,176 | 11,214 | 9.27% | 10.14% | 0.91 |
+| Other | 4,533 | 24,116 | 19.31% | 21.80% | 0.89 |
+
+Set against D1's 474, the contrast is stark:
+
+| Category | D1's 474 skew | D2's Metro slice skew |
+|---|---|---|
+| Frozen | **2.9× over** | **1.04 — neutral** |
+| Meat & fish | **2.6× over** | 1.22 |
+| Pantry staples | **2.4× under** | 0.91 |
+
+Brand retention tells the same story. Baseline retention is 21.2%; the spread runs 14.7%
+(LIFE SMART) to 48.6% (HIGH LINER), and every major brand's share of the evaluable set
+sits close to its share of all events:
+
+| Brand | Retention % | % of evaluable | % of all |
+|---|---|---|---|
+| HIGH LINER | 48.6% | 3.05% | 1.40% |
+| PHILADELPHIA | 37.0% | 1.54% | 0.92% |
+| CAMPBELL'S | 34.9% | 1.90% | 1.21% |
+| IRRÉSISTIBLE | 20.1% | 8.82% | 9.75% |
+| SELECTION | 18.7% | 6.48% | 7.71% |
+| LIFE SMART | 14.7% | 2.04% | 3.09% |
+
+High Liner is still the most-retained brand — but at 2.2× its baseline share, against
+**16.6×** in D1's 474. The effect is present and small, not structural.
+
+**Why the two filters behave so differently.** They look alike and are not:
+
+- **D1** demands presence on ≥90% of a *fixed 97-day calendar window*. Only a product
+  listed almost continuously for over three months qualifies — which selects hard for
+  never-out-of-stock frozen and packaged goods.
+- **D2** demands 14 consecutive days immediately before a sale, and is **event-anchored
+  and sliding**: any SKU qualifies if it happened to be listed for the fortnight before
+  any one of its sales, at any point across two years. A product can fail in March and
+  qualify in September.
+
+A 14-day sliding requirement is roughly one-seventh the length of D1's and can be
+satisfied at many different moments, so it does not concentrate on permanently-listed
+stock the way D1's does.
+
+**Verdict: D2's Metro slice is representative of Metro's promotional activity on brand
+and category.** The bias in D2 is the one F5 found — promotion *type* — not product mix.
+The two are independent, and only the first is a problem.
+
+*Source: `F6_metro_d2_composition.sql`.*
+
+### F7. What the private-label percentages actually measure, and their error rate
+
+**They are coverage, not accuracy.** Separating the two:
+
+| Vendor | Products | Brand coverage (the F3 number) | Blank (unclassifiable) | Junk brand values | Classified private label |
+|---|---|---|---|---|---|
+| NoFrills | 24,398 | 94.31% | 1,389 | 0 | 3,880 |
+| Metro | 26,311 | 92.45% | 1,986 | 3 | 3,503 |
+| Loblaws | 31,688 | 90.64% | 2,967 | 0 | 4,439 |
+| SaveOnFoods | 16,158 | 89.39% | 1,714 | 14 | 2,718 |
+| Walmart | 37,914 | 67.52% | 12,316 | 434 | 1,084 |
+| Voila | 26,320 | 0.81% | 26,107 | 0 | 23 |
+| TandT | 13,542 | 0.00% | 13,542 | 0 | 0 |
+| Galleria | 10,697 | 0.00% | 10,697 | 0 | 0 |
+
+**The classification method.** Case-folded exact match of `brand` against a written-out
+list of each retailer's own labels (Metro: SELECTION, IRRÉSISTIBLE, LIFE SMART, FRONT
+STREET BAKERY, metrogo!, ECONOMAX, PREMIÈRE MOISSON; Loblaws/No Frills: President's
+Choice, PC variants, No Name, Farmer's Market; Save-On-Foods: Western Family,
+Save-On-Foods, Bake Shop, Only Goodness; Walmart: Great Value, Our Finest, Equate, …).
+Everything else with a non-blank brand is called national. The list is a **judgement
+input**, written into `F3_private_label_detectability.sql` so it can be argued with and
+extended. There is no ground-truth label set to score against, so what follows is a
+bounded error estimate, not a measured accuracy.
+
+**Error source 1 — the case-split bug: zero effect. Verified, not assumed.**
+96,124 products carry a mixed-case brand across 8,575 distinct brands, and the split is
+worst on private labels (`western family`/`Western Family` 1,800; `SELECTION`/`Selection`
+1,160). But the classifier folds case before matching, so:
+
+| Check | Result |
+|---|---|
+| Products with mixed-case brand | 96,124 |
+| **Private/national verdicts that change under case-folding** | **0** |
+
+The case bug breaks a naive `GROUP BY brand` — which is why it stays on the bug list — but
+it does **not** affect this classification.
+
+**Error source 2 — false negatives (private label filed as national).** Estimated by
+finding brands carried by exactly one vendor in volume, then judging by name. Above 120
+products there are only three, and none is a missed private label: `NESTLE` (151,
+Save-On-Foods) is a national brand that happens to appear at one vendor here; `E-ALTRA`
+(160) and `QIOPERTAR` (156) are Walmart marketplace-seller names. Lowering the threshold
+to 40 products surfaces genuine candidates: `FROM OUR CHEFS` (75, Loblaws), `ZENSHI` (93,
+Loblaws), `PLATINUM GRILL` (65, Metro), `REDLAND FARMS` (76, Save-On-Foods), `DELI FRESH`
+(68, Save-On-Foods), `WESTERN CANADIAN` (105, Save-On-Foods). **Upper bound ≈ 480
+products**, against 14,540 classified private label — about **3% of the private-label
+count**. That ceiling rests on my reading of brand names, not on a verified list.
+
+**Error source 3 — false positives (junk filed as national).** 451 products carry a
+non-brand value that the classifier counts as a national brand:
+
+| Vendor | Value | Products |
+|---|---|---|
+| Walmart | `Unbranded` / `unbranded` | 260 |
+| Walmart | `Out of stock` | 174 |
+| SaveOnFoods | `-` | 11 |
+| SaveOnFoods | `N/A` | 3 |
+| Metro | `.` | 3 |
+
+**Net.** For Metro — the vendor whose freeze claim this is — the binding constraint is
+**coverage (92.45%), not classification error**: within the covered population the
+estimated error is roughly 3% of the private-label count on the false-negative side and
+3 products on the false-positive side. For Walmart both constraints bite: 67.52% coverage
+*and* 434 junk values. For T&T and Galleria the question is moot — no brand data exists,
+so a private-label-scoped claim is untestable for them at any accuracy.
+
+*Source: `F7_private_label_error_analysis.sql`, `F3_private_label_detectability.sql`.*
+
 ---
 
 ## 8. What this dataset can and cannot support
@@ -1150,10 +1406,16 @@ impossible at 0.81%.** Walmart is partial and additionally polluted (see E15).
 contains actual milk, bread, eggs, cheese and coffee, not only a long tail. Every such
 claim must say *four of eight vendors*, and *Toronto pickup pricing*.
 
-**Sale-behaviour analysis at scale.** 273,873 sale events with a full 14 days of
-continuous pre-sale daily history *and* numeric prices throughout (279,599 before removing
-E8-affected events — a 2.05% attrition that does not shift the vendor mix by more than
-0.5 pp, so the sample is smaller, not biased). This is the strongest thing in the dataset. "Was the
+**Sale-behaviour analysis of single-unit markdowns, at scale.** 273,873 sale events with
+a full 14 days of continuous pre-sale daily history and numeric prices throughout.
+
+**Scope limit, load-bearing (F5):** this sample contains **no multibuy promotions at all**
+— a multibuy price is non-scalar, so every "2 for $7" offer is excluded by construction
+(925 events at Metro), as is every per-weight-priced promotion at Save-On-Foods (1,512)
+and T&T (651). At Metro the excluded promotions are also ~8 pp deeper at the median
+(24.81% vs 16.69% off). Any published figure must therefore say *single-unit markdowns*,
+not *sales*, and report the excluded count. Product mix within the sample is
+representative (F6); it is promotion type that is not. This is the strongest thing in the dataset. "Was the
 price raised before the sale" is answerable with a large sample — provided Loblaws
 multibuy offers are handled (E12) and non-scalar prices are parsed rather than dropped (E8).
 
@@ -1230,8 +1492,8 @@ python scripts/run_query.py analysis/phase0/B6_duplicate_rows.sql --all \
 |---|---|
 | `scripts/check_schema.py` | PASS — 2 tables, 15 columns match |
 | `scripts/test_check_schema.py` | **6 of 6** cases behaved as expected |
-| `scripts/check_manifest.py` | PASS — 53 tracked files, 15 manifest entries |
-| Query smoke test (every `.sql` in `analysis/phase0/` executes) | **39 of 39** run without error |
+| `scripts/check_manifest.py` | PASS — 56 tracked files, 15 manifest entries |
+| Query smoke test (every `.sql` in `analysis/phase0/` executes) | **42 of 42** run without error |
 
 The only tests that exist are the 6 schema-check cases. There is no test suite for the
 analysis queries themselves — they are verified by execution, not by assertion — so
