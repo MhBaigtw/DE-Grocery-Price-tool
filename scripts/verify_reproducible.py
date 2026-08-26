@@ -37,7 +37,8 @@ def main() -> int:
     # Macros are created in the in-memory catalog (the default), NOT in snap -- a
     # read-only attachment refuses CREATE, which is the point: the verifier must not be
     # able to modify what it verifies.
-    con.execute((REPO / "models" / "price_parse_macros.sql").read_text(encoding="utf-8"))
+    for mf in ("price_parse_macros.sql", "unit_parse_macros.sql", "brand_class_macros.sql"):
+        con.execute((REPO / "models" / mf).read_text(encoding="utf-8"))
 
     kind = con.execute(
         "SELECT table_type FROM information_schema.tables "

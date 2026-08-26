@@ -37,8 +37,16 @@ import sys
 import duckdb
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-MACROS = REPO / "models" / "price_parse_macros.sql"
-MODELS = [("stg_price", REPO / "models" / "stg_price.sql")]
+MACRO_FILES = [
+    REPO / "models" / "price_parse_macros.sql",
+    REPO / "models" / "unit_parse_macros.sql",
+    REPO / "models" / "brand_class_macros.sql",
+]
+# (model name, sql file, source table it must be 1:1 with)
+MODELS = [
+    ("stg_price",   REPO / "models" / "stg_price.sql",   "raw"),
+    ("stg_product", REPO / "models" / "stg_product.sql", "product"),
+]
 
 
 def main() -> int:
@@ -54,11 +62,12 @@ def main() -> int:
     con = duckdb.connect(str(db))
     con.execute("PRAGMA disable_progress_bar;")
 
-    # Macros are recreated every build so the database always matches the committed file.
-    con.execute(MACROS.read_text(encoding="utf-8"))
-    print(f"macros loaded from {MACROS.relative_to(REPO)}")
+    # Macros are recreated every build so the database always matches the committed files.
+    for mf in MACRO_FILES:
+        con.execute(mf.read_text(encoding="utf-8"))
+        print(f"macros loaded from {mf.relative_to(REPO)}")
 
-    for name, path in MODELS:
+    for name, path, src_table in MODELS:
         body = path.read_text(encoding="utf-8")
         kind = "VIEW" if args.materialize == "view" else "TABLE"
         # DuckDB raises rather than no-opping when DROP VIEW IF EXISTS hits a table
@@ -73,11 +82,12 @@ def main() -> int:
             con.execute(f"DROP {'TABLE' if existing[0] == 'BASE TABLE' else 'VIEW'} {name};")
         con.execute(f"CREATE {kind} {name} AS {body}")
         n = con.execute(f"SELECT count(*) FROM {name}").fetchone()[0]
-        src = con.execute("SELECT count(*) FROM raw").fetchone()[0]
+        src = con.execute(f"SELECT count(*) FROM {src_table}").fetchone()[0]
         status = "OK" if n == src else "ROW COUNT MISMATCH"
-        print(f"  {name}: {kind.lower()}, {n:,} rows (raw has {src:,}) -- {status}")
+        print(f"  {name}: {kind.lower()}, {n:,} rows ({src_table} has {src:,}) -- {status}")
         if n != src:
-            print("  refusing to continue: the model must be 1:1 with raw", file=sys.stderr)
+            print(f"  refusing to continue: {name} must be 1:1 with {src_table}",
+                  file=sys.stderr)
             return 1
 
     con.close()

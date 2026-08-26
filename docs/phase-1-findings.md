@@ -800,9 +800,251 @@ mode Section 5's reconciliation tests are meant to catch, arriving early.
 **Not done in Section 2, and why:** 2.4's agreement quantification is deferred to Section
 3, which now has an additional job: `price_per_unit`'s implied `pack_count` becomes a
 **cross-check on the unit parser**, not a field to be validated against it.
+**Resolved in §3.4** — and it earned its keep immediately by finding a representation flaw
+in the unit parser on first run.
 
 ## Section 3 — Unit representation
 
-Not started. The §2.5 correctness sweep found a defect that required rebuilding the model
-and recomputing every Section 2 figure, so those are reported first rather than building
-Section 3 on numbers that had just moved.
+**Status: complete.** Headline: **88.84% of products with a units string parse to a
+canonical (quantity, unit, pack_count).** The pack-count cross-check found and fixed a
+representation flaw that no amount of re-reading the parser would have surfaced.
+
+### 3.1 Canonical unit parse
+
+`stg_product` resolves every product to:
+
+| Column | Meaning |
+|---|---|
+| `unit_qty` | size of ONE item, in g / mL / count |
+| `unit_uom` | `g` \| `ml` \| `count` |
+| `pack_count` | how many items in the listing (`2 x 500 mL` → 2) |
+| `total_qty` | `unit_qty × pack_count` — the size you actually buy |
+| `unit_parse_confidence` | `exact` \| `derived` \| `inferred` \| `none` |
+| `units_raw` | always retained |
+
+Per-item size and pack count are kept **separate** deliberately: `2 x 500 mL` and `1 L`
+are the same total volume but not the same product. Collapsing them at parse time discards
+a distinction that cannot be recovered downstream.
+
+| Vendor | Products | No units text | Parsed | **% of text parsed** |
+|---|---|---|---|---|
+| SaveOnFoods | 16,158 | 1 | 16,155 | **99.99%** |
+| Voila | 26,320 | 750 | 25,565 | 99.98% |
+| Loblaws | 31,688 | 1,718 | 29,754 | 99.28% |
+| NoFrills | 24,398 | 839 | 23,359 | 99.15% |
+| Metro | 26,311 | 661 | 25,157 | 98.08% |
+| TandT | 13,542 | 964 | 12,021 | 95.57% |
+| Galleria | 10,697 | 112 | 10,062 | 95.06% |
+| **Walmart** | 37,914 | 249 | 19,375 | **51.44%** |
+| **All** | **187,028** | **5,294** | **161,448** | **88.84%** |
+
+The two denominators are reported separately on purpose: 5,294 products have **no units
+text at all** (nothing to parse) and are a different problem from text that fails to parse
+(something to fix). A single percentage hides which is which.
+
+| Unit | Products | Multipacks | Median item size | Median total | Max pack |
+|---|---|---|---|---|---|
+| g | 112,177 | 4,926 | 280 g | 300 g | 800 |
+| ml | 39,407 | 5,285 | 473 mL | 510 mL | 800 |
+| count | 9,864 | 7,614 | 1 | 10 | 2,036 |
+
+`2 x 500 mL` is handled, as are `12x355.0ml`, `4 x 100g`, `60gx6` and `93ML*6`.
+
+**One parser bug found while building this.** The trailing-multiplier form (`60gx6`) failed
+entirely: the unit token `g` is followed by `x`, a word character, so the `\b` anchor never
+matched. It is stripped before token extraction now. Unit tests: **16 of 16 pass.**
+
+The unparsed tail is unchanged from Phase 0 C1 and is dominated by Walmart marketing text
+(`perfect every time™`, `shelf stable`, `sold in singles`), the `error` sentinel (409
+products) and Galleria's bare `ea` / `current price: lb`.
+
+*Source: `P3_1_unit_parse_rate.sql`.*
+
+### 3.2 Walmart's 51% — is the size recoverable? **Recommendation: no. Do not build it.**
+
+The brief asks for a recommendation, not a decision. Here is the evidence.
+
+**The cause is confirmed, and it is worse than "bad formatting".** `concatted` has the form
+`vendor~product_name@units^brand`, and for **6,898 Walmart products (18.19%)** the units
+slot holds a **verbatim copy of the product name**. Every other vendor: 0.00%. So the size
+was never captured into that field — it is not hiding in `concatted` either.
+
+That leaves the product name itself, which for Walmart often ends `..., 90 g`.
+
+| Vendor | Unparsed products | Size suffix in name | **% recoverable** |
+|---|---|---|---|
+| **Walmart** | **18,290** | **6** | **0.03%** |
+| TandT | 557 | 22 | 3.95% |
+| NoFrills | 200 | 4 | 2.00% |
+| Metro | 493 | 1 | 0.20% |
+| Voila | 5 | 4 | 80.00% |
+| Galleria | 523 | 0 | 0.00% |
+| Loblaws | 216 | 0 | 0.00% |
+
+**Six products.** Out of 18,290.
+
+The rule would be *accurate* — validated against 14,700 Walmart products where `units`
+already parses AND the name carries a size suffix, the two agree **99.39%** of the time.
+That control matters: a rule tested only on the rows it was built for is not tested. So
+this is not a case of an unreliable heuristic. It is a reliable heuristic with almost
+nothing to work on.
+
+**Recommendation: do not build it.**
+
+- **Cost:** a vendor-specific extraction rule, permanently in the codebase, needing
+  maintenance whenever Walmart's naming changes, and a second place where size can come
+  from — which means a second place for size bugs to hide.
+- **Benefit:** 6 products, 0.03% of the target population. Walmart's parse rate would go
+  from 51.44% to 51.46%.
+- **The honest framing:** Walmart's missing sizes are not a parsing problem we can solve.
+  They are absent from the published data. §2 already recommends this to the maintainer as
+  a field-assignment bug; that is where the fix belongs.
+
+**What to do instead:** treat Walmart's unit coverage as a stated limit. Any size-normalised
+analysis (price per 100 g, shrinkflation, unit-price comparison) covers ~51% of Walmart's
+catalogue and must say so. That is a smaller loss than it sounds, because the products that
+*do* parse are the packaged goods those analyses target; the ones that do not are largely
+marketplace items.
+
+**Where I would change my mind:** if Walmart's share of the D4 reliable-tier basket turned
+out to depend on the unparsed half, 6 products would not fix it either — the answer would
+still be an upstream fix, not a downstream rule.
+
+*Source: `P3_2_walmart_size_recovery.sql`.*
+
+### 3.3 Junk handling — junk does not default to a real category
+
+`brand_class` in `stg_product` now has an explicit unclassifiable verdict, split three ways
+so the **reason** is visible rather than collapsed:
+
+| Vendor | Products | Private label | National brand | Blank | Junk | No vendor data | **% unclassifiable** |
+|---|---|---|---|---|---|---|---|
+| Voila | 26,320 | 0 | 0 | 0 | 0 | 26,320 | **100.00%** |
+| TandT | 13,542 | 0 | 0 | 0 | 0 | 13,542 | **100.00%** |
+| Galleria | 10,697 | 0 | 0 | 0 | 0 | 10,697 | **100.00%** |
+| Walmart | 37,914 | 1,084 | 24,080 | 12,316 | **434** | 0 | 33.63% |
+| SaveOnFoods | 16,158 | 2,967 | 11,463 | 1,714 | **14** | 0 | 10.69% |
+| Loblaws | 31,688 | 4,607 | 24,114 | 2,967 | 0 | 0 | 9.36% |
+| Metro | 26,311 | 3,568 | 20,754 | 1,986 | **3** | 0 | 7.56% |
+| NoFrills | 24,398 | 3,880 | 19,129 | 1,389 | 0 | 0 | 5.69% |
+
+All **451 junk values** land in `unclassifiable_junk`, none in `national_brand`:
+
+| Vendor | Value | Products |
+|---|---|---|
+| Walmart | `Unbranded` / `unbranded` | 260 |
+| Walmart | `Out of stock` | 174 |
+| SaveOnFoods | `-` | 11 |
+| SaveOnFoods | `N/A` | 3 |
+| Metro | `.` | 3 |
+
+Symmetrically, the `error` sentinel in `units` (409 products) and `n/a` (1) parse to
+**NULL, not a size** — `wrongly_parsed = 0` for both.
+
+#### Why this mattered — the bias it removes
+
+If unknowns had fallen through to national brand, private-label share would have been
+understated by exactly the invisible amount:
+
+| Vendor | PL share if junk defaults | PL share, classifiable only | **Understatement** |
+|---|---|---|---|
+| SaveOnFoods | 18.36% | 20.56% | **2.20 pp** |
+| Loblaws | 14.54% | 16.04% | **1.50 pp** |
+| Walmart | 2.86% | 4.31% | **1.45 pp** |
+| Metro | 13.56% | 14.67% | **1.11 pp** |
+| NoFrills | 15.90% | 16.86% | **0.96 pp** |
+
+Metro's freeze claim is scoped to *"all private label and national brand grocery
+products"*. Understating private-label share by 1.11 pp at Metro is not catastrophic on its
+own — but it is a **one-directional** error, and it would have been invisible, which is the
+combination that turns a small bias into a wrong conclusion.
+
+The three-way split also makes the T&T / Galleria / Voila situation legible: they are not
+0% private label, they have **no brand data at all**. `unclassifiable_no_vendor_data` says
+that; `national_brand` would have silently claimed the opposite.
+
+*Source: `P3_3_brand_classification.sql`.*
+
+### 3.4 `price_per_unit` as a cross-check ON the parser (brief 2.4, folded in)
+
+§2.4 established that comparing `price_per_unit` against our `unit_price` measures nothing,
+because they are different quantities. But their **ratio is a pack count**, derived from
+upstream's own arithmetic — sharing no inputs and no code with our text parsing:
+
+```
+implied_pack = unit_price / price_per_unit_value        (both per-each)
+```
+
+**This immediately found a flaw in my unit parser.**
+
+`24ea` was parsing as `unit_qty=24, pack_count=1`. Upstream's arithmetic implied
+`pack_count=24`. Both encode "24 items", so total size was right — but the count was in the
+**wrong column**, and a caller asking *how many items am I buying* was told **one**.
+
+For a count-type unit there is no separate per-item size: the number *is* the pack count.
+Fixed: `24ea` → `unit_qty=1, pack_count=24, total_qty=24`.
+
+**Agreement before and after, on 137,898 comparable rows** (4% deterministic sample, rows
+flagged `ambiguous` excluded):
+
+| Vendor | Before fix | **After fix** |
+|---|---|---|
+| Voila | 0.01% | **52.20%** |
+| SaveOnFoods | 0.59% | **68.33%** |
+| Loblaws | 45.33% | **67.15%** |
+| NoFrills | 56.98% | **70.26%** |
+| Metro | 44.96% | **59.90%** |
+| Walmart | 0.00% | 0.00% *(n=16 — negligible)* |
+
+Count-type multipacks detected went from **83 to 7,614**.
+
+**The residual disagreement is upstream rounding, not parser error.** `price_per_unit` is
+published to 2 decimals, so dividing by it cannot recover an exact integer — $5.99 / $0.50
+gives 11.98, not 12:
+
+| Tolerance | Agreement |
+|---|---|
+| ±0.05 absolute | 65.15% |
+| **±2% relative** | **85.05%** |
+| ±5% relative | 88.80% |
+| ±10% relative | 90.32% |
+
+**Two genuine parser gaps remain**, both stated rather than fixed:
+
+1. **Compound size-and-count strings.** `355ml cans12 each` is a 12-pack of 355 mL cans.
+   The parser sees `355ml` first and reports `pack_count=1`. Concentrated at Save-On-Foods.
+2. **Pack size stated only in the product name.** `Romaine Hearts, 2-Pack` with
+   `units = '1ea'`. The pack count is in the name, and per §3.2 I am not building
+   name-extraction rules.
+
+**Recommendation on importing upstream's pack count: not in Phase 1.** It is tempting —
+`price_per_unit` demonstrably knows things `units` does not. But it is a *derived* upstream
+figure with its own rounding and its own defects (§2 found four price-encoding bugs in the
+same family of fields), and adopting it would make our parse depend on a column CLAUDE.md
+already flags as untrustworthy. Its correct role is the one it just played: **an independent
+check that catches our errors**, kept separate so it can keep catching them. Using it as an
+input would destroy exactly the independence that made it useful.
+
+*Source: `P3_4_packcount_crosscheck.sql`.*
+
+---
+
+## Section 3 — what changed, in one place
+
+| Item | Before | After |
+|---|---|---|
+| Unit parse rate (of products with text) | 88.12% *(Phase 0 ad-hoc)* | **88.84%** *(committed parser)* |
+| `2 x 500 mL` handled | — | **yes**, plus `60gx6`, `93ML*6` |
+| Count-type multipacks detected | 83 | **7,614** |
+| Pack-count agreement with upstream (Voila) | 0.01% | **52.20%** |
+| Junk brand values in `national_brand` | 451 | **0** |
+| Private-label understatement | up to 2.20 pp | **0** |
+| `error` in units parsing to a size | — | **0** |
+
+**Not done, and why:** Walmart size recovery from product names — accurate rule, 6
+products, recommended against. Compound size-and-count strings and name-stated pack sizes
+remain unparsed and are documented above rather than papered over.
+
+## Section 4 — Product identity
+
+Not started. Awaiting sign-off on Section 3.
