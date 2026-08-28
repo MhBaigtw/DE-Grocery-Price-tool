@@ -44,9 +44,11 @@ MACRO_FILES = [
     REPO / "models" / "brand_class_macros.sql",
 ]
 # (model name, sql file, source table it must be 1:1 with)
+# (model name, sql file, source table it must be 1:1 with; None = no 1:1 contract)
 MODELS = [
-    ("stg_price",   REPO / "models" / "stg_price.sql",   "raw"),
-    ("stg_product", REPO / "models" / "stg_product.sql", "product"),
+    ("stg_price",     REPO / "models" / "stg_price.sql",     "raw"),
+    ("stg_product",   REPO / "models" / "stg_product.sql",   "product"),
+    ("int_upc_match", REPO / "models" / "int_upc_match.sql", "stg_product"),
 ]
 
 

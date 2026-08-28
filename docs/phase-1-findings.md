@@ -1285,4 +1285,173 @@ time, always with the dropped count stated.
 
 ## Section 4 — Product identity
 
-Not started. Awaiting sign-off on Section 3.
+**Status: complete.** Headline: **the owned key covers 100% of products including the
+blank-sku 13.8%, `raw.product_id` appears nowhere below staging and that is enforced
+mechanically, and the cross-vendor tier model reconciles with Phase 0 exactly.**
+
+### 4.1 The owned key
+
+Defined in `models/product_key_macros.sql`, proved collision-free in §3.5:
+
+```
+product_key = md5( vendor || chr(31) || sku )                    where sku is present
+product_key = md5( vendor || chr(31) || '#c:' || concatted )     where it is not
+```
+
+| Measure | Value |
+|---|---|
+| Products | 187,028 |
+| **With an owned key** | **187,028 (100%)** |
+| Missing a key | **0** |
+| Distinct keys | **187,028** — one per product, no collisions |
+| Keyed on `vendor_sku` | 161,300 (86.24%) |
+| **Keyed on `vendor_concatted`** *(the blank-sku 13.8%)* | **25,728** |
+
+The blank-sku population is covered rather than excluded. `product_key_basis` records
+which branch produced each key, because the two are not equally strong: §1.4 found 12 rows
+where upstream re-keyed a product from the hash form to the `vendor||sku` form after
+recovering a SKU. A consumer that needs the stronger identity can filter on the basis; one
+that just needs *a* key does not have to care.
+
+#### `raw.product_id` below staging: zero, and enforced
+
+`scripts/check_layering.py` parses the model files and fails if `product_id` appears in
+any `int_*` or `mart_*` model. Staging models may reference it — they are the layer whose
+job is to translate it away.
+
+```
+staging models    : 2 (stg_price.sql, stg_product.sql)
+below-staging     : 1 (int_upc_match.sql)
+
+OK - product_id appears nowhere below the staging layer.
+```
+
+**Shown to fail when it should.** Injecting `sp.product_id` into `int_upc_match.sql` and
+re-running:
+
+```
+FAIL - product_id referenced below staging in 1 model(s):
+  models/int_upc_match.sql:33: sp.product_id,
+                                                                   (exit 1)
+```
+
+The line was reverted and the check returns to green. A rule nobody checks is a wish; this
+one is now mechanical, so the announced `product_id` type change stays an ingest-layer
+event by construction rather than by discipline.
+
+*Source: `P4_1_identity_model.sql`, `scripts/check_layering.py`.*
+
+### 4.2 Cross-vendor identity — `int_upc_match`
+
+One row per product (187,028, 1:1 with `stg_product`). **Nothing is filtered out**: a
+product with no usable UPC still appears, tiered `no_upc`. That keeps the denominator
+available for every percentage and keeps lower tiers auditable rather than deleted.
+
+#### The tier of a match is the weakest tier of its participants
+
+Per-vendor UPC reliability comes from CLAUDE.md's Known Contamination section, but a
+*match* spans two vendors, and its trustworthiness is set by the weaker one. A
+Metro↔Loblaws match is not a `vendor_upc` match — it is only as good as its fuzzy side, so
+it is tiered `fuzzy`.
+
+Taking the *strongest* participant instead would let one reliable vendor launder a fuzzy
+match into a headline number. That is exactly the failure honesty rule 2 exists to prevent,
+and the effect is large:
+
+| Match tier | This vendor's own tier | Products |
+|---|---|---|
+| fuzzy | fuzzy | 15,756 |
+| **fuzzy** | **vendor_upc** | **8,920** |
+| **fuzzy** | **matched_upc** | **2,964** |
+| matched_upc | vendor_upc | 4,692 |
+| matched_upc | matched_upc | 3,147 |
+| vendor_upc | vendor_upc | 4,209 |
+
+**8,920 products whose own UPC is vendor-direct are demoted to `fuzzy`** because the GTIN
+they share is also carried by a fuzzy-tier vendor. Under a strongest-participant rule
+those would have counted as reliable matches.
+
+#### The tier census
+
+| Match tier | Products | Distinct GTINs | % of products |
+|---|---|---|---|
+| `no_upc` | 114,869 | 0 | 61.42% |
+| `unmatched` | 31,373 | 31,351 | 16.77% |
+| `fuzzy` | 27,640 | 8,114 | 14.78% |
+| `matched_upc` | 7,839 | 3,142 | 4.19% |
+| **`vendor_upc`** | **4,209** | **2,080** | **2.25%** |
+| `plu_short` | 1,098 | 0 | 0.59% |
+
+`plu_short` is the 4–5 digit PLU produce codes Phase 0 B4c identified. They are **real
+cross-vendor identifiers** — `4312` is Eddoes at four vendors — but they name a *commodity*
+rather than a package, so mixing them into a packaged-goods basket would compare a loose
+apple against a bagged one. They are kept, tiered, and excluded from the basket by tier
+rather than by a silent filter.
+
+#### Reconciliation with Phase 0 — the model must agree with the finding it was built from
+
+| Measure | Model | Phase 0 | **Difference** |
+|---|---|---|---|
+| Reliable-only GTINs (2+ vendors, all reliable) | 5,222 | B4: 5,222 | **0** |
+| …with 90+ co-observed days | 3,477 | B4d: 3,477 | **0** |
+| …with 365+ co-observed days | 1,560 | B4d: 1,560 | **0** |
+
+And the full vendor-count breakdown, reproducing B4's table exactly:
+
+| Vendors on GTIN | GTINs | Reliable-only | Fuzzy-only | Mixed |
+|---|---|---|---|---|
+| 1 | 31,351 | 31,008 | 343 | 0 |
+| 2 | 6,859 | 3,721 | 2,485 | 653 |
+| 3 | 2,780 | 1,410 | 0 | 1,370 |
+| 4 | 1,628 | 91 | 0 | 1,537 |
+| 5 | 1,503 | 0 | 0 | 1,503 |
+| 6 | 473 | 0 | 0 | 473 |
+| 7 | 77 | 0 | 0 | 77 |
+| 8 | 16 | 0 | 0 | 16 |
+
+**No GTIN reaches 5+ vendors without a fuzzy participant** — unchanged from Phase 0, and
+now a property of a materialised model rather than a one-off query.
+
+The co-observation reconciliation is the first downstream use of the owned key: it joins
+`stg_price` to `int_upc_match` on `product_key`, never on `product_id`, and lands on
+Phase 0's number exactly.
+
+**Headline filtering is at query time**, not at load: `WHERE is_reliable_only` or
+`WHERE match_tier = 'vendor_upc'`. Lower tiers stay in the table, so "how many rows did
+this exclude?" always has an answer.
+
+*Source: `P4_1_identity_model.sql`, `models/int_upc_match.sql`.*
+
+### 4.3 Fuzzy cross-vendor matching — not attempted
+
+Per the brief. The `fuzzy` tier in this model is **upstream's** fuzzy UPC matching, carried
+through and labelled; no new matching was performed on our side.
+
+Two Phase 1 findings reinforce that this was the right call, beyond the brief's own
+reasoning that B5's 26/30 eyeball is not a basis for shipping:
+
+- **§1.3 / F8:** fuzzy-tier UPCs are *not stable between publications* — 10,318 gained and
+  128 re-pointed to different GTINs in two days, against zero movement in the reliable
+  tier. Building our own fuzzy layer on top of a base that is itself being rewritten would
+  produce matches that cannot be reproduced next week.
+- **§4.2:** the weakest-participant rule already demotes 11,884 products to `fuzzy`. Adding
+  a second, home-grown fuzzy source would make the tier a mixture of two different error
+  processes with no way to tell them apart in the fact table.
+
+---
+
+## Section 4 — what changed, in one place
+
+| Item | Before | After |
+|---|---|---|
+| Products with an owned key | 0 | **187,028 (100%)** |
+| Blank-sku products covered | — | **25,728** |
+| Key collisions | 1 *(64-bit workaround)* | **0** *(proved, both snapshots)* |
+| `product_id` below staging | unenforced | **0, enforced + shown to fail** |
+| Cross-vendor tiers | ad-hoc per query | **materialised, 6 tiers, nothing dropped** |
+| Reliable-only GTINs | B4 query | **model, reconciles exactly (0 difference)** |
+| Matches laundered by a strong participant | possible | **8,920 correctly demoted** |
+
+## Section 5 — Contracts and tests
+
+Not started. Awaiting sign-off on Section 4.
