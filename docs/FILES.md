@@ -81,6 +81,18 @@ Read these in order to understand the project from scratch:
 **Depends on:** `models/`, a loaded snapshot database.
 **Notes:** Asserts row count in == row count out and refuses to continue on a mismatch — silent row loss is the failure mode this catches. Defaults to a view; `--materialize table` trades ~2.1 GB of disk for query speed, which is what the current build uses because the regex parse over 71.8M rows made every downstream query cost minutes.
 
+### docs/retention-design.md
+**Purpose:** Proposes a two-tier snapshot scheme — full archives at low cadence for the public mirror, plus a slim per-product metadata delta at high cadence for shrinkflation detection. For decision before Phase 2.
+**Breaks if removed:** The retention cadence gets decided on the cost of full archives (1.38 GB each), which prices the wrong artifact and makes weekly observation look impossible when it costs 420 MB a year.
+**Depends on:** Phase 0 D3 (shrinkflation needs snapshot comparison), Phase 1 §1.3 (what actually changes between publications), §3.5 (the owned key the deltas join on).
+**Notes:** The 8.09 MB delta size is measured against the real 187,028-row catalogue, not estimated. Deliberately omits the price series — prices are append-only, so a delta of them would restore most of the 906 MB and defeat the point.
+
+### scripts/compact_db.py
+**Purpose:** Rewrites an analysis DuckDB into a fresh file to reclaim dead pages. DuckDB does not reclaim space on `CREATE OR REPLACE TABLE`, and repeated model rebuilds had left `hammer.duckdb` at 5.74 GB with 43% free blocks.
+**Breaks if removed:** The database grows without bound across rebuilds. Recovered 2.55 GB on first use.
+**Depends on:** An existing analysis database.
+**Notes:** Copies table by table straight out of the old file rather than re-running the loader — the loader path extracts a 4.3 GB SQLite intermediate, which needs more free space than a nearly-full disk has. Verifies row counts per table and only deletes the original after the new file is complete, so a failure leaves the original untouched.
+
 ### scripts/check_layering.py
 **Purpose:** Enforces that `product_id` appears nowhere below the staging layer — the rule that keeps the announced upstream `raw.product_id` type change an ingest-layer event.
 **Breaks if removed:** The rule reverts to discipline. A downstream model could start keying on `product_id`, and the breaking change would then propagate into every mart built on it.

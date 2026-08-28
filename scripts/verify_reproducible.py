@@ -78,31 +78,6 @@ def main() -> int:
     else:
         print("build stamp   : absent (built before stamping was added)")
 
-    # Build stamp first: a model built from older macro sources is stale even if its
-    # content happens to match today's recomputation on the columns we check.
-    import hashlib
-    try:
-        stamp = dict(con.execute("SELECT k, v FROM snap._build_stamp").fetchall())
-    except Exception:
-        stamp = {}
-    if stamp:
-        drifted = []
-        for key, recorded in stamp.items():
-            if not key.startswith("sha256:"):
-                continue
-            f = REPO / key[len("sha256:"):]
-            if not f.exists() or hashlib.sha256(f.read_bytes()).hexdigest() != recorded:
-                drifted.append(key[len("sha256:"):])
-        if drifted:
-            print("FAIL - built from source files that have since changed: "
-                  + ", ".join(drifted), file=sys.stderr)
-            print("       rebuild before trusting any query.", file=sys.stderr)
-            return 1
-        n_src = len([k for k in stamp if k.startswith("sha256:")])
-        print(f"build stamp   : OK, {n_src} source files match")
-    else:
-        print("build stamp   : absent (built before stamping was added)")
-
     body = (REPO / "models" / "stg_price.sql").read_text(encoding="utf-8")
     body = body.replace("FROM raw r", "FROM snap.raw r").replace(
     "JOIN product pr", "JOIN snap.product pr")
@@ -130,7 +105,10 @@ def main() -> int:
         mark = "ok  " if a == b else "DRIFT"
         if a != b:
             drift.append(c)
-        print(f"  {mark} {c}")
+        # Print the actual checksums, not just a verdict. A verifier that says "ok"
+        # without showing its working asks to be trusted; showing both digests lets a
+        # reader confirm the comparison was real and diff two runs by eye.
+        print(f"  {mark} {c:<26} cached={a!s:>22}  recomputed={b!s:>22}")
 
     if drift:
         print(f"\nFAIL - {len(drift)} column(s) drifted from the committed definition: "
