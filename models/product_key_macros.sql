@@ -31,12 +31,30 @@
 -- re-keyed a product from the hash form to the vendor||sku form after recovering a SKU --
 -- so `product_key_basis` records which branch was taken and downstream can filter on it.
 
+-- NO PRODUCT ROW MEANS NO KEY.
+--
+-- `stg_price` LEFT JOINs `product`, because 878,559 rows (snapshot 1) resolve to no
+-- product row at all (Phase 0 E2) and an INNER join would silently drop them. Those rows
+-- reach this macro with vendor, sku and concatted ALL NULL.
+--
+-- The first version of `k_source` wrote `coalesce(vendor, '?')`, which turned every one
+-- of those rows into the SAME key -- md5('?' || US || '#c:'). That is not a missing key,
+-- it is a manufactured identity: 878,559 price rows of unknown provenance sharing one
+-- product. It is the same defect section 3.5 spent the whole section removing from the
+-- 64-bit hash, at 878,559x the scale, and it was found by the section 5 relationships
+-- test rather than by reading the macro.
+--
+-- `product.vendor` is never NULL and never blank in either snapshot (verified, both), so
+-- "vendor IS NULL" means exactly "no product row" and nothing else. Such a row gets a
+-- NULL key: unknown identity is representable, and a NULL propagates into a join as an
+-- absence rather than as a false match.
 CREATE OR REPLACE MACRO k_has_sku(sku) AS (sku IS NOT NULL AND trim(sku) <> '');
 
 CREATE OR REPLACE MACRO k_source(vendor, sku, concatted) AS
-  CASE WHEN k_has_sku(sku)
-       THEN coalesce(vendor, '?') || chr(31) || trim(sku)
-       ELSE coalesce(vendor, '?') || chr(31) || '#c:' || coalesce(concatted, '')
+  CASE WHEN vendor IS NULL THEN NULL
+       WHEN k_has_sku(sku)
+       THEN vendor || chr(31) || trim(sku)
+       ELSE vendor || chr(31) || '#c:' || coalesce(concatted, '')
   END;
 
 CREATE OR REPLACE MACRO product_key(vendor, sku, concatted) AS

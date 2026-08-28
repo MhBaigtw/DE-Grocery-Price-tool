@@ -1,0 +1,40 @@
+# dbt project for the modelling layer.
+#
+# DUPLICATION, STATED HONESTLY. The bodies here are a SECOND COPY of ../models/*.sql,
+# differing only in that sources resolve through dbt's ref/source graph so lineage and
+# tests attach. dbt cannot include a plain .sql file, and the plain path (build_models.py,
+# run_query.py, verify_reproducible.py) has no Jinja renderer, so one file cannot serve
+# both. An earlier version of this comment claimed there was no second copy; that was
+# wrong, and pretending it away is how the two silently diverge.
+#
+# The duplication is made safe mechanically instead: `python scripts/check_model_parity.py`
+# normalises both bodies and fails on any difference beyond comments, {{ config }} and the
+# source references. Run it before reporting anything built on these models.
+#
+# Parsing macros are DuckDB CREATE MACRO statements, not Jinja. DuckDB persists them in
+# the database catalog, so dbt asserts they are present rather than re-declaring them --
+# a second Jinja definition could drift from the one run_query.py and
+# verify_reproducible.py use, and those have no dbt in them.
+#
+# ORDERING: `python scripts/build_models.py --db hammer.duckdb` must run before `dbt test`.
+# on-run-start fails with a clear message if it has not.
+name: grocery
+version: "1.0.0"
+config-version: 2
+profile: grocery
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+on-run-start:
+  - "{{ assert_duckdb_macros() }}"
+
+models:
+  grocery:
+    staging:
+      +materialized: table
+    intermediate:
+      +materialized: table

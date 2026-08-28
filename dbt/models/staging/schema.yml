@@ -1,0 +1,90 @@
+version: 2
+
+models:
+  - name: stg_price
+    description: >
+      One row per raw price observation, with a computable unit price. 1:1 with the source
+      `raw` table -- nothing is filtered, and unparseable text is retained with
+      offer_type='unparsed' rather than dropped.
+    columns:
+      - name: src_rowid
+        description: Source rowid. Unique within a snapshot; the grain of this model.
+        data_tests:
+          - unique
+          - not_null
+      - name: product_key
+        description: >
+          The owned key (md5, proved collision-free in P3.5). Nullable only for the
+          878,559 rows that resolve to no product row (Phase 0 E2).
+        data_tests:
+          - relationships:
+              to: ref('stg_product')
+              field: product_key
+      - name: offer_type
+        description: The commercial offer, not the encoding. See models/price_parse_macros.sql.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['scalar', 'multibuy', 'per_weight', 'unparsed', 'blank']
+      - name: price_basis
+        data_tests:
+          - accepted_values:
+              values: ['each', 'per_100g', 'per_100ml']
+      - name: parse_confidence
+        description: >
+          'ambiguous' marks rows where two readings are both defensible and the evidence
+          does not separate them. CLAUDE.md honesty rule 3 excludes these from D2/D4
+          headline numbers at query time.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['exact', 'derived', 'inferred', 'ambiguous', 'none']
+      - name: old_offer_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['scalar', 'multibuy', 'per_weight', 'unparsed', 'blank']
+      - name: current_price_raw
+        description: Always retained, never discarded, so the unparsed set stays inspectable.
+
+  - name: stg_product
+    description: One row per product, with a parsed size and a brand class. 1:1 with `product`.
+    columns:
+      - name: product_key
+        description: The owned surrogate key. Covers the blank-sku 13.8% via `concatted`.
+        data_tests:
+          - unique
+          - not_null
+      - name: product_key_basis
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['vendor_sku', 'vendor_concatted']
+      - name: vendor
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Metro', 'Galleria', 'SaveOnFoods', 'Walmart', 'Loblaws', 'NoFrills', 'TandT', 'Voila']
+      - name: unit_uom
+        data_tests:
+          - accepted_values:
+              values: ['g', 'ml', 'count']
+      - name: unit_parse_confidence
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['exact', 'derived', 'inferred', 'none']
+      - name: brand_class
+        description: >
+          Junk NEVER defaults to a real category (brief 3.3) -- an unknown brand yields an
+          unclassifiable_* verdict, not 'national_brand'.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['private_label', 'national_brand', 'unclassifiable_blank',
+                       'unclassifiable_junk', 'unclassifiable_no_vendor_data']
+      - name: upc_tier
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['vendor_upc', 'matched_upc', 'fuzzy']

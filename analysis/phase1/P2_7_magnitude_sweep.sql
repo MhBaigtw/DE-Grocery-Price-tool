@@ -15,18 +15,22 @@
 -- clearance as readily as a parse bug, so a hit is a lead, not a verdict -- but a parse
 -- bug CANNOT hide from it, which is the point.
 --
--- Key carried as a hash: materialising `sku` as VARCHAR in a temp table off this join
--- trips a DuckDB 1.5.5 statistics bug (see P2_6).
+-- Keyed on the OWNED product_key (md5, proved collision-free in P3.5). This query
+-- originally used a 64-bit hash workaround that had ONE collision in 161,300 keys -- and
+-- a merged key is not a harmless rounding error HERE: it interleaves two different
+-- products' price series under one key, manufacturing exactly the large adjacent-day
+-- ratio this sweep is built to detect. Re-run under the md5 key; the delta is reported
+-- in section 5.5.
 SET threads = 4;
 
 CREATE OR REPLACE TEMP TABLE keymap AS
-SELECT hash(vendor || '|' || sku) AS k, any_value(vendor) AS vendor, any_value(sku) AS sku,
-       any_value(product_name) AS product_name, any_value(units) AS units
-FROM product WHERE sku IS NOT NULL AND trim(sku) <> '' GROUP BY 1;
+SELECT product_key AS k, any_value(vendor) AS vendor, any_value(sku) AS sku,
+       any_value(product_name) AS product_name, any_value(units_raw) AS units
+FROM stg_product GROUP BY 1;
 
 -- one price per key per day, per basis (comparing 'each' against 'per_100g' is meaningless)
 CREATE OR REPLACE TEMP TABLE d AS
-SELECT hash(p.vendor || '|' || p.sku) AS k, s.price_basis, s.observed_date AS dt,
+SELECT s.product_key AS k, s.price_basis, s.observed_date AS dt,
        avg(s.unit_price)          AS px,
        any_value(s.normalization) AS norm,
        any_value(s.offer_type)    AS otype

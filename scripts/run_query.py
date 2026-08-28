@@ -4,7 +4,9 @@
 Honesty rule #3 (CLAUDE.md): every published number has a committed SQL file that
 regenerates it. This is the runner that makes that cheap to do -- and to redo.
 
-Opens the database READ ONLY, so a query can never mutate the analysis DB.
+Opens the database READ ONLY, so a query can never mutate the analysis DB. A file that
+declares macros gets an in-memory catalog with the database ATTACHed read-only, so the
+macros have somewhere to live without the snapshot becoming writable.
 A file may contain several statements; only the last SELECT's result is printed by
 default (--all prints every statement that returns rows).
 
@@ -13,11 +15,40 @@ Usage:  python scripts/run_query.py analysis/phase0/A1_shape.sql [--db hammer.du
 """
 import argparse
 import pathlib
+import re
 import sys
 
 import duckdb
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
+
+
+def expand_reads(sql: str, base: pathlib.Path, _seen: frozenset = frozenset()) -> str:
+    """Inline `.read <path>` lines.
+
+    `.read` is a DuckDB *CLI* dot-command; the Python API rejects it outright. A query
+    file that needs the parsing macros therefore had two bad options: duplicate the macro
+    bodies (a second definition that can drift from models/) or be unrunnable by this
+    runner. P2_2_parser_unit_tests.sql took the second, which meant the "22 of 22 pass"
+    figure had no committed way to regenerate it -- honesty rule 4 unmet for exactly the
+    test that guards the 100x errors.
+
+    Paths resolve relative to the repo root, matching how the CLI is invoked from there.
+    Nested reads are expanded; a cycle raises rather than recursing forever.
+    """
+    out = []
+    for line in sql.splitlines():
+        if line.strip().startswith(".read "):
+            target = (base / line.strip()[len(".read "):].strip().strip("'\"")).resolve()
+            if not target.exists():
+                raise FileNotFoundError(f".read target does not exist: {target}")
+            if target in _seen:
+                raise RecursionError(f".read cycle at {target}")
+            out.append(expand_reads(target.read_text(encoding="utf-8"), base,
+                                    _seen | {target}))
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 
 def split_statements(sql: str) -> list[str]:
@@ -89,11 +120,27 @@ def main() -> int:
     path = pathlib.Path(args.sql_file)
     if not path.exists():
         sys.exit(f"no such query file: {path}")
-    stmts = split_statements(path.read_text(encoding="utf-8"))
+    stmts = split_statements(expand_reads(path.read_text(encoding="utf-8"), REPO))
     if not stmts:
         sys.exit(f"{path} contains no statements")
 
-    con = duckdb.connect(args.db, read_only=True)
+    # A query file that declares macros needs somewhere to put them. The analysis DB is
+    # opened READ ONLY on purpose, so CREATE MACRO would fail against it -- but DuckDB
+    # allows creating them in a separate in-memory catalog and using them over an
+    # attached read-only database. That keeps the read-only guarantee intact.
+    declares_macros = re.search(r"\bcreate\b(\s+or\s+replace)?(\s+temp\w*)?\s+macro\b",
+                                " ".join(stmts), re.I) is not None
+    if declares_macros:
+        con = duckdb.connect(":memory:")
+        con.execute(f"ATTACH '{pathlib.Path(args.db).as_posix()}' AS db (READ_ONLY);")
+        # DuckDB makes a freshly attached database the default catalog, which would send
+        # CREATE MACRO into the read-only file. Force the default back to `memory` so
+        # CREATE lands there, and put db.main on the search path so unqualified table
+        # names still resolve to the snapshot. The snapshot stays READ_ONLY either way.
+        con.execute("USE memory.main;")
+        con.execute("SET search_path='memory.main,db.main';")
+    else:
+        con = duckdb.connect(args.db, read_only=True)
     con.execute("PRAGMA disable_progress_bar;")
     # 71M-row aggregations exceed RAM; let DuckDB spill instead of dying.
     tmp = args.temp_dir or str(pathlib.Path(args.db).resolve().parent / ".duckdb_spill")

@@ -16,14 +16,13 @@ SET threads = 4;
 
 -- daily price level per key, using the parsed unit price.
 --
--- IMPLEMENTATION NOTE: the key is carried as a HASH, not as the (vendor, sku) strings.
--- Materialising `sku` as a VARCHAR column in a temp table built from this join makes
--- DuckDB 1.5.5 fail with "Invalid unicode (byte sequence mismatch) detected in segment
--- statistics update". Reading the same strings is fine; only writing their statistics
--- fails. Hashing sidesteps it, and the strings are joined back at the sample stage where
--- the row count is small.
+-- Keyed on the OWNED product_key (md5, proved collision-free in P3.5). The original
+-- 64-bit hash workaround had one collision, and a merged key is actively dangerous here:
+-- two products sharing a key produce an artificial gap followed by an artificial price
+-- discontinuity -- precisely the pattern this heuristic counts. Re-run under md5; the
+-- delta is reported in section 5.5.
 CREATE OR REPLACE TEMP TABLE d AS
-SELECT hash(p.vendor || '|' || p.sku) AS k, s.observed_date AS d, avg(s.unit_price) AS px
+SELECT s.product_key AS k, s.observed_date AS d, avg(s.unit_price) AS px
 FROM stg_price s JOIN product p ON p.id = s.product_id
 WHERE p.sku IS NOT NULL AND trim(p.sku) <> ''
   AND s.observed_date >= DATE '2024-06-11'
@@ -63,9 +62,9 @@ FROM gaps WHERE gap_days BETWEEN 1 AND 7 AND px_before IS NOT NULL AND px_before
 
 -- 3. Per vendor (key strings rejoined here, where the row count is small).
 CREATE OR REPLACE TEMP TABLE keymap AS
-SELECT hash(vendor || '|' || sku) AS k, any_value(vendor) AS vendor, any_value(sku) AS sku,
-       any_value(product_name) AS product_name, any_value(units) AS units
-FROM product WHERE sku IS NOT NULL AND trim(sku) <> '' GROUP BY 1;
+SELECT product_key AS k, any_value(vendor) AS vendor, any_value(sku) AS sku,
+       any_value(product_name) AS product_name, any_value(units_raw) AS units
+FROM stg_product GROUP BY 1;
 
 SELECT m.vendor, count(*) AS gap_events,
        round(median(g.gap_days),0) AS median_gap_days,

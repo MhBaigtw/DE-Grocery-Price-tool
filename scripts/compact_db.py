@@ -14,6 +14,9 @@ table straight out of the existing database, so the peak requirement is
 The swap is deliberately last and atomic-ish: the new file is fully built and verified
 row-for-row BEFORE the old one is deleted. If anything fails, the original is untouched.
 
+Macros are recreated from models/*_macros.sql after the copy -- a table-by-table copy does
+not carry them, and losing them silently breaks `dbt test` and any query that calls one.
+
 Usage:  python scripts/compact_db.py [--db hammer.duckdb] [--keep-original]
 """
 import argparse
@@ -22,6 +25,8 @@ import shutil
 import sys
 
 import duckdb
+
+REPO = pathlib.Path(__file__).resolve().parent.parent
 
 
 def gb(path: pathlib.Path) -> float:
@@ -68,6 +73,31 @@ def main() -> int:
             dst.unlink(missing_ok=True)
             print("\nrow count mismatch -- original left untouched", file=sys.stderr)
             return 1
+
+    # MACROS DO NOT SURVIVE A TABLE-BY-TABLE COPY, and dropping them is not cosmetic.
+    # DuckDB persists `CREATE MACRO` in the database catalog, but this script copies
+    # BASE TABLEs only, so a compacted database comes out with the parsing macros gone.
+    # That is silent until something needs them, and then it is confusing rather than
+    # obvious: `dbt test` fails its on-run-start probe with "Scalar Function with name
+    # p_offer_type does not exist", which reads like a dbt problem and is not one. Any
+    # committed query that declares no macros of its own -- P5_6 uses `k_source` -- breaks
+    # the same way.
+    #
+    # So they are recreated from the committed sources, which is also the only correct
+    # place to get them from: the compacted database must be a faithful copy of the old
+    # one, and the old one's macros came from these same files via build_models.py.
+    macro_files = [REPO / "models" / f for f in
+                   ("product_key_macros.sql", "price_parse_macros.sql",
+                    "unit_parse_macros.sql", "brand_class_macros.sql")]
+    for mf in macro_files:
+        if not mf.exists():
+            con.close()
+            dst.unlink(missing_ok=True)
+            print(f"\nmissing macro source {mf} -- original left untouched", file=sys.stderr)
+            return 1
+        con.execute(mf.read_text(encoding="utf-8"))
+    con.execute("SELECT p_offer_type('3.29'), product_key('Metro', '1', 'c');")
+    print(f"  macros restored from {len(macro_files)} committed source files")
 
     con.execute("DETACH old;")
     con.close()

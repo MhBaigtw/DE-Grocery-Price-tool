@@ -1,0 +1,30 @@
+version: 2
+
+models:
+  - name: int_upc_match
+    description: >
+      Cross-vendor product identity with a confidence tier on every match. One row per
+      product; nothing is filtered, so lower tiers stay auditable and every percentage has
+      a denominator. The tier of a match is the WEAKEST tier of its participants.
+    columns:
+      - name: product_key
+        description: The owned key. This model must not reference product_id at all.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_product')
+              field: product_key
+      - name: match_tier
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['vendor_upc', 'matched_upc', 'fuzzy', 'unmatched', 'no_upc', 'plu_short']
+      - name: vendor_upc_tier
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['vendor_upc', 'matched_upc', 'fuzzy']
+      - name: is_reliable_only
+        data_tests:
+          - not_null

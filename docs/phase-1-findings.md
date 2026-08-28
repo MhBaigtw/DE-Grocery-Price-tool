@@ -497,59 +497,94 @@ different product. If that happens, one key silently splices two unrelated price
 Heuristic: for keys with an observation gap > 30 days, does the price level shift
 discontinuously on resumption? Compared against a baseline of normal 1–7 day gaps.
 
+> ### RESTATED in §5.5. The figures below are the corrected ones.
+> The originally published values — 3,845 moves >50% (3.25%), 663 >200% (0.56%), a 0.41%
+> baseline — were computed on a build that **predated the §2.5 bare-integer-cents fix**.
+> They are not wrong arithmetic; they are arithmetic on 79,478 Walmart prices that were
+> wrong by 100×. §2.5's "Ordering of the fixes, stated" audited §2.3's numbers for exactly
+> this and did not extend to §2.6. Every figure in this section is now from the fixed
+> build. See §5.5 for the delta and what it costs this section's conclusion.
+
 | | Long gaps (>30d) | Baseline (1–7d) |
 |---|---|---|
-| Events | 118,430 | 58,826,990 |
+| Events | 118,430 | 58,827,148 |
 | Distinct keys | 76,824 | — |
 | Median gap | 73 days | — |
 | **Median price move** | **0.00%** | **0.00%** |
-| **Moves > 50%** | **3,845 (3.25%)** | **0.41%** |
-| Moves > 200% | 663 (0.56%) | — |
+| **Moves > 50%** | **3,484 (2.94%)** | **0.23%** |
+| Moves > 200% | **296 (0.25%)** | — |
 
-**The signal is real but small.** Large price moves are **8× more likely** after a long gap
-than after a normal one (3.25% vs 0.41%). The median move is zero in both, so the typical
-long gap is entirely benign — it is the tail that differs.
+**The signal is real but small.** Large price moves are **12.8× more likely** after a long
+gap than after a normal one (2.94% vs 0.23%). The median move is zero in both, so the
+typical long gap is entirely benign — it is the tail that differs.
+
+Note that the *ratio* got **stronger** under the corrected figures (12.8× against the
+originally reported 8×) even though both numbers fell, because the baseline fell
+proportionally further. The qualitative conclusion survives; the absolute risk upper bound
+more than halves.
 
 Per vendor, the >200% moves concentrate sharply:
 
-| Vendor | Gap events | Median gap | Moves > 200% |
-|---|---|---|---|
-| **Walmart** | 27,828 | 51 days | **416** |
-| Metro | 18,083 | 69 days | 95 |
-| Galleria | 5,639 | 106 days | 59 |
-| SaveOnFoods | 4,497 | 70 days | 55 |
-| Loblaws | 23,467 | 73 days | 16 |
-| NoFrills | 29,196 | 71 days | 15 |
-| TandT | 5,925 | 76 days | 7 |
-| Voila | 3,795 | 94 days | **0** |
+| Vendor | Gap events | Median gap | Moves > 200% | *(as first published)* |
+|---|---|---|---|---|
+| **Walmart** | 27,828 | 51 days | **49** | *416* |
+| Metro | 18,083 | 69 days | 95 | 95 |
+| Galleria | 5,639 | 106 days | 59 | 59 |
+| SaveOnFoods | 4,497 | 70 days | 55 | 55 |
+| Loblaws | 23,467 | 73 days | 16 | 16 |
+| NoFrills | 29,196 | 71 days | 15 | 15 |
+| TandT | 5,925 | 76 days | 7 | 7 |
+| Voila | 3,795 | 94 days | **0** | 0 |
+
+**The entire correction is Walmart, 416 → 49. Every other vendor is unchanged to the
+row.** That is the signature of a parser artifact rather than a data change, and it is
+what §5.5 confirms directly.
 
 The sample makes the mechanism visible — and it is **not grocery repricing**:
 
-| Vendor | SKU | Gap | Before | After | Move |
-|---|---|---|---|---|---|
-| Metro | `4341` | 458 d | $16.90 | **$14,858.40** | 87,820% |
-| Walmart | `226PJRK24U5X` | 37 d | $4.37 | $1,074.00 | 24,477% |
-| Walmart | `3RGEXVPTBDWG` | 122 d | $0.99 | $170.90 | 17,163% |
-| Walmart | `6000205233379` | 615 d | $13.47 | $2,196.00 | 16,203% |
+| Vendor | SKU | Gap | Before | After | Move | Still present? |
+|---|---|---|---|---|---|---|
+| Metro | `4341` | 458 d | $16.90 | **$14,858.40** | 87,820% | **yes** |
+| NoFrills | `20891206001_KG` | 71 d | $0.01 | $2.75 | 27,400% | **yes** |
+| Walmart | `3RGEXVPTBDWG` | 122 d | $0.99 | $170.90 | 17,163% | **yes** |
+| Walmart | `226PJRK24U5X` | 37 d | $4.37 | ~~$1,074.00~~ | ~~24,477%~~ | **no — parser** |
+| Walmart | `6000205233379` | 615 d | $13.47 | ~~$2,196.00~~ | ~~16,203%~~ | **no — parser** |
 
-Two things stand out. **Walmart's opaque marketplace IDs** (`226PJRK24U5X`) jump from
-grocery scale to appliance scale, which is what a reused marketplace listing slot looks
-like. And **Metro SKU `4341` is a four-digit PLU produce code** — exactly the shared,
-non-unique code space Phase 0 B4c identified, where reuse is expected rather than
-surprising.
+**Two of the four originally published examples were parser artifacts, and this is the
+bad news of §5.5.** `226PJRK24U5X` reads `1074` in the source and now parses as **$10.74**,
+not $1,074.00; `6000205233379` reads `2196` and now parses as **$21.96**. Both are
+`bare_integer_cents` rows — the exact defect §2.5 found and fixed — and both were quoted
+here as evidence of SKU reuse.
 
-**Verdict, as a risk statement.** An upper bound of **663 gap events across 76,824 keys
-with gaps (0.56%)** show a discontinuity large enough to be consistent with SKU reuse.
+What survives, and what does not:
+
+- **Metro `4341` survives.** It is a four-digit PLU produce code — the shared, non-unique
+  code space Phase 0 B4c identified, where reuse is expected rather than surprising. This
+  half of the conclusion is unaffected, and Metro/Galleria's counts did not move at all.
+- **The Walmart marketplace-ID story is substantially weakened.** It rested on opaque IDs
+  jumping from grocery scale to appliance scale; most of that jump was our parser reading
+  cents as dollars. Walmart's >200% count falls from 416 to 49 — from **the largest** such
+  count of any vendor to **fourth**, behind Metro, Galleria and Save-On-Foods.
+  `3RGEXVPTBDWG` is a genuine case and the mechanism is real, but 49 events is not the
+  evidence 416 looked like.
+
+**Verdict, as a risk statement.** An upper bound of **296 gap events across 76,824 keys
+with gaps (0.25%)** show a discontinuity large enough to be consistent with SKU reuse.
 That is an upper bound, not an estimate: a genuine relisting at a new price, a seasonal
 item returning, or a unit-size change would all look identical here. The heuristic cannot
 separate them and no attempt is made to.
 
 **What this changes: nothing yet, deliberately.** It is not enough to complicate Section
-4's key, and acting on 0.56% by adding a splice-detection layer would be building
-machinery for a problem we have not confirmed exists. It is enough to justify two things
-in a later phase: excluding four/five-digit PLU-style SKUs from single-vendor time series,
-and treating Walmart marketplace IDs as a lower-confidence identity tier than grocery
-SKUs. Both are Phase 2 decisions.
+4's key, and acting on 0.25% by adding a splice-detection layer would be building
+machinery for a problem we have not confirmed exists.
+
+It is enough to justify **one** thing in a later phase — excluding four/five-digit
+PLU-style SKUs from single-vendor time series, where the evidence is unchanged. The
+second recommendation this section originally made, **treating Walmart marketplace IDs as
+a lower-confidence identity tier, is withdrawn to "worth a look" rather than "justified"**:
+it was carried by 416 events of which 367 were our own 100× parse error. Both remain Phase
+2 decisions, but they no longer have the same weight behind them and should not be
+presented as if they did.
 
 *Source: `P2_6_sku_reuse_heuristic.sql`.*
 
@@ -1454,4 +1489,491 @@ reasoning that B5's 26/30 eyeball is not a basis for shipping:
 
 ## Section 5 — Contracts and tests
 
-Not started. Awaiting sign-off on Section 4.
+**Status: complete.** Headline: **40 dbt tests, all passing on both snapshots; 23 of 23
+fail-when-they-should cases behave as expected; and the suite found a real defect in the
+owned key on its first run against real data.**
+
+Section 5 was supposed to be bookkeeping. It was not. Writing a relationships test between
+the price model and the product model surfaced a defect in Section 4's key that had been
+sitting in the model since it was built, and the correctness sweep this section was asked
+to re-verify turned out to have been published from a stale build. Both are below, before
+the test counts, because they matter more than the counts do.
+
+---
+
+### 5.1 The defect the test suite found on its first run — 878,559 rows sharing one identity
+
+**This is the worst thing in Phase 1 and it was found by a test, which is the entire
+argument for writing tests.**
+
+`stg_price` LEFT JOINs `product`, deliberately: **878,559 rows resolve to no product row
+at all** (Phase 0 E2) and an INNER join would silently drop them, breaking the 1:1
+contract. Those rows therefore reach the key macro with `vendor`, `sku` and `concatted`
+all NULL. The macro read:
+
+```sql
+coalesce(vendor, '?') || chr(31) || '#c:' || coalesce(concatted, '')
+```
+
+`coalesce(vendor, '?')` kept the key non-null — and gave **every one of the 878,559 rows
+the same md5**.
+
+| Measure | Snapshot 1 | Snapshot 2 |
+|---|---|---|
+| Rows resolving to no product | 878,559 | 880,787 |
+| Distinct keys among them | **1** | **1** |
+| Rows whose key exists in `stg_product` | **0** | **0** |
+
+That is not a missing key. It is a **manufactured identity**: 878,559 price rows of
+unknown provenance presented as one product. §3.5 spent an entire section removing exactly
+this failure from the 64-bit hash, where it merged **two** products and moved a count by 6.
+This merged 878,559 rows and nobody noticed, because it was in a branch no published query
+happened to reach.
+
+#### Blast radius: zero published numbers, checked one by one
+
+Volunteering the bad news first: it is a real defect and it was in the model for the whole
+of Sections 2–4. Then the actual exposure, which I checked rather than assumed — every
+Phase 1 query that touches `stg_price` reaches products through a join that excludes the
+orphan key:
+
+| Query | How it joins | Orphans reached? |
+|---|---|---|
+| `P2_3` D2 reconciliation | INNER `JOIN product ON p.id = s.product_id` | no |
+| `P2_6` sku-reuse | INNER join to `product` / `stg_product` | no |
+| `P2_7` magnitude sweep | INNER join to `product` / `stg_product` | no |
+| `P2_8` old_price coverage | INNER `JOIN product` | no |
+| `P3_6` ambiguous semantics | INNER `JOIN product` | no |
+| `P4_1` identity model | INNER `JOIN int_upc_match USING (product_key)` | no |
+| §2.2 parse coverage | reads `stg_price` directly, no join | n/a — no key used |
+
+**No published Phase 1 figure moves.** But "every consumer happened to filter it out" is
+luck, not a guarantee, and the next consumer — a D2 or D4 query in Phase 2 aggregating by
+`product_key` — would have had 878,559 rows collapse into one product with no error.
+
+#### The fix
+
+A NULL vendor means "no product row" and nothing else: `product.vendor` is **never NULL
+and never blank in either snapshot** (verified on both, not assumed). So the key is NULL
+where there is no product:
+
+```sql
+CREATE OR REPLACE MACRO k_source(vendor, sku, concatted) AS
+  CASE WHEN vendor IS NULL THEN NULL
+       WHEN k_has_sku(sku) THEN vendor || chr(31) || trim(sku)
+       ELSE vendor || chr(31) || '#c:' || coalesce(concatted, '')
+  END;
+```
+
+Unknown identity is now representable, and a NULL propagates into a join as an **absence**
+rather than as a false match. `coalesce(vendor, '?')` was not a safety net; it was a
+non-null constraint satisfied by inventing a value.
+
+**The fix changes exactly one column and nothing else.** `verify_reproducible.py` compares
+a per-column checksum, so this is measurable rather than asserted — of 22 columns, 21 have
+byte-identical checksums before and after, and `product_key` is the only one that moved:
+
+| Column | Before fix | After fix |
+|---|---|---|
+| `product_key` | 660906526141231848679888005 | **659391862899380406995276451** |
+| all other 21 | *unchanged* | *unchanged* |
+
+Both databases were rebuilt and re-verified. `stg_product` and `int_upc_match` are
+unaffected — `product.vendor` is never NULL there, so every one of the 187,028 / 187,070
+product keys is byte-identical to before.
+
+*Source: `dbt/models/staging/schema.yml` (the relationships test that found it),
+`models/product_key_macros.sql`, `P5_6_both_snapshots_parse.sql` result 7.*
+
+---
+
+### 5.5 Did the retired 64-bit hash contaminate §2.5 or §2.6? **No. Zero.**
+
+The question: §3.5 restated D2's counts after replacing the colliding 64-bit hash with the
+owned md5 key, but §2.5's correctness sweep and §2.6's sku-reuse heuristic were left on
+the old keying. A merged key is *especially* dangerous in both — it interleaves two price
+series under one identity, manufacturing precisely the adjacent-day ratio the sweep detects
+and precisely the gap-then-discontinuity the heuristic counts.
+
+**Method.** Both keyings computed in one run from one base table, so the delta is measured
+rather than compared across two runs that could differ for other reasons. A control
+confirms the population is identical under both joins (**70,132,782 rows either way**), so
+what changes is the key and nothing else.
+
+**The collision, named:** hash bucket `918118051070506723`, holding
+
+- SaveOnFoods / `00014100283522` — Goldfish Mega Bites Crackers, Cheddar Jalapeno, 167 g
+- SaveOnFoods / `00064100283022` — Nutri-Grain Bars, Raspberry, 8 Each
+
+#### §2.5 magnitude sweep — identical, to the bucket
+
+| Keying | Flagged pairs | x100 | x0.01 | x10 | x0.1 |
+|---|---|---|---|---|---|
+| **md5 (owned key)** | **1,825** | 876 | 866 | 40 | 43 |
+| hash64 (retired) | **1,825** | 876 | 866 | 40 | 43 |
+| **Delta** | **0** | **0** | **0** | **0** | **0** |
+
+#### §2.6 sku-reuse heuristic — identical
+
+| Keying | Gap events | Distinct keys | Median gap | >50% | >200% | % >50 |
+|---|---|---|---|---|---|---|
+| **md5 (owned key)** | **118,430** | 76,824 | 73 d | 3,484 | 296 | 2.9418% |
+| hash64 (retired) | **118,430** | 76,824 | 73 d | 3,484 | 296 | 2.9418% |
+| **Delta** | **0** | **0** | **0** | **0** | **0** | **0** |
+
+#### The only measurable trace of the collision anywhere
+
+| Measure | md5 | hash64 | Delta |
+|---|---|---|---|
+| 1–7 day baseline adjacency events | 58,827,148 | 58,826,990 | **158** |
+| Baseline % moving >50% | 0.2306% | 0.2306% | **0** |
+| Flagged pairs on the colliding bucket | 0 | 0 | 0 |
+| Long-gap events on the colliding bucket | 0 | 0 | 0 |
+
+**158 adjacency pairs out of 58.8 million — 0.00027%** — and it does not move the reported
+percentage at four decimal places. The two merged products simply never produced a large
+adjacent-day ratio or a long gap between them.
+
+**Answer: zero.** Not "small". Zero, on every published figure in both sections.
+
+*Source: `P5_5_hash_collision_impact.sql`. The committed `P2_6` and `P2_7` were re-keyed
+onto the owned key and re-run; both reproduce these numbers exactly.*
+
+#### But the recomputation found a different error, and this one is real
+
+**§2.6's published figures were computed on a build that predated the §2.5
+bare-integer-cents fix.** Not a collision — a stale build:
+
+| Figure | As published | Corrected | Cause |
+|---|---|---|---|
+| Moves > 50% | 3,845 (3.25%) | **3,484 (2.94%)** | §2.5 fix |
+| **Moves > 200%** | **663 (0.56%)** | **296 (0.25%)** | §2.5 fix |
+| Baseline % > 50% | 0.41% | **0.23%** | §2.5 fix |
+| Long-gap : baseline ratio | 8× | **12.8×** | both fell, baseline further |
+
+**The whole correction is Walmart: >200% events fall 416 → 49, and every other vendor is
+unchanged to the row.** That is a parser signature, not a data change. Verified directly
+against the published sample: `226PJRK24U5X` was quoted jumping $4.37 → $1,074.00; the raw
+text is `1074` and it now parses as **$10.74**, `normalization = bare_integer_cents`.
+`6000205233379` was quoted $13.47 → $2,196.00; raw `2196`, now **$21.96**. Two of the four
+headline examples of "SKU reuse" were our own 100× error.
+
+**What this costs.** §2.6's PLU-code conclusion is unaffected (Metro and Galleria did not
+move). Its **Walmart marketplace-ID conclusion is withdrawn from "justified" to "worth a
+look"** — Walmart drops from the largest >200% count of any vendor to fourth. §2.6 has been
+restated in place with the correction marked rather than silently edited.
+
+**Why this was not caught earlier.** §2.5 has a subsection, "Ordering of the fixes,
+stated", written specifically to check which figures predated which fix. It audited §2.3's
+numbers. It did not extend to §2.6. The lesson is that a one-off audit of "which numbers
+came from which build" is not a substitute for the `_build_stamp` mechanism §3.8 added,
+and the stamp only tells you the *current* build is consistent — it cannot retroactively
+date a number already written into a document.
+
+---
+
+### 5.6 Both snapshots are parsed — the exit criterion was unmet and is now met
+
+**Volunteering this plainly: Phase 1's exit criteria say "Every price row in *both
+snapshots* has an `offer_type` and either a `unit_price` or an explicit `unparsed`
+verdict." Section 2 reported 71,809,333 rows — snapshot 1 only. Snapshot 2's 213,319
+additional rows and 2 additional dates had never been through the parser, and the findings
+document did not say so.** `hammer2.duckdb` had also been deleted for disk space, which
+made the cross-snapshot claims in §1.3, §1.4 and §3.5 unreproducible.
+
+**Resolution: extend coverage, not amend the criterion.** Snapshot 2 was reloaded and the
+models built on it.
+
+**Why both rather than only the newer one.** Snapshot 2 carries every date snapshot 1 has
+plus two more, so it is *nearly* a superset — but not exactly: §1.4 found 12 rows upstream
+re-keyed between the publications. "Nearly a superset" is not a basis for discarding a
+snapshot, and locked decision 2 retains both regardless. So both are parsed and both
+reported. Snapshot 1 stays the basis for the published Section 2–4 numbers because that is
+what they were computed on; snapshot 2 is evidence the parser holds on a publication it
+never saw.
+
+#### Row-count reconciliation, both snapshots
+
+| Snapshot | `raw` rows | `stg_price` rows | Difference |
+|---|---|---|---|
+| 1 (`20260822T134045Z`) | 71,809,333 | 71,809,333 | **0** |
+| 2 (`20260824T132829Z`) | 72,022,652 | 72,022,652 | **0** |
+
+#### The exit criterion, as a number
+
+| Snapshot | Rows | Missing `offer_type` | **Silently lost** | `unparsed` | **% resolved** |
+|---|---|---|---|---|---|
+| 1 | 71,809,333 | 0 | **0** | 33 | **100.000000%** |
+| 2 | 72,022,652 | 0 | **0** | 33 | **100.000000%** |
+
+"Silently lost" is the count that matters: a row with no `unit_price` *and* no explicit
+`unparsed`/`blank` verdict. Zero on both.
+
+#### The parser holds on data it never saw
+
+| `offer_type` | Snapshot 1 | Snapshot 2 | Delta |
+|---|---|---|---|
+| scalar | 70,566,164 | 70,777,694 | +211,530 |
+| multibuy | 679,923 | 680,161 | +238 |
+| per_weight | 563,213 | 564,764 | +1,551 |
+| **unparsed** | **33** | **33** | **0** |
+
+**No new shape appeared, and the unparsed set did not grow by a single row** across two
+days and 213,319 new observations.
+
+| `normalization` | Snapshot 1 | Snapshot 2 | Delta |
+|---|---|---|---|
+| none | 71,563,707 | 71,769,435 | +205,728 |
+| basis_rescaled | 106,264 | 106,325 | +61 |
+| **bare_integer_cents** | **79,478** | **85,688** | **+6,210** |
+| cents_div100 | 47,992 | 48,342 | +350 |
+| now_prefix_cents_div100 | 11,506 | 12,476 | +970 |
+| thousands_sep | 353 | 353 | 0 |
+
+The `cents_div100` growth of **+350 over 2 days** matches §1.5's measured ~175 rows/day
+exactly — the Loblaws defect is still accruing at a steady rate and is not spreading.
+
+| `parse_confidence` | Snapshot 1 | Snapshot 2 | Delta |
+|---|---|---|---|
+| exact | 70,380,304 | 70,584,089 | +203,785 |
+| derived | 818,899 | 826,667 | +7,768 |
+| inferred | 563,213 | 564,764 | +1,551 |
+| **ambiguous** | **46,884** | **47,099** | **+215** |
+| none | 33 | 33 | 0 |
+
+#### §3.5's cross-snapshot collision proof, now reproducible again
+
+This is the claim that could not be re-run after `hammer2.duckdb` was deleted:
+
+| Scope | Distinct key sources | Distinct keys | **Collisions** |
+|---|---|---|---|
+| **Union of both snapshots** | **187,087** | **187,087** | **0** |
+
+**§3.5's number is confirmed exactly.** One caveat on method, recorded because I got it
+wrong first: comparing distinct `(product_key, vendor, sku, concatted)` tuples reports
+**559 "collisions"**, and they are not collisions. They are products whose `concatted`
+changed between publications (§1.3 measured 388 name and 541 brand changes, and `concatted`
+embeds both) while vendor and sku held steady. `concatted` is not an input to the key where
+a sku exists, so it cannot change the key. The unit of comparison must be the **key source
+string** — the exact input to md5 — not the product row.
+
+*Source: `P5_6_both_snapshots_parse.sql`.*
+
+---
+
+### 5.7 Rewrite detector — added to the retention design
+
+Appended to `docs/retention-design.md` as **Tier 2a**. The short version: §1.4's
+"upstream is append-only" rests on **12 changed rows across 2 dates over one 2-day
+window**, the maintainer has announced he is reworking post-processing, and honesty rule 4
+silently depends on the conclusion. A per-`observed_date` row count plus a price checksum,
+carried in the weekly slim delta, turns it into a monitored property without touching
+archive cadence.
+
+**One design note that changes the ask.** A price-only checksum — literally what was asked
+for — **would have been blind to the only rewrite ever observed**: §1.4's 12 rows were
+re-keyed at an *unchanged price*. So the detector carries two checksums, a price one and
+an identity one that includes `product_id`, and they separate "our published numbers
+moved" from "upstream re-keyed something". The second costs 8 bytes per date.
+
+**Cost, measured on the real 889-date history rather than estimated:**
+
+| Measure | Value |
+|---|---|
+| Rows (one per observed date, 2024-02-28 → 2026-08-23) | **889** |
+| Price rows fingerprinted | 72,022,644 |
+| **Parquet + zstd** | **16.77 KiB** |
+| Per date | 19.3 bytes |
+| Growth | ~7 KB/year |
+| **Against the 8.09 MB slim delta** | **0.2%** |
+| **Weekly cadence cost** | **+0.9 MB/year** |
+
+*Source: `P5_7_rewrite_detector_size.sql`. Full detail and the "what it does not do"
+section are in `docs/retention-design.md` Tier 2a.*
+
+---
+
+### 5.2 The tests — 40 of them, on both snapshots
+
+Reported as counts, per brief 5.4 and honesty rule 6. **These are counts of tests that
+exist. They are not a pass rate for Phase 1.**
+
+| Target | Tests | Passed | Failed |
+|---|---|---|---|
+| `dev` (snapshot 1) | 40 | **40** | 0 |
+| `snapshot2` (snapshot 2) | 40 | **40** | 0 |
+
+Run with `python scripts/run_dbt_tests.py`.
+
+**31 generic tests** from `schema.yml` — uniqueness and not-null on the owned key and on
+`src_rowid`, accepted values on `offer_type`, `price_basis`, `parse_confidence`,
+`brand_class`, `product_key_basis`, `vendor`, `match_tier` and `vendor_upc_tier`, and the
+relationships test between `stg_price` and `stg_product` that found §5.1.
+
+**9 singular tests** in `dbt/tests/`, one per rule that would otherwise be a comment:
+
+| Test | What it forbids | Why it exists |
+|---|---|---|
+| `assert_stg_price_rowcount_matches_raw` | `stg_price` ≠ `raw` | reconciliation (5.2); silent row loss |
+| `assert_stg_product_rowcount_matches_product` | `stg_product` ≠ `product` | same |
+| `assert_int_upc_match_rowcount_matches_stg_product` | tiers dropped at load | keeps denominators available |
+| `assert_no_price_row_lost_to_parsing` | no price *and* no `unparsed` verdict | the naive-CAST failure |
+| `assert_multibuy_never_stripped_to_total` | `2/$7.00` → 7.00 | doubles the true price |
+| `assert_cents_form_never_read_as_dollars` | `329$` → 329.00 | 100× error, 79,478 rows |
+| `assert_junk_brand_never_national` | junk → `national_brand` | biases private-label share down |
+| `assert_match_tier_is_weakest_participant` | strongest-participant tiering | launders fuzzy into headline |
+| `assert_reliable_only_excludes_fuzzy` | `is_reliable_only` on a fuzzy GTIN | D4's basket filter |
+| `relationships` (generic) | a price key with no product | **found §5.1** |
+
+#### The reconciliation test (brief 5.2), stated
+
+Row count in equals row count out at every layer, with any deliberate reduction named. The
+deliberate reduction is **zero** at all three layers — nothing is filtered anywhere, which
+is itself the design commitment (honesty rule 2: lower tiers kept and flagged, never
+deleted; honesty rule 5: the denominator is always available).
+
+| Layer | Source | Model | Deliberate reduction |
+|---|---|---|---|
+| `raw` → `stg_price` | 71,809,333 / 72,022,652 | same | **none** |
+| `product` → `stg_product` | 187,028 / 187,070 | same | **none** |
+| `stg_product` → `int_upc_match` | 187,028 / 187,070 | same | **none** |
+
+### 5.3 Every test demonstrated to fail when it should — 23 of 23
+
+A test that has never failed has not been tested. `scripts/test_dbt_contracts.py` proves
+each one fails, and the result is **23 of 23 cases behaved as expected**: 1 control plus 22
+injected violations.
+
+**Method, and why it does not run against the real database.** The obvious approach —
+break a row in `stg_price` and watch the test go red — would mutate a 71.8M-row
+materialisation that locked decision 2 and `verify_reproducible.py` both require to be a
+pure function of an immutable snapshot. Testing a test by destroying the property the test
+protects is not a trade worth making, and the rebuild costs the better part of an hour.
+
+So the harness builds a **fixture database**: small tables with the same names and columns,
+built from the **same committed model SQL**, populated with rows that satisfy every
+contract. Then per test: rebuild clean, inject one violation aimed at that test, run only
+that test with `dbt test --select`, require a non-zero exit.
+
+**The control is not decoration.** A clean fixture must pass **all 40** tests — without it,
+a suite that failed on everything would score a perfect 22 of 22. That is the same trap
+`test_check_schema.py` documents, and it caught something real here: **the control failed
+on the first run**, and the cause was not the fixture. It was §5.1.
+
+| Case | Injection | Result |
+|---|---|---|
+| **CONTROL** | *(nothing)* | all 40 pass |
+| `assert_stg_price_rowcount_matches_raw` | delete one row | fails |
+| `assert_stg_product_rowcount_matches_product` | delete a vendor's row | fails |
+| `assert_int_upc_match_rowcount_matches_stg_product` | delete a tier row | fails |
+| `assert_no_price_row_lost_to_parsing` | NULL price, `offer_type='scalar'` | fails |
+| `assert_multibuy_never_stripped_to_total` | `2/$7.00` → 7.00 | fails |
+| `assert_cents_form_never_read_as_dollars` | `329$` → 329.00 | fails |
+| `assert_junk_brand_never_national` | `Out of stock` → `national_brand` | fails |
+| `assert_match_tier_is_weakest_participant` | fuzzy GTIN → `vendor_upc` | fails |
+| `assert_reliable_only_excludes_fuzzy` | fuzzy GTIN → `is_reliable_only` | fails |
+| 13 generic tests | duplicate row / NULL / out-of-domain / orphan key | all fail |
+
+Two of the 22 injections did **not** fail on the first attempt. The cause was mine — a
+14-digit GTIN written as a 17-character literal, so the injection updated no rows. That is
+the harness working: an injection that changes nothing must not be reported as a caught
+violation, and the "TEST DID NOT RUN" path exists for exactly that.
+
+**Also demonstrated to fail, outside dbt:**
+
+| Check | Injection | Result |
+|---|---|---|
+| `check_layering.py` | `sp.product_id` into `int_upc_match.sql` | exit 1, names file and line (§4.1) |
+| `check_model_parity.py` | `p_min_qty(...)` → `1` in the dbt copy | exit 1, word-level diff |
+| `test_check_schema.py` | 6 schema mutations incl. `product_id` → number | 6 of 6 |
+
+### 5.4 Two problems in the test framework itself, fixed
+
+Volunteered because both would have produced a green suite that meant nothing.
+
+**1. dbt was testing an empty database.** `profiles.yml` said `path: ../hammer.duckdb`.
+dbt resolves that against the **current working directory**, not against the profile — so
+run from the repo root it points one level *above* the repo, and DuckDB cheerfully
+**created** an empty database there. The visible symptom was a missing-macro catalog error,
+which looks nothing like the cause. The dangerous outcome is the other one: a suite that
+passes against an empty database and reports 40 of 40. Paths now come from environment
+variables that `scripts/run_dbt_tests.py` sets to absolute values.
+
+**2. The dbt models are a second copy of `models/*.sql`, and `dbt_project.yml` claimed
+they were not.** They are. dbt cannot include a plain `.sql` file and the plain path has no
+Jinja renderer, so one file cannot serve both. The comment was corrected, and — because
+correcting a comment does not stop drift — `scripts/check_model_parity.py` now normalises
+both bodies and fails on any difference beyond comments, `{{ config }}` and source
+references. They are currently identical.
+
+**3. The price-parser test could not be run by committed tooling.** `P2_2` opens with
+`.read models/price_parse_macros.sql`, a DuckDB **CLI dot-command** that the Python API
+rejects, and there is no `duckdb` CLI in this environment. The published "22 of 22 pass"
+therefore had **no committed way to regenerate it** — honesty rule 4 unmet for precisely
+the test that guards the 100× errors. `run_query.py` now expands `.read` and, when a query
+file declares macros, gives them an in-memory catalog with the database ATTACHed read-only
+so the snapshot never becomes writable. **22 of 22, reproducibly.**
+
+### 5.8 Full check status
+
+| Check | Result |
+|---|---|
+| `check_manifest.py` | **OK** — 118 tracked files, 28 manifest entries |
+| `check_schema.py` — snapshot 1 | **OK** — 2 tables, 15 columns |
+| `check_schema.py` — snapshot 2 | **OK** — 2 tables, 15 columns; `raw.product_id` still VARCHAR |
+| `check_layering.py` | **OK** — 0 `product_id` references below staging |
+| `check_model_parity.py` | **OK** — 3 of 3 model bodies identical across build paths |
+| `verify_reproducible.py` — snapshot 1 | **OK** — 22 of 22 columns, build stamp 7 of 7 |
+| `verify_reproducible.py` — snapshot 2 | **OK** — 22 of 22 columns, build stamp 7 of 7 |
+| `test_check_schema.py` | **6 of 6** cases |
+| Unit parser tests | **16 of 16** |
+| Price parser tests | **22 of 22** |
+| **dbt tests, snapshot 1** | **40 of 40** |
+| **dbt tests, snapshot 2** | **40 of 40** |
+| **dbt fail-when-they-should** | **23 of 23** |
+
+**Counts, not a pass rate.** Adding those up needs care, because two of them are the same
+tests run twice and one is those tests being deliberately broken:
+
+| | Count |
+|---|---|
+| Distinct test cases that exist | **84** — 40 dbt + 22 price parser + 16 unit parser + 6 schema |
+| Executions of them in this run | **124** — the 40 dbt tests ran against both snapshots |
+| Fail-when-they-should demonstrations | **23** — 1 control + 22 injections, over the same 40 dbt tests |
+| Standing checks (not test cases) | **5** — manifest, layering, model parity, reproducibility ×2 |
+
+**84 distinct test cases exist and 84 passed.** That is a count of what exists, not a
+percentage of some larger set of tests that ought to. Phase 1 has no test-coverage
+percentage and this document does not report one.
+
+---
+
+## Section 5 — what changed, in one place
+
+| Item | Before | After |
+|---|---|---|
+| dbt tests | 0 | **40, passing on both snapshots** |
+| Tests shown to fail when they should | 0 of 0 | **23 of 23** |
+| Rows sharing one manufactured product identity | **878,559** | **0** |
+| Snapshots with every price row parsed | 1 of 2 | **2 of 2** |
+| Cross-snapshot key collision proof | unreproducible | **187,087 → 187,087, 0 collisions** |
+| §2.6 figures | pre-§2.5-fix build | **restated, correction marked** |
+| Hash-collision contamination of §2.5 / §2.6 | unknown | **measured: zero** |
+| Price-parser test regenerable by committed tooling | no | **yes** |
+| dbt database path | CWD-dependent, could test an empty DB | **absolute** |
+| Model-body drift between build paths | unmanaged | **checked, shown to fail** |
+| Append-only assumption | assumed | **monitored, +0.9 MB/year** |
+
+**Not done in Section 5, and why:** no marts, no D2 or D4 numbers, no dashboard — all
+Phase 2. The `plu_short` and `no_upc` tiers carry no tests beyond domain membership because
+there is no invariant to assert about them yet; that arrives when a Phase 2 query first
+depends on one.
+
+**Phase 1 exit criteria — all met:**
+
+- ✅ Two snapshots archived with provenance; cross-snapshot identity stability measured per vendor (§1.3)
+- ✅ Every price row **in both snapshots** has an `offer_type` and a `unit_price` or explicit `unparsed` (§5.6)
+- ✅ Post-parse D2 exclusion reported against the pre-parse 5,726 / 6,421 (§2.3)
+- ✅ Owned key exists, `product_id` nowhere below staging (enforced), cross-vendor tier model materialised (§4)
+- ✅ All tests pass and each has been demonstrated to fail when it should (§5.2, §5.3)
+- ✅ `docs/FILES.md` current, `check_manifest.py` passes (§5.8)

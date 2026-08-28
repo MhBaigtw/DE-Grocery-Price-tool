@@ -1,0 +1,20 @@
+version: 2
+
+sources:
+  - name: hammer
+    description: >
+      The loaded Project Hammer snapshot. Populated by scripts/load_snapshot.py from an
+      immutable archive under data/snapshots/, verified by sha256. Never written to by
+      this project.
+    schema: main
+    tables:
+      - name: raw
+        description: Price observations, one row per product per scrape day.
+        columns:
+          - name: product_id
+            description: >
+              Upstream row id. Announced to change from string to number. It appears in the
+              staging layer and NOWHERE BELOW IT -- scripts/check_layering.py enforces that,
+              so the type change stays an ingest-layer event.
+      - name: product
+        description: Product metadata. Updated only when a new product is discovered.

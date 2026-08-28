@@ -1,0 +1,40 @@
+# Points at the analysis databases in the repo root. Those files are gitignored and
+# regenerable (scripts/load_snapshot.py + scripts/build_models.py), so nothing here
+# depends on state that cannot be rebuilt.
+#
+# PATHS ARE RESOLVED AGAINST THE CURRENT WORKING DIRECTORY, not against this file. An
+# earlier version wrote `../hammer.duckdb`, which is correct only when dbt is invoked from
+# inside dbt/ -- run from the repo root it pointed one level ABOVE the repo, and DuckDB
+# happily CREATED an empty database there. dbt then reported a catalog error about a
+# missing macro, which looks like a macro problem and is not one. Silently testing an
+# empty database is the worse half of that failure.
+#
+# So the paths come from environment variables that scripts/run_dbt_tests.py sets to
+# absolute paths, with a repo-root-relative default for a hand-run `dbt test` from the
+# repo root. Prefer the script.
+grocery:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('HAMMER_DB', 'hammer.duckdb') }}"
+      threads: 4
+      settings:
+        memory_limit: '2GB'
+
+    # Snapshot 2, for the exit criterion that BOTH snapshots are parsed and tested.
+    snapshot2:
+      type: duckdb
+      path: "{{ env_var('HAMMER2_DB', 'hammer2.duckdb') }}"
+      threads: 4
+      settings:
+        memory_limit: '2GB'
+
+    # A throwaway fixture database built by scripts/test_dbt_contracts.py, which proves
+    # each test fails when it should. It cannot point at the real database: mutating a
+    # 71.8M-row materialisation to test a test would destroy the reproducibility property
+    # verify_reproducible.py exists to guarantee.
+    fixture:
+      type: duckdb
+      path: "{{ env_var('FIXTURE_DB', '/nonexistent/fixture.duckdb') }}"
+      threads: 1
