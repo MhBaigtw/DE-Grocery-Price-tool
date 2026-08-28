@@ -227,8 +227,20 @@ CREATE OR REPLACE MACRO p_normalization_v(vendor, x) AS
 CREATE OR REPLACE MACRO p_voila_thousands(vendor, x) AS
   (vendor = 'Voila' AND p_is_thousands(x));
 
+-- GALLERIA BARE INTEGERS are ambiguous too, and for a reason worth stating plainly:
+-- "a bare integer means dollars" is an UNEVIDENCED DEFAULT, and it is the same default
+-- that was wrong for Walmart on 66,538 rows. P2.9 adjudicated Galleria and found 131
+-- adjudicable rows splitting 21 dollars / 21 cents -- no evidence either way.
+--
+-- Declining to CONVERT them was right. Leaving them parsed as dollars was not: that is
+-- not neutrality, it is picking one of the two readings and hiding the choice. They are
+-- flagged instead, so the uncertainty is visible and downstream can decide.
+CREATE OR REPLACE MACRO p_galleria_bare_int(vendor, x) AS
+  (vendor = 'Galleria' AND p_is_bare_int(x));
+
 CREATE OR REPLACE MACRO p_confidence_v(vendor, x) AS
-  CASE WHEN p_wm_cents(vendor, x)       THEN 'derived'
-       WHEN p_wm_ambiguous(vendor, x)   THEN 'ambiguous'
-       WHEN p_voila_thousands(vendor, x) THEN 'ambiguous'
+  CASE WHEN p_wm_cents(vendor, x)          THEN 'derived'
+       WHEN p_wm_ambiguous(vendor, x)      THEN 'ambiguous'
+       WHEN p_voila_thousands(vendor, x)   THEN 'ambiguous'
+       WHEN p_galleria_bare_int(vendor, x) THEN 'ambiguous'
        ELSE p_confidence(x) END;

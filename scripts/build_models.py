@@ -38,6 +38,7 @@ import duckdb
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 MACRO_FILES = [
+    REPO / "models" / "product_key_macros.sql",
     REPO / "models" / "price_parse_macros.sql",
     REPO / "models" / "unit_parse_macros.sql",
     REPO / "models" / "brand_class_macros.sql",
@@ -62,12 +63,26 @@ def main() -> int:
     con = duckdb.connect(str(db))
     con.execute("PRAGMA disable_progress_bar;")
 
+    # Any failure below must STOP the build and be unmistakable in a log. The first
+    # rebuild after the section 2.5 fix crashed on a DROP type mismatch, and the queries
+    # that followed ran happily against the STALE table while the traceback sat several
+    # screens further up. A build step that can leave old data in place while later steps
+    # report success is worse than one that simply fails.
+    def fail(msg: str) -> int:
+        print("\n" + "=" * 70, file=sys.stderr)
+        print("BUILD FAILED -- MODELS MAY BE STALE. DO NOT TRUST ANY QUERY RUN AFTER THIS.",
+              file=sys.stderr)
+        print(f"  {msg}", file=sys.stderr)
+        print("=" * 70, file=sys.stderr)
+        return 1
+
     # Macros are recreated every build so the database always matches the committed files.
     for mf in MACRO_FILES:
         con.execute(mf.read_text(encoding="utf-8"))
         print(f"macros loaded from {mf.relative_to(REPO)}")
 
     for name, path, src_table in MODELS:
+      try:
         body = path.read_text(encoding="utf-8")
         kind = "VIEW" if args.materialize == "view" else "TABLE"
         # DuckDB raises rather than no-opping when DROP VIEW IF EXISTS hits a table
@@ -86,10 +101,25 @@ def main() -> int:
         status = "OK" if n == src else "ROW COUNT MISMATCH"
         print(f"  {name}: {kind.lower()}, {n:,} rows ({src_table} has {src:,}) -- {status}")
         if n != src:
-            print(f"  refusing to continue: {name} must be 1:1 with {src_table}",
-                  file=sys.stderr)
-            return 1
+            return fail(f"{name} is {n:,} rows but {src_table} is {src:,} -- "
+                        "the model must be 1:1 with its source")
+      except Exception as exc:
+        return fail(f"while building {name}: {type(exc).__name__}: {exc}")
 
+    # Build stamp: what was built, from which macro sources, when. verify_reproducible.py
+    # compares these digests against the committed files, so a model built from an older
+    # version of the macros is detectable rather than merely suspected.
+    import hashlib
+    import datetime
+    con.execute("DROP TABLE IF EXISTS _build_stamp;")
+    con.execute("CREATE TABLE _build_stamp (k VARCHAR, v VARCHAR);")
+    con.execute("INSERT INTO _build_stamp VALUES (?, ?)",
+                ["built_utc", datetime.datetime.now(datetime.timezone.utc).isoformat()])
+    con.execute("INSERT INTO _build_stamp VALUES (?, ?)", ["materialize", args.materialize])
+    for f in MACRO_FILES + [m[1] for m in MODELS]:
+        digest = hashlib.sha256(f.read_bytes()).hexdigest()
+        con.execute("INSERT INTO _build_stamp VALUES (?, ?)",
+                    [f"sha256:{f.relative_to(REPO).as_posix()}", digest])
     con.close()
     print(f"\nbuilt into {db}")
     return 0

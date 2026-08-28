@@ -14,15 +14,18 @@
 -- `stg_price.unit_price IS NOT NULL`.
 SET threads = 4;
 
--- Key carried as a hash: materialising `sku` as VARCHAR in a temp table off this join
--- trips a DuckDB 1.5.5 statistics bug ("Invalid unicode ... segment statistics update").
--- Strings are rejoined at aggregation, where the row count is small. See P2_6.
+-- Keyed on the OWNED product_key (md5, 128-bit), NOT the 64-bit workaround hash this
+-- query originally used. That hash had one collision in 161,300 keys, which merged two
+-- products into a single series and moved the counts below by 6 events. P3.5 proves the
+-- owned key is collision-free across both snapshots, so the numbers here are exact.
+-- md5's hex output is also pure ASCII, which sidesteps the DuckDB statistics bug on
+-- VARCHAR sku columns that motivated the workaround in the first place.
 CREATE OR REPLACE TEMP TABLE keymap AS
-SELECT hash(vendor || '|' || sku) AS k, any_value(vendor) AS vendor
-FROM product WHERE sku IS NOT NULL AND trim(sku) <> '' GROUP BY 1;
+SELECT product_key AS k, any_value(vendor) AS vendor
+FROM stg_product GROUP BY 1;
 
 CREATE OR REPLACE TEMP TABLE daily AS
-SELECT hash(p.vendor || '|' || p.sku) AS k, s.observed_date AS d,
+SELECT s.product_key AS k, s.observed_date AS d,
        max(CASE WHEN s.old_offer_type <> 'blank' THEN 1 ELSE 0 END)        AS on_sale,
        -- POST-PARSE dirty: no derivable unit price at all
        max(CASE WHEN s.unit_price IS NULL AND s.offer_type <> 'blank' THEN 1 ELSE 0 END) AS dirty_post,
@@ -32,6 +35,7 @@ SELECT hash(p.vendor || '|' || p.sku) AS k, s.observed_date AS d,
        max(CASE WHEN s.offer_type = 'multibuy' THEN 1 ELSE 0 END)          AS multibuy
 FROM stg_price s JOIN product p ON p.id = s.product_id
 WHERE p.sku IS NOT NULL AND trim(p.sku) <> '' AND s.observed_date >= DATE '2024-06-11'
+  AND s.product_key IS NOT NULL
 GROUP BY 1,2;
 
 CREATE OR REPLACE TEMP TABLE runs AS

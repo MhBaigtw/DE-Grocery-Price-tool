@@ -103,16 +103,39 @@ timestamp and sha256 per the immutability rule below.
    a tier (e.g. vendor_upc / matched_upc / fuzzy / unmatched). Headline numbers are
    computed from the top tier only. Lower tiers are **flagged and kept**, never deleted,
    and are auditable in the fact table.
-3. **Every published number is reproducible.** Each figure that appears in a writeup or
+3. **An ambiguous parse is excluded from headline numbers, kept, and counted.**
+   Where the source text admits two readings and the evidence does not separate them, the
+   parse carries `parse_confidence = 'ambiguous'` and the literal reading is retained.
+
+   **Downstream semantics, decided:**
+   - **D2 (sale behaviour) and D4 (cross-vendor basket) exclude ambiguous rows from
+     headline numbers.** The exclusion is applied at query time, never at load time, and
+     every published figure states how many rows it dropped.
+   - Ambiguous rows are **never deleted and never silently converted**. They stay in
+     `stg_price` with their raw text, so the set remains countable and a later decision
+     can re-admit them.
+   - A product is not excluded because *some* of its history is ambiguous — only the
+     ambiguous rows are. A product whose history is mostly ambiguous will fail the
+     existing coverage bars on its own; no separate rule is needed.
+
+   **Why exclusion rather than a confidence tier:** an ambiguous price is not a weaker
+   signal, it is possibly wrong by 100×. A tier invites averaging it in, and there is no
+   average of $2.98 and $298 that means anything.
+
+   This rule exists because "a bare integer means dollars" was an unevidenced default that
+   proved wrong for 66,538 Walmart rows. The same default is still unproven for Galleria,
+   so those rows are flagged rather than trusted.
+
+4. **Every published number is reproducible.** Each figure that appears in a writeup or
    dashboard has a committed SQL file that regenerates it. No number exists only in a
    chat message or a notebook cell.
-4. **Report the denominator.** Every percentage carries its n. Every exclusion states how
+5. **Report the denominator.** Every percentage carries its n. Every exclusion states how
    many rows it dropped and why.
-5. **Never report a pass rate for tests that don't exist.** If there are no tests, the
+6. **Never report a pass rate for tests that don't exist.** If there are no tests, the
    answer is "0 of 0", not a percentage.
-6. **Do not invent numbers.** If you have not run the query, say you have not run the
+7. **Do not invent numbers.** If you have not run the query, say you have not run the
    query. An estimate must be labelled an estimate.
-7. **Volunteer bad news.** If a finding is weaker than it looks, if a number is
+8. **Volunteer bad news.** If a finding is weaker than it looks, if a number is
    suspicious, if an earlier decision now looks wrong — say so unprompted, immediately,
    before continuing.
 

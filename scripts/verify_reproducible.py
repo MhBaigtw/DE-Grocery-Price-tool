@@ -37,7 +37,8 @@ def main() -> int:
     # Macros are created in the in-memory catalog (the default), NOT in snap -- a
     # read-only attachment refuses CREATE, which is the point: the verifier must not be
     # able to modify what it verifies.
-    for mf in ("price_parse_macros.sql", "unit_parse_macros.sql", "brand_class_macros.sql"):
+    for mf in ("product_key_macros.sql", "price_parse_macros.sql",
+               "unit_parse_macros.sql", "brand_class_macros.sql"):
         con.execute((REPO / "models" / mf).read_text(encoding="utf-8"))
 
     kind = con.execute(
@@ -51,6 +52,56 @@ def main() -> int:
         print(f"stg_price is a {kind[0]}, not a materialised table -- "
               "it is its definition by construction. Nothing to drift.")
         return 0
+
+    # Build stamp first: a model built from older macro sources is stale even if its
+    # content happens to match today's recomputation on the columns we check.
+    import hashlib
+    try:
+        stamp = dict(con.execute("SELECT k, v FROM snap._build_stamp").fetchall())
+    except Exception:
+        stamp = {}
+    if stamp:
+        drifted = []
+        for key, recorded in stamp.items():
+            if not key.startswith("sha256:"):
+                continue
+            f = REPO / key[len("sha256:"):]
+            if not f.exists() or hashlib.sha256(f.read_bytes()).hexdigest() != recorded:
+                drifted.append(key[len("sha256:"):])
+        if drifted:
+            print("\nFAIL - built from source files that have since changed: "
+                  + ", ".join(drifted), file=sys.stderr)
+            print("       rebuild before trusting any query.", file=sys.stderr)
+            return 1
+        n_src = len([k for k in stamp if k.startswith("sha256:")])
+        print(f"build stamp   : OK, {n_src} source files match")
+    else:
+        print("build stamp   : absent (built before stamping was added)")
+
+    # Build stamp first: a model built from older macro sources is stale even if its
+    # content happens to match today's recomputation on the columns we check.
+    import hashlib
+    try:
+        stamp = dict(con.execute("SELECT k, v FROM snap._build_stamp").fetchall())
+    except Exception:
+        stamp = {}
+    if stamp:
+        drifted = []
+        for key, recorded in stamp.items():
+            if not key.startswith("sha256:"):
+                continue
+            f = REPO / key[len("sha256:"):]
+            if not f.exists() or hashlib.sha256(f.read_bytes()).hexdigest() != recorded:
+                drifted.append(key[len("sha256:"):])
+        if drifted:
+            print("FAIL - built from source files that have since changed: "
+                  + ", ".join(drifted), file=sys.stderr)
+            print("       rebuild before trusting any query.", file=sys.stderr)
+            return 1
+        n_src = len([k for k in stamp if k.startswith("sha256:")])
+        print(f"build stamp   : OK, {n_src} source files match")
+    else:
+        print("build stamp   : absent (built before stamping was added)")
 
     body = (REPO / "models" / "stg_price.sql").read_text(encoding="utf-8")
     body = body.replace("FROM raw r", "FROM snap.raw r").replace(

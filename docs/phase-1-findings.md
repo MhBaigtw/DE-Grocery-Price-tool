@@ -371,21 +371,23 @@ Definitions held identical to F5; only the "is this price usable" test changes, 
 
 | | Events |
 |---|---|
-| Evaluable events | 279,593 |
+| Evaluable events | **279,599** |
 | Lost **pre**-parse | **6,421** |
 | Lost **post**-parse | **3** |
 | **Recovered** | **6,418** |
-| **Usable now** | **~279,590** |
+| **Usable now** | **279,596** |
 
-> Figures restated after the §2.5 correctness fix. The recovery count (6,418) and the
-> Metro multibuy recovery (925 of 925) are unchanged; the totals moved by 6 events due to
-> a single hash collision in my own workaround, not the data. See §2.6.
+> **Figures are exact as of §3.5.** They were briefly reported as 279,593 / ~279,590
+> while the queries keyed on a 64-bit workaround hash that had one collision in 161,300
+> keys. The owned key (`md5`, proved collision-free across both snapshots) restores the
+> original counts exactly. The recovery count (6,418) and the Metro multibuy recovery
+> (925 of 925) were never affected.
 
 Per vendor:
 
 | Vendor | Evaluable | Lost pre-parse | Lost post-parse | **Recovered** |
 |---|---|---|---|---|
-| SaveOnFoods | 79,344 | 2,680 | 0 | **2,680** |
+| SaveOnFoods | 79,350 | 2,680 | 0 | **2,680** |
 | Metro | 23,472 | 1,787 | 1 | **1,786** |
 | Walmart | 8,031 | 709 | 0 | **709** |
 | TandT | 18,944 | 691 | 0 | **691** |
@@ -672,17 +674,18 @@ fixed build. The current numbers are:
 | Unparsed rows | 33 | no |
 | D2 events recovered | **6,418** | no |
 | Metro multibuy recovered | **925 of 925** | no |
-| D2 evaluable events | 279,599 → **279,593** | yes, by 6 |
-| D2 usable events | 279,596 → **279,590** | yes, by 6 |
-| Sale events total | 566,564 → **566,558** | yes, by 6 |
+| D2 evaluable events | 279,599 → 279,593 → **279,599** | no — the 6-event dip was a hash collision, fixed in §3.5 |
+| D2 usable events | 279,596 → 279,590 → **279,596** | no — same cause, fixed in §3.5 |
+| Sale events total | 566,564 → 566,558 → **566,564** | no — same cause, fixed in §3.5 |
 
-**The 6-event drift is not from the price fix — it is a hash collision, and it is mine.**
+**The 6-event drift was not from the price fix — it was a hash collision, and it was
+mine. §3.5 replaces the workaround with a collision-free owned key and the counts return
+to their exact original values.**
 To work around a DuckDB 1.5.5 statistics bug, the queries key on
 `hash(vendor || '|' || sku)` rather than the string pair. There is **exactly 1 collision
 in 161,300 keys**, which merges two products into one series and costs 6 sale events.
-Measured, not estimated. It is a 0.0006% effect on a number reported to 6 significant
-figures, so the honest statement is that D2's usable sample is **~279,590**, and the last
-digit should not be leaned on.
+Measured, not estimated. It was a 0.0006% effect on a number reported to 6 significant
+figures. **Resolved in §3.5: D2's usable sample is 279,596, exactly.**
 
 ### 2.7 `old_price`: value versus presence
 
@@ -1027,6 +1030,233 @@ input would destroy exactly the independence that made it useful.
 
 *Source: `P3_4_packcount_crosscheck.sql`.*
 
+### 3.5 The owned key — collision-free, proved, and D2 restated exactly
+
+The analysis queries in §2 and §3 keyed on DuckDB's 64-bit `hash()` as a workaround for a
+statistics bug on VARCHAR `sku` columns. That workaround produced **one collision in
+161,300 keys**, silently merging two distinct products into a single price series and
+moving the D2 event count by 6. Acceptable in a throwaway query; **not acceptable in the
+owned key**, and collision probability grows with the catalogue.
+
+**Construction** (`models/product_key_macros.sql`):
+
+```
+product_key = md5( vendor || chr(31) || sku )                    where sku is present
+product_key = md5( vendor || chr(31) || '#c:' || concatted )     where it is not
+```
+
+Two deliberate choices:
+
+- **`chr(31)`, ASCII UNIT SEPARATOR, as the delimiter.** It cannot occur in a vendor name
+  or a SKU, so `('Metro','12'||'34')` and `('Metro','1234')` cannot collide through
+  concatenation. A `'|'` would be a *guess* about the data; `chr(31)` is a *guarantee*
+  about the encoding.
+- **md5, 128-bit.** At 64 bits the birthday bound puts a collision near 2^32 keys — but
+  the bound is probabilistic, and 161,300 keys already hit one. 128 bits removes the
+  concern rather than deferring it. md5's hex output is also pure ASCII, which sidesteps
+  the invalid-UTF-8 statistics bug that motivated the workaround in the first place. Both
+  problems, one construction. (Used as a checksum, not for security — adversarial
+  collisions are not a threat model for a grocery price key.)
+
+#### The proof
+
+| Scope | Distinct key sources | Distinct keys | **Collisions** |
+|---|---|---|---|
+| Snapshot 1 | 187,028 | 187,028 | **0** |
+| Snapshot 2 | 187,070 | 187,070 | **0** |
+| **Union of both** | **187,087** | **187,087** | **0** |
+| *64-bit workaround, same data* | *161,300* | *161,299* | ***1*** |
+
+Zero — not "few". The union matters as much as the per-snapshot result: a key that is
+collision-free within one publication but not across them reintroduces the problem on the
+first cross-snapshot join.
+
+**Key composition and cross-snapshot behaviour:**
+
+| Basis | Products | Share |
+|---|---|---|
+| `vendor_sku` | 161,300 | 86.24% |
+| `vendor_concatted` *(blank sku)* | 25,728 | 13.76% |
+
+| Check | Result |
+|---|---|
+| Keys matching across snapshots on the owned key | 161,290 |
+| Keys matching across snapshots on `(vendor, sku)` | 161,290 |
+| **Disagreement** | **0** |
+
+The owned key behaves exactly like `(vendor, sku)` across publications — it adds
+collision-freedom and a blank-sku branch without changing identity semantics.
+
+#### D2 evaluable count, restated exactly
+
+Re-running the D2 reconciliation on the collision-free key **restores the original figures
+exactly**. The 6-event drift was entirely the hash collision:
+
+| | With 64-bit hash | **With owned key** |
+|---|---|---|
+| Sale events | 566,558 | **566,564** |
+| Evaluable events | **279,599** | **279,599** |
+| Lost pre-parse | 6,421 | **6,421** |
+| Lost post-parse | 3 | **3** |
+| Recovered | 6,418 | **6,418** |
+| **Usable** | ~279,590 | **279,596** |
+| Metro multibuy recovered | 925 of 925 | **925 of 925** |
+
+**D2's usable sample is 279,596 events. No tilde.**
+
+*Source: `P3_5_key_collision_proof.sql`, `P2_3_d2_reconciliation.sql`.*
+
+### 3.6 Galleria bare integers — flagged, not left as dollars
+
+Galleria has **26,306 bare-integer prices**. §2.5 declined to convert them, because P2.9
+found only 131 adjudicable rows splitting 21 dollars / 21 cents — no evidence either way.
+Declining to convert was right. **Leaving them parsed as dollars was not.**
+
+"A bare integer means dollars" is an *unevidenced default*, and it is the same default that
+was wrong for Walmart on 66,538 rows. Keeping it is not neutrality — it is picking one of
+two readings and hiding the choice. They are now flagged `parse_confidence = 'ambiguous'`.
+
+| Vendor | Price rows | Ambiguous rows | **% of vendor rows** | Distinct products |
+|---|---|---|---|---|
+| **Galleria** | 5,892,146 | **26,306** | **0.446%** | 90 |
+| Walmart | 6,372,804 | 20,555 | 0.323% | 340 |
+| Voila | 12,937,809 | 23 | 0.000% | 5 |
+| All others | — | **0** | 0.000% | 0 |
+
+**Total ambiguous: 46,884 rows across 435 distinct products.**
+
+Galleria's 26,306 rows concentrate in just **90 products** — an average of 292 daily
+observations each, i.e. a handful of long-lived listings, not a broad contamination.
+
+#### Does D4 depend on any of them?
+
+D4's basket is the reliable-tier UPC set, and **Galleria and Walmart are two of its four
+vendors**, so this is not hypothetical.
+
+| Measure | Value |
+|---|---|
+| D4 reliable-tier basket GTINs | 5,222 |
+| **GTINs with any ambiguous price row** | **27** |
+| **% of basket touched** | **0.52%** |
+
+And of those 27, how much of their history is ambiguous:
+
+| Share of history ambiguous | GTINs |
+|---|---|
+| <1% | 13 |
+| 1–10% | 10 |
+| 10–50% | 4 |
+| **≥50% (unusable)** | **0** |
+
+**No basket product is majority-ambiguous.** D4 loses 27 of 5,222 GTINs' worth of
+*partial* history, and nothing wholesale.
+
+D2's exposure is smaller still: of the 46,884 ambiguous rows, only **167 fall on a sale
+day** (Walmart 162, Voila 5, Galleria 0) — Galleria's ambiguous products are never on sale
+in a way `old_price` records.
+
+*Source: `P3_6_ambiguous_semantics.sql`.*
+
+### 3.7 Downstream semantics for ambiguous prices — decided and written into CLAUDE.md
+
+**Decision: D2 and D4 exclude ambiguous rows from headline numbers. Excluded at query
+time, never at load time, with every published figure stating how many rows it dropped.**
+
+Added to `CLAUDE.md` as honesty rule 3 (existing rules 3–7 renumbered to 4–8).
+
+**Why exclusion rather than a confidence tier.** A tier says "this signal is weaker" and
+invites averaging it in with a lower weight. That is the wrong mental model here: an
+ambiguous price is not *less precise*, it is **possibly wrong by 100×**. There is no
+average of $2.98 and $298 that means anything. The two readings are not a distribution
+around a true value; they are two different claims, one of which is false.
+
+**Three supporting rules, also written down:**
+
+- Ambiguous rows are **never deleted and never silently converted**. They stay in
+  `stg_price` with their raw text, so the set remains countable and a later decision — a
+  third snapshot, an upstream fix, a vendor confirmation — can re-admit them.
+- **A product is not excluded because *some* of its history is ambiguous.** Only the
+  ambiguous rows are. A product whose history is mostly ambiguous will fail the existing
+  coverage bars on its own; no separate rule is needed, and the §3.6 numbers confirm none
+  is close (worst case 10–50%, zero at ≥50%).
+- The exclusion is at **query time**, so the count is always reportable. Dropping at load
+  time would make "how many rows did we exclude?" unanswerable, which is precisely the
+  question honesty rule 5 requires an answer to.
+
+**Category concentration.** The ambiguous set does lean toward produce:
+
+| Category | Ambiguous rows | Share |
+|---|---|---|
+| other | 13,328 | 28.43% |
+| **produce** | **10,550** | **22.50%** |
+| meat & fish | 8,246 | 17.59% |
+| beverages | 6,230 | 13.29% |
+| dairy | 3,759 | 8.02% |
+| pantry staples | 2,500 | 5.33% |
+| bread & bakery | 2,066 | 4.41% |
+| eggs | 205 | 0.44% |
+
+Produce at 22.5% is over its share of the catalogue, which is unsurprising — loose produce
+is exactly where a bare integer like `4` is genuinely ambiguous between $4.00 and $0.04.
+**But this does not translate into a D4 problem**, because the categories D4 relies on are
+reached through the reliable-tier UPC set, and only 27 of those 5,222 GTINs are touched at
+all. The concentration is real and worth knowing; the impact on the basket is 0.52%.
+
+### 3.8 No Section 3 number came from the stale-table window — and the build now halts
+
+**Verified, not assumed.** The stale window occurred during the §2.5 rework, when a failed
+rebuild left `stg_price` untouched while later queries ran against it. `stg_product` **did
+not exist** at that point — it was introduced in a later build that succeeded ("stg_price
+… OK / stg_product: table, 187,028 rows … OK"). Every `P3_*` query reads `stg_product`, so
+none could have read a stale table.
+
+Confirmed against the current build:
+
+| Check | Value | Meaning |
+|---|---|---|
+| `stg_product` rows | 187,028 | exists, 1:1 with `product` |
+| count-type multipacks | 7,614 | post-count-fix semantics |
+| `bare_integer_cents` rows | 79,478 | post-§2.5-fix semantics |
+| `ambiguous` rows | 46,884 | post-§3.6 semantics |
+
+**Two changes so this cannot recur:**
+
+1. **The build halts loudly.** Every model build is wrapped, and any failure prints a
+   banner to stderr — `BUILD FAILED -- MODELS MAY BE STALE. DO NOT TRUST ANY QUERY RUN
+   AFTER THIS.` — and returns non-zero. The original failure was a `DROP VIEW` type
+   mismatch whose traceback scrolled several screens above the queries that then ran
+   happily against old data.
+2. **A build stamp makes staleness detectable after the fact.** `_build_stamp` records the
+   sha256 of every macro and model file that produced the current tables.
+   `verify_reproducible.py` compares those digests against the committed files and fails
+   if the model was built from source that has since changed:
+
+   ```
+   build stamp   : OK, 6 source files match
+   ```
+
+   A build step that can silently leave old data in place while later steps report success
+   is worse than one that simply fails — this makes both failure modes visible.
+
+### 3.9 The `60gx6` fix preceded the 88.84% parse rate
+
+**Verified empirically rather than from memory.** The rate was recomputed from the current
+build, and that build parses the trailing-multiplier form correctly:
+
+| units_raw | unit_qty | uom | pack_count | total_qty | confidence |
+|---|---|---|---|---|---|
+| `60gx6` | 60 | g | 6 | 360 | derived |
+| `250mlx6` | 250 | ml | 6 | 1,500 | derived |
+| `185gx4` | 185 | g | 4 | 740 | derived |
+| `330mlx6` | 330 | ml | 6 | 1,980 | derived |
+
+Across the whole catalogue: **2,280 products carry a trailing multiplier, 2,249 parse
+(98.6%), 2,269 have `pack_count > 1`.**
+
+88.84% was computed twice — once before the count-representation fix and once after — and
+came out identical both times, from builds that both included the `u_core` strip.
+**No recomputation needed.**
+
 ---
 
 ## Section 3 — what changed, in one place
@@ -1040,10 +1270,18 @@ input would destroy exactly the independence that made it useful.
 | Junk brand values in `national_brand` | 451 | **0** |
 | Private-label understatement | up to 2.20 pp | **0** |
 | `error` in units parsing to a size | — | **0** |
+| Owned-key collisions (both snapshots) | 1 *(64-bit workaround)* | **0** *(md5, proved)* |
+| D2 usable events | ~279,590 | **279,596, exact** |
+| Ambiguous rows flagged | 20,578 | **46,884** *(Galleria added)* |
+| Build failure leaving stale models | possible, silent | **halts loudly + build stamp**|
 
 **Not done, and why:** Walmart size recovery from product names — accurate rule, 6
 products, recommended against. Compound size-and-count strings and name-stated pack sizes
 remain unparsed and are documented above rather than papered over.
+
+**Ambiguous-price semantics are now a project rule**, not a Phase 1 implementation detail:
+CLAUDE.md honesty rule 3. D2 and D4 exclude ambiguous rows from headline numbers at query
+time, always with the dropped count stated.
 
 ## Section 4 — Product identity
 

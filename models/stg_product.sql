@@ -6,9 +6,12 @@
 --     keeps its raw text. Nothing defaults to a fabricated 1.
 --   * Junk brand values yield 'unclassifiable_*', NEVER 'national_brand' (brief 3.3).
 --
--- `product.id` appears here because this IS the staging layer. Section 4's owned key
--- replaces it downstream, so the announced upstream type change stays an ingest event.
+-- `product_key` is the OWNED key (models/product_key_macros.sql). Downstream models
+-- reference only that. `product.id` appears here because this IS the staging layer;
+-- it must not appear below it, so the announced upstream type change stays an ingest event.
 SELECT
+    product_key(p.vendor, p.sku, p.concatted)   AS product_key,
+    product_key_basis(p.sku)                    AS product_key_basis,
     p.id                                        AS product_id,
     p.vendor                                    AS vendor,
     p.sku                                       AS sku,

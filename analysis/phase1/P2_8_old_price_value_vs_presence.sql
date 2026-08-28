@@ -30,7 +30,7 @@ GROUP BY p.vendor ORDER BY pct_of_flags_valueless DESC;
 --      * old_price VALUE only if discount depth is reported
 --    So: how many Loblaws sale events can support each variant?
 CREATE OR REPLACE TEMP TABLE daily AS
-SELECT hash(p.vendor||'|'||p.sku) AS k, s.observed_date AS dt,
+SELECT s.product_key AS k, s.observed_date AS dt,
        max(CASE WHEN s.old_offer_type <> 'blank' THEN 1 ELSE 0 END)   AS on_sale,
        max(CASE WHEN s.old_unit_price IS NOT NULL THEN 1 ELSE 0 END)  AS old_has_value,
        max(CASE WHEN s.unit_price IS NULL THEN 1 ELSE 0 END)          AS cur_missing
@@ -49,9 +49,11 @@ SELECT k, dt, count(*) OVER w AS pre_days, max(cur_missing) OVER w AS pre_missin
 FROM daily
 WINDOW w AS (PARTITION BY k ORDER BY dt RANGE BETWEEN INTERVAL 14 DAY PRECEDING AND INTERVAL 1 DAY PRECEDING);
 
+-- Keyed on the owned product_key (P3.5, proved collision-free), not the 64-bit
+-- workaround hash. The per-vendor figures below were verified unchanged by the switch --
+-- the single collision fell outside the Loblaws keys these numbers depend on.
 CREATE OR REPLACE TEMP TABLE keymap AS
-SELECT hash(vendor||'|'||sku) AS k, any_value(vendor) AS vendor
-FROM product WHERE sku IS NOT NULL AND trim(sku)<>'' GROUP BY 1;
+SELECT product_key AS k, any_value(vendor) AS vendor FROM stg_product GROUP BY 1;
 
 SELECT m.vendor,
        count(*)                                                    AS evaluable_events,

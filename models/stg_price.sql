@@ -20,6 +20,7 @@
 -- announced upstream type change stays an ingest-layer event.
 SELECT
     r.rowid                                   AS src_rowid,
+    product_key(pr.vendor, pr.sku, pr.concatted) AS product_key,
     r.product_id                              AS product_id,
     r.nowtime                                 AS nowtime_raw,
     try_cast(substr(r.nowtime, 1, 10) AS DATE) AS observed_date,
