@@ -10,7 +10,7 @@ Two jobs, both of them small and both of them things that went wrong once alread
    catalog error. The visible symptom was nothing like the cause, and the invisible half
    was worse: a green suite would have meant nothing. This sets the paths explicitly.
 
-2. COUNTS, NEVER A PHASE PASS RATE. Brief 5.4 and CLAUDE.md honesty rule 6: the output is
+2. COUNTS, NEVER A PHASE PASS RATE. Brief 5.4 and CLAUDE.md honesty rule 8 ("report a pass rate only for tests that exist"): the output is
    "N of M tests passed", scoped to the tests that exist. It is not a percentage, and it
    is not a statement about Phase 1 as a whole.
 
@@ -41,7 +41,7 @@ DONE = re.compile(r"PASS=(\d+)\s+WARN=(\d+)\s+ERROR=(\d+)\s+SKIP=(\d+)")
 # dbt's `Done. PASS=N` counts NODES, and the on-run-start hook is a node. Reporting that
 # number as a test count inflates it by one: this project has 40 data tests and 1 hook, so
 # PASS=41 would be published as "41 tests". The hook is a real assertion -- it fails the
-# run if the DuckDB parsing macros are missing -- but it is not a test, and honesty rule 6
+# run if the DuckDB parsing macros are missing -- but it is not a test, and honesty rule 8
 # is specifically about not reporting a test count that is larger than the tests that
 # exist. So the data-test count is taken from the line that states it.
 FINISHED = re.compile(r"Finished running(?:\s+\d+\s+project hooks?,)?\s+(\d+)\s+data tests?")
@@ -107,7 +107,7 @@ def main() -> int:
         verdict = "all passed" if total and not nerror else f"{nerror} failed"
         print(f"{t:10s} ({label}):  {npass} of {total} tests passed   [{verdict}]")
     print("\nCounts only. This is not a pass rate for Phase 1 -- it is the number of "
-          "tests that\nexist and the number that passed (CLAUDE.md honesty rule 6).")
+          "tests that\nexist and the number that passed (CLAUDE.md honesty rule 8).")
     return 1 if bad else 0
 
 

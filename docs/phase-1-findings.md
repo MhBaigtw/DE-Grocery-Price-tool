@@ -338,12 +338,20 @@ than silently priced.
 
 Repairs applied, each named and counted:
 
-| Normalization | Rows | Vendors | Price range after repair |
-|---|---|---|---|
-| `basis_rescaled` | 105,540 | Metro, T&T, Save-On-Foods | $0.0005 – $19.60 |
-| `cents_div100` | **47,992** | Loblaws | $1.00 – $84.17 |
-| `now_prefix_cents_div100` | **11,506** | Walmart | $0.38 – $25.97 |
-| `thousands_sep` | 353 | Walmart, Voila | $1,059 – $21,525 |
+> **Restated in §5.8.** This table previously showed four repairs and a `basis_rescaled`
+> count of **105,540**, which matches no state that can now be reconstructed — not the
+> current all-rows figure (106,264), not the current with-a-vendor figure (105,488). It
+> also **omitted `bare_integer_cents` entirely**, the largest repair rule in the phase, in
+> a table captioned "each named and counted". The §2.5 correction note below updated two
+> of the four rows and stopped. Five rules, all five counted:
+
+| Normalization | Rows (all) | Rows with a vendor | Vendors | Price range after repair |
+|---|---|---|---|---|
+| `basis_rescaled` | **106,264** | 105,488 | Metro, T&T, Save-On-Foods | $0.0005 – $19.60 |
+| **`bare_integer_cents`** | **79,478** | 79,478 | **Walmart** | **$1.00 – $69.96** |
+| `cents_div100` | **47,992** | 47,707 | Loblaws | $1.00 – $84.17 |
+| `now_prefix_cents_div100` | **11,506** | 11,496 | Walmart | $0.38 – $25.97 |
+| `thousands_sep` | 353 | 353 | Walmart, Voila | $1,059 – $21,525 |
 
 > **Corrected after §2.5.** The first version of this table reported 47,707 and 11,496 —
 > the counts from an INNER join to `product`, which silently drops the 878,559 rows that
@@ -633,12 +641,26 @@ magnitude.** Nothing in the coverage report could ever have shown it.
 Rather than assume "Walmart bare integer = cents", each bare-integer row was checked
 against the same SKU's nearest non-bare price within 7 days:
 
-| Walmart magnitude | Adjudicable rows | Matches **dollars** | Matches **cents** | Verdict |
-|---|---|---|---|---|
-| < 10 | 1,631 | **1,189** | 0 | dollars |
-| 10–99 | 3,008 | 1,767 | 1,048 | **genuinely ambiguous** |
-| 100–999 | 58,267 | **0** | 56,567 | cents |
-| 1000+ | 8,271 | **0** | 7,878 | cents |
+> **Restated in §5.8, and the reason is not staleness.** This query resolved multiple
+> candidate reference prices with `any_value()`, which picks arbitrarily. Three runs over
+> the same immutable snapshot and the same build returned **57,008 / 57,212 / 56,598** for
+> the 100–999 cents count. The published figures were not wrong-for-their-build; they were
+> **irreproducible**, which honesty rule 4 now names explicitly. The query takes the
+> genuinely nearest reference price and is verified identical across three runs. The
+> **adjudicable row counts never moved** — 1,631 / 3,008 / 58,267 / 8,271 then and now —
+> and neither did the verdict.
+
+| Walmart magnitude | Adjudicable rows | Matches **dollars** | Matches **cents** | Verdict | *(as published)* |
+|---|---|---|---|---|---|
+| < 10 | 1,631 | **1,190** | 0 | dollars | *1,189 / 0* |
+| 10–99 | 3,008 | 1,769 | 1,067 | **genuinely ambiguous** | *1,767 / 1,048* |
+| 100–999 | 58,267 | **0** | 57,587 | cents | *0 / 56,567* |
+| 1000+ | 8,271 | **0** | 8,091 | cents | *0 / 7,878* |
+
+**The load-bearing claim is unmoved and was never at risk: `matches_dollars = 0` for both
+bands ≥ 100, in every run of both versions.** The rule rests on 0 of 66,538, not on the
+cents counts, which is why an irreproducible supporting figure did not produce a wrong
+decision. It could have, on a different question.
 
 Galleria also has 26,306 bare integers, but only 131 are adjudicable and they split 21/21
 — **no evidence, so no rule.** Galleria keeps the literal reading. Assuming the two
@@ -918,6 +940,11 @@ That leaves the product name itself, which for Walmart often ends `..., 90 g`.
 | Voila | 5 | 4 | 80.00% |
 | Galleria | 523 | 0 | 0.00% |
 | Loblaws | 216 | 0 | 0.00% |
+| SaveOnFoods | 2 | 0 | 0.00% |
+
+*(The Save-On-Foods row was missing from this table until §5.8 re-ran the query. It
+changes nothing — 2 products, none recoverable — but a table with a vendor silently
+absent is the shape of a real error, so it is filled in rather than left short.)*
 
 **Six products.** Out of 18,290.
 
@@ -1216,7 +1243,7 @@ around a true value; they are two different claims, one of which is false.
   is close (worst case 10–50%, zero at ≥50%).
 - The exclusion is at **query time**, so the count is always reportable. Dropping at load
   time would make "how many rows did we exclude?" unanswerable, which is precisely the
-  question honesty rule 5 requires an answer to.
+  question honesty rule 7 (report the denominator) requires an answer to.
 
 **Category concentration.** The ambiguous set does lean toward produce:
 
@@ -1795,7 +1822,7 @@ section are in `docs/retention-design.md` Tier 2a.*
 
 ### 5.2 The tests — 40 of them, on both snapshots
 
-Reported as counts, per brief 5.4 and honesty rule 6. **These are counts of tests that
+Reported as counts, per brief 5.4 and honesty rule 8 ("pass rates only for tests that exist"). **These are counts of tests that
 exist. They are not a pass rate for Phase 1.**
 
 | Target | Tests | Passed | Failed |
@@ -1830,7 +1857,7 @@ relationships test between `stg_price` and `stg_product` that found §5.1.
 Row count in equals row count out at every layer, with any deliberate reduction named. The
 deliberate reduction is **zero** at all three layers — nothing is filtered anywhere, which
 is itself the design commitment (honesty rule 2: lower tiers kept and flagged, never
-deleted; honesty rule 5: the denominator is always available).
+deleted; honesty rule 7: the denominator is always available).
 
 | Layer | Source | Model | Deliberate reduction |
 |---|---|---|---|
@@ -1914,7 +1941,356 @@ the test that guards the 100× errors. `run_query.py` now expands `.read` and, w
 file declares macros, gives them an in-memory catalog with the database ATTACHed read-only
 so the snapshot never becomes writable. **22 of 22, reproducibly.**
 
-### 5.8 Full check status
+## Section 5.8 — Build-provenance sweep
+
+*Computed under build `2026-08-28T17:48:35Z` — models `d1f90ee`/`f6d7345`/`6d01e90`/`01ff1a1`, both snapshots.*
+
+**Status: complete.** Headline: **of 14 parser-dependent queries re-run, 11 are unchanged
+to the digit, 3 carry corrections — and one of the three was not stale but
+irreproducible.** No Phase 0 number is affected. No conclusion is withdrawn.
+
+### The method the task asked for does not work, and here is what replaces it
+
+The brief says to determine which build produced each number **using `_build_stamp`**.
+It cannot do that, and saying so is the first result:
+
+- **`_build_stamp` has no history.** It records the sha256 of the model sources behind
+  the *current* tables and nothing else. It is a tripwire against querying a stale model,
+  not an archive of past builds. A number written into a document three days ago has no
+  stamp attached to it anywhere.
+- **Git cannot substitute.** On this project the model fix and the section quoting it
+  have landed in the *same commit* every time — `cf21e02` carries both the
+  bare-integer-cents fix and the §2.5 write-up. Commit order therefore proves nothing
+  about ordering *within* a session, and within-session ordering is exactly how §2.6
+  slipped.
+
+So the sweep is done by **recomputation**, which does not depend on the archaeology at
+all, and the archaeology is used only to prioritise. This is also why honesty rule 5 now
+requires the stamp to be written into the section at the time the number is published:
+the check has to be made possible going forward, because it cannot be reconstructed
+backwards.
+
+### Fix timeline, from git
+
+| Fix | Landed | Commit |
+|---|---|---|
+| `bare_integer_cents` (Walmart ≥100 → cents, 79,478 rows) | 2026-08-24 19:35 | `cf21e02` |
+| `60gx6` trailing multiplier + count-type pack (`24ea`) | 2026-08-26 19:52 | `eaf1d1f` |
+| Galleria `ambiguous` flag | 2026-08-28 14:35 | `8282905` |
+| Owned md5 key replaces the 64-bit hash in queries | 2026-08-28 14:35 | `8282905` |
+| **Orphan-key fix** (NULL for rows with no product) | 2026-08-28 22:35 | `aba3b6f` |
+
+### Phase 0 is not exposed to any of them — structurally, and verified
+
+**No Phase 0 number can be affected by any model-layer fix, because no Phase 0 query
+reads the model layer.** Checked mechanically across all 43 queries rather than assumed:
+
+| Property | Result |
+|---|---|
+| Phase 0 queries reading `stg_price` / `stg_product` / `int_upc_match` | **0 of 43** |
+| Phase 0 queries reading `models/*.sql` via `.read` | **0 of 43** |
+| Phase 0 queries defining their own `TEMP MACRO`s inline | **all of them** |
+| Phase 0 queries modified since Phase 0 | 3, at `36f8ddf` — **before the first fix** |
+| Snapshot archives verified by sha256 | **4 of 4 OK** |
+
+Phase 0's numbers are a pure function of unchanged inputs and unchanged, self-contained
+queries. `C1`'s unit parse rate (88.12%) uses an inline ad-hoc parser, not the committed
+one — which is why §3.1's 88.84% is reported as a *different measurement* rather than a
+correction of it.
+
+**The exception, and it is the one that mattered:** `docs/phase-0-findings.md` was edited
+at `b37234a` (08-24 18:17) to import Phase 1's parser-derived figures into D2's verdict
+and D1's provisional GO — **77 minutes before the bare-integer-cents fix landed**. Those
+imported numbers were the real exposure in the Phase 0 document. All of them were re-run:
+
+| Imported figure | Published | Recomputed | Delta |
+|---|---|---|---|
+| D2 sale events | 566,564 | 566,564 | **unchanged** |
+| D2 evaluable | 279,599 | 279,599 | **unchanged** |
+| D2 lost pre-parse / post-parse | 6,421 / 3 | 6,421 / 3 | **unchanged** |
+| D2 recovered / usable | 6,418 / 279,596 | 6,418 / 279,596 | **unchanged** |
+| Metro multibuy recovered | 925 of 925 | 925 of 925 | **unchanged** |
+| D1 window cents-form `current_price` | 15,789 (0.739%), 96 dates | identical | **unchanged** |
+| D1 window cents-form `old_price` | 2,086 (0.098%) | identical | **unchanged** |
+| D1 window sale events touched | 194 of 14,357 (1.35%) | identical | **unchanged** |
+
+**Phase 0's document needs no correction.**
+
+### The sweep: 14 queries re-run
+
+| Query | Section | Verdict |
+|---|---|---|
+| `P2_2b` parse coverage | §2.2 | **corrected** — `basis_rescaled`, and a missing repair rule |
+| `P2_3` D2 reconciliation | §2.3 | unchanged, every figure and the full per-vendor table |
+| `P2_4` price_per_unit cross-check | §2.4 | unchanged |
+| `P2_5` cents-form in D1 window | §2.5 | unchanged |
+| `P2_6` sku-reuse heuristic | §2.6 | **corrected in §5.5** (bare-integer-cents) |
+| `P2_7` magnitude sweep | §2.5 | unchanged (1,825 flagged, per-vendor identical) |
+| `P2_8` old_price value vs presence | §2.7 | unchanged |
+| `P2_9` bare-integer adjudication | §2.5 | **corrected — non-deterministic, now fixed** |
+| `P3_1` unit parse rate | §3.1 | unchanged (88.84%, and the full uom table) |
+| `P3_2` Walmart size recovery | §3.2 | **table completed** — a vendor row was missing |
+| `P3_3` brand classification | §3.3 | unchanged (451 junk, PL understatement table) |
+| `P3_4` pack-count cross-check | §3.4 | unchanged (137,898 comparable) |
+| `P3_5` key collision proof | §3.5 | unchanged (187,087 → 187,087, 0 collisions) |
+| `P3_6` ambiguous semantics | §3.6, §3.7 | unchanged (46,884; D4 27 of 5,222) |
+| `P4_1` identity model | §4.1, §4.2 | unchanged (tier census, B4 reconciliation 0 difference) |
+
+**11 unchanged. 3 corrected.** All three corrections are restated in place, above, with
+the superseded values shown rather than overwritten.
+
+### Correction 1 — §2.2's repairs table was wrong and incomplete
+
+`basis_rescaled` was published as **105,540**. That figure matches **no state that can now
+be reconstructed**: not the current all-rows count (106,264), not the current
+with-a-vendor count (105,488). The macro governing per-weight rescaling has not changed
+since it was written, and switching `stg_price` from `p_normalization` to the vendor-aware
+`p_normalization_v` provably changes nothing outside `bare_integer_cents` (verified: the
+only disagreement between the two macros across all 71.8M rows is those 79,478 rows). So
+the 52-row gap against the inner-join count has no committed explanation. The most likely
+candidate is the stale-table window documented in §3.8, but **I cannot reproduce it, and I
+am not going to invent a cause for it.**
+
+Worse than the wrong number: the table was captioned "**Repairs applied, each named and
+counted**" and listed **four** rules while the section's own summary table said "**5 repair
+rules**". The missing one was `bare_integer_cents` — 79,478 rows, the largest correction in
+the phase. The §2.5 correction note updated two of the four rows and stopped there.
+
+### Correction 2 — §2.5's adjudication table was irreproducible, not stale
+
+This is the finding that changed a project rule. `P2_9` resolved multiple candidate
+reference prices with `any_value()`, which picks **arbitrarily**. Three runs over the same
+immutable snapshot and the same build:
+
+| Run | 100–999 matching cents | 1000+ matching cents | <10 matching dollars |
+|---|---|---|---|
+| 1 | 57,008 | 8,036 | 1,211 |
+| 2 | 57,212 | 8,045 | 1,211 |
+| 3 | 56,598 | 7,884 | 1,209 |
+
+**A spread of 614 on a published figure, with nothing stale and nothing wrong with the
+data.** The published values (56,567 / 7,878 / 1,189) sit inside that spread. A staleness
+sweep would never have caught this, because there is no stale build to find.
+
+The query's own header claimed it took the "nearest non-bare price within 7 days". It did
+not. It now does — ranked by absolute day difference, ties broken by earlier date then by
+price, so the order is total. **Verified identical across three consecutive runs.**
+
+Fixing it exposed a second bug and the same old hazard. Partitioning by `(key, date)`
+still varied, because Phase 0 B6 established that one product appears many times in a
+single day's scrape **with conflicting prices** — so `(key, date)` is not the grain, and
+rows migrated between magnitude bands between runs. The partition is `(key, date, bare
+value)`. **This is the third time on this dataset that a non-unique key has produced a
+moving number** (§1.4 was the first, the fixture-control failure in §5.1 the second).
+
+**The verdict is unmoved.** `matches_dollars = 0` for both bands ≥ 100 in every run of
+both versions, and the adjudicable row counts (1,631 / 3,008 / 58,267 / 8,271) never
+changed. The rule rests on *0 of 66,538*, which is deterministic. It could easily have
+rested on a number that was not.
+
+### Correction 3 — §3.2's table was missing a vendor
+
+Save-On-Foods (2 unparsed products, 0 recoverable) was absent. It changes no conclusion,
+but a vendor silently missing from a per-vendor table is the shape of a real error.
+
+### What this says about the three named fixes
+
+| Fix | Numbers it could have contaminated | Found |
+|---|---|---|
+| bare-integer cents | every price-magnitude figure | **§2.6 only** (caught in §5.5) |
+| `60gx6` / count-type pack | §3.1, §3.4, §3.2 | **none** — §3.9 had already verified this empirically |
+| orphan key | anything aggregating `stg_price` by key | **none** — every consumer joins through `product` or `int_upc_match`, both of which excluded the orphan key |
+
+The orphan-key result is worth stating plainly because it is the one I most expected to
+find damage in: **zero published numbers moved.** §5.1 called that luck rather than
+design, and the sweep confirms the luck held.
+
+**The honest summary of this section: the systematic check found one real number error
+(§2.2), one reproducibility defect that no staleness check could have found (§2.5), and
+one incomplete table (§3.2) — and confirmed 11 of 14 queries and all of Phase 0
+unchanged.** §2.6 remains the only case where a conclusion had to be weakened, and it was
+found by accident before this sweep existed.
+
+*Source: the 14 queries above, re-run under one build; `P2_9` restated after the
+determinism fix.*
+
+---
+
+## Section 5.9 — The 878,559 orphan price rows
+
+*Computed under build `2026-08-28T17:48:35Z` — models `d1f90ee`/`f6d7345`/`6d01e90`/`01ff1a1`.*
+
+**Status: complete.** Headline: **they are real grocery prices for products that have left
+the catalogue, 74% of them keyed under a `product_id` scheme upstream has retired. They
+are not a scrape artifact and not our bug. None is recoverable. They are excluded from D2
+and D4 headline numbers at query time, counted, and kept.**
+
+### What they are
+
+| Measure | Value |
+|---|---|
+| Orphan rows (snapshot 1) | **878,559** — 1.2235% of 71,809,333 |
+| Distinct orphan `product_id`s | **10,625** |
+| `product` rows for comparison | 187,028 |
+
+By vendor, with each vendor's own row count as the denominator:
+
+| Vendor prefix | Orphan rows | Distinct ids | Rows for that vendor | **% of vendor** |
+|---|---|---|---|---|
+| **Metro** | **637,508** | 6,906 | 8,203,156 | **7.211%** |
+| Walmart | 56,125 | 1,742 | 6,372,804 | 0.873% |
+| Galleria | 46,254 | 145 | 5,892,146 | 0.779% |
+| Loblaws | 43,270 | 302 | 14,013,669 | 0.308% |
+| NoFrills | 32,413 | 222 | 11,024,382 | 0.293% |
+| TandT | 23,726 | 217 | 5,393,781 | 0.438% |
+| Voila | 21,120 | 102 | 12,937,809 | 0.163% |
+| SaveOnFoods | 18,064 | 966 | 7,093,027 | 0.254% |
+| *malformed / unattributable* | *78* | *21* | — | — |
+
+**Metro is an order of magnitude worse than anyone else** and holds 72.6% of the orphan
+rows — consistent with Phase 0 E11, which found Metro's daily extract captures a rotating
+subset of its catalogue.
+
+### They cluster, and the break is a known regime change
+
+| Regime | Orphan rows | All rows | **% orphan** | Distinct ids |
+|---|---|---|---|---|
+| **Before 2024-10-01** | 649,605 | 7,722,502 | **8.412%** | 8,252 |
+| **2024-10-01 onward** | 228,954 | 64,086,831 | **0.357%** | 2,430 |
+
+A **24× step**, falling between 2024-09 (8.500%) and 2024-10 (0.358%). That boundary is
+already in `CLAUDE.md`'s Known Contamination as "Pre Sept 30 2024", and Phase 0 B1b
+independently found a `product_id` scheme change there. **74% of all orphan rows sit on
+the old side of it.**
+
+The post-2024-10 rate is not flat either: it falls to 0.141% (2025-09) then climbs back to
+0.542% (2026-06). So there are two populations, not one — a large historical block and a
+live, slowly growing background.
+
+### Three id generations, which is the mechanism
+
+Metro's *current* `product.id` values are opaque base64 (`YRnfY16EEimWdPCI1S5mVw==`). The
+orphan rows carry something else entirely:
+
+| Generation | Form | Ids | Orphan rows | Share |
+|---|---|---|---|---|
+| **gen-C** | `Metro~Old Cheddar Cheese Slices@200 g^Cracker Barrel` (the `concatted` form) | 8,604 | **670,189** | **76.28%** |
+| **gen-B** | `Metro062020000064` (`vendor \|\| sku`) | 1,992 | 208,293 | 23.71% |
+| malformed | URL-slug fragments, e.g. `Loblawshoney-bunches-of-oat-honey-roasted-cere` | 21 | 67 | 0.01% |
+| gen-A | base64 hash | 8 | 10 | 0.00% |
+
+So the join does not fail because the `product_id` is junk. It fails because these rows
+were written under **id schemes upstream has since retired**, and the migration was never
+applied to history.
+
+### None of it is recoverable — tested, not assumed
+
+The id forms are so legible that recovery looks easy: `Metro062020000064` is plainly
+vendor + sku, and the gen-C form is exactly the `concatted` string our own blank-sku key
+branch already uses. Both were tested against the current catalogue:
+
+| Generation | Ids | Rows | **Recoverable** |
+|---|---|---|---|
+| gen-B — split to (vendor, sku), match `product` | 2,012 | 208,314 | **0** |
+| gen-C — match the id against `product.concatted` | 8,604 | 670,189 | **0** |
+
+**Zero, on both paths.** The skus and the concatted strings are not in the catalogue under
+any key. The products are genuinely gone, not merely re-keyed — which also means no clever
+join recovers them, and a Phase 2 attempt to do so would be wasted work.
+
+Two further checks agree:
+
+| Check | Orphan ids | Joined ids |
+|---|---|---|
+| Average days observed | **62.1** | 322.2 |
+| Median days since last observed | **690** | **2** |
+| Still observed in the final 7 days | 403 of 10,625 | 95,844 of 187,027 |
+
+And the decisive test against snapshot 2: of 10,625 orphan ids, **6 appear in snapshot 2's
+`product` table and 10,619 do not.** Upstream does not backfill. **This is not publication
+lag** — the distinction `CLAUDE.md` insists on — it is absence.
+
+### Verdict on the three hypotheses
+
+- **Scrape artifact — no.** These are real prices. 878,554 of 878,559 parse; the median
+  unit price is **$5.89** and the multibuy median $3.50. Ordinary groceries.
+
+  | `offer_type` | Rows | With a unit price | Median | Range |
+  |---|---|---|---|---|
+  | scalar | 794,271 | 794,271 | $5.89 | $0.12 – $2,197.00 |
+  | multibuy | 82,130 | 82,130 | $3.50 | $0.60 – $21.99 |
+  | per_weight | 2,153 | 2,153 | $0.88 | $0.54 – $65.43 |
+  | unparsed | 5 | 0 | — | — |
+
+- **Product-table completeness gap — yes, and this is the main answer.** `product` is a
+  snapshot of the **currently listed** catalogue, while `raw` is the full price history.
+  A delisted product is removed from `product` outright, orphaning its history. The
+  median orphan id was last seen **690 days ago**.
+
+- **Upstream defect — yes, in two distinct and separately reportable forms.** (1) A
+  `product_id` scheme migration applied to the catalogue but **not retroactively to
+  history**, which is what makes the pre-2024-10 block unjoinable — 74% of the total.
+  (2) A small malformed-id defect: 21 ids that are truncated URL slugs, of which the
+  Loblaws ones on 2026-02-01 were already noted in Phase 0 E2.
+
+**It is not our bug**, and the one part that *was* ours — giving all 878,559 rows a single
+shared key — was fixed in §5.1.
+
+### Downstream semantics — decided, and written into CLAUDE.md
+
+**Decision: D2 and D4 exclude rows with a NULL `product_key` from headline numbers, at
+query time, with the dropped count stated. The rows are never deleted and never re-keyed
+to a placeholder.** Added as honesty rule 6.
+
+**D4 exposure: zero additional rows.**
+
+| Measure | Value |
+|---|---|
+| Orphan rows reachable through `int_upc_match` | **0** |
+
+An orphan row has no product row, therefore no UPC, therefore no GTIN. It could never
+reach the basket. There is nothing to exclude and the rule is a formality for D4 — stated
+as a number rather than asserted.
+
+**D2 exposure: 15,936 sale-flagged rows across 246 product ids.**
+
+| Measure | Value |
+|---|---|
+| Orphan rows | 878,559 |
+| …with a non-blank `old_price` | 262,740 |
+| …with a sale flag in `other` | **15,936** |
+| …distinct ids carrying a sale flag | **246** |
+
+That is the real cost, it is small, and it must be quoted whenever a D2 figure is
+published.
+
+**Why exclusion, and why it is a different call from §3.7's.** An ambiguous price has an
+identity and a doubtful value. An orphan row has a **sound value and no identity at all**.
+Admitting one to D2 means building a price series keyed on `raw.product_id` — which locked
+decision 5 forbids, `check_layering.py` blocks mechanically, and upstream has announced
+will change type from string to number. Two of the three id generations here are already
+retired; keying on the third would be building on the next one to be retired. These rows
+are not weak evidence. They are evidence we have no owned key for.
+
+**Denominator treatment, stated because it is the easiest thing to get wrong.** Orphans
+**stay** in row-count denominators where the denominator is "rows we parsed" — parse
+coverage is 100.000% of 71,809,333 *including* them. They are **absent** from per-vendor
+denominators, because they have no vendor, which is why §2.2's per-vendor table sums to
+70,930,774 and not 71,809,333. Any per-vendor table must state that residual.
+
+**This is not permanent.** The cause is upstream and could be removed upstream. If a
+product-history table is ever published, or if the retired id schemes are backfilled, the
+exclusion should be revisited — and because the rows are kept with a NULL key rather than
+dropped, that revisit is a query change and nothing more.
+
+**Upstream feedback.** The non-retroactive id migration belongs in
+`docs/upstream-feedback.md`: it costs a downstream consumer 1.22% of all price rows and
+7.2% of Metro's, for no benefit, and a single published mapping from retired ids to
+current ones would erase it. Added there.
+
+*Source: `P5_9_orphan_price_rows.sql`.*
+
+### 5.10 Full check status
 
 | Check | Result |
 |---|---|
@@ -1931,6 +2307,9 @@ so the snapshot never becomes writable. **22 of 22, reproducibly.**
 | **dbt tests, snapshot 1** | **40 of 40** |
 | **dbt tests, snapshot 2** | **40 of 40** |
 | **dbt fail-when-they-should** | **23 of 23** |
+| Build-provenance sweep (§5.8) | **14 of 14** parser-dependent queries re-run under one build |
+| `P2_9` determinism | **3 of 3** consecutive runs byte-identical |
+| Snapshot archives, sha256 | **4 of 4** verify against their manifests |
 
 **Counts, not a pass rate.** Adding those up needs care, because two of them are the same
 tests run twice and one is those tests being deliberately broken:
@@ -1944,7 +2323,11 @@ tests run twice and one is those tests being deliberately broken:
 
 **84 distinct test cases exist and 84 passed.** That is a count of what exists, not a
 percentage of some larger set of tests that ought to. Phase 1 has no test-coverage
-percentage and this document does not report one.
+percentage and this document does not report one. (Honesty rule 8.)
+
+---
+
+---
 
 ---
 
@@ -1963,9 +2346,16 @@ percentage and this document does not report one.
 | dbt database path | CWD-dependent, could test an empty DB | **absolute** |
 | Model-body drift between build paths | unmanaged | **checked, shown to fail** |
 | Append-only assumption | assumed | **monitored, +0.9 MB/year** |
+| Parser-dependent numbers verified against one build | 2 of 14 | **14 of 14** |
+| Published numbers that move between runs of the same query | **1** (undetected) | **0** |
+| Repair rules listed in the "each named and counted" table | 4 of 5 | **5 of 5** |
+| Orphan price rows: what they are | counted, uncharacterised | **diagnosed, cause upstream, 0 recoverable** |
+| Orphan rows: downstream semantics | undefined | **excluded from D2/D4 at query time, counted, kept** |
 
 **Not done in Section 5, and why:** no marts, no D2 or D4 numbers, no dashboard — all
-Phase 2. The `plu_short` and `no_upc` tiers carry no tests beyond domain membership because
+Phase 2. Orphan-row recovery is not deferred but **closed**: §5.9 tested both plausible
+recovery paths and both return zero, so there is nothing for Phase 2 to attempt unless
+upstream changes what it publishes. The `plu_short` and `no_upc` tiers carry no tests beyond domain membership because
 there is no invariant to assert about them yet; that arrives when a Phase 2 query first
 depends on one.
 

@@ -226,13 +226,48 @@ price rows" and "the number of price rows we can attribute to a vendor" differ b
 Metro losing 637K rows across 884 of 887 days is a persistent structural gap, not an
 occasional glitch.
 
-**Smallest fix.** Either add the missing `product` rows, or — much cheaper — document
-that `raw` is not guaranteed to be referentially complete, so consumers use a LEFT JOIN
-with an explicit orphan count rather than an INNER JOIN that silently shrinks their data.
+**We have since diagnosed the cause, and it is more specific than "missing rows".**
+Three quarters of it is a **`product_id` scheme migration that was applied to the
+catalogue but not retroactively to history.**
 
-Related, smaller: on **2026-02-01** a handful of Loblaws `product_id` values are malformed
-URL slugs (`Loblawshoney-bunches-of-oat-honey-roasted-cere`, `Loblawsready-to-serve-chicke`),
-which looks like a truncated field in that day's extract.
+Metro's current `product.id` values are opaque base64 (`YRnfY16EEimWdPCI1S5mVw==`). The
+orphaned rows carry two earlier forms:
+
+| Generation | Example | Distinct ids | Orphan rows | Share |
+|---|---|---|---|---|
+| `vendor~name@units^brand` | `Metro~Old Cheddar Cheese Slices@200 g^Cracker Barrel` | 8,604 | **670,189** | **76.3%** |
+| `vendor` + `sku` | `Metro062020000064` | 1,992 | 208,293 | 23.7% |
+| malformed URL slugs | `Loblawshoney-bunches-of-oat-honey-roasted-cere` | 21 | 67 | 0.01% |
+
+The fingerprint is unmistakable: **8.41% of rows before 2024-10-01 are orphaned, against
+0.357% after** — a 24× step at the boundary your documentation already flags as the
+Sept 30 2024 change.
+
+**These are not junk rows.** 878,554 of 878,559 parse to a price, the median is $5.89,
+and the multibuy median is $3.50. They are ordinary grocery prices whose catalogue entry
+is no longer reachable.
+
+**And they are not recoverable downstream.** We tried both obvious routes, because the id
+forms are so legible: splitting `vendor||sku` and matching `(vendor, sku)` against
+`product`, and matching the `vendor~name@units^brand` id against `product.concatted`.
+**Both return exactly zero matches.** The skus and concatted strings are not in the
+current catalogue under any key.
+
+**Smallest fix, in the order we would value it:**
+
+1. **Publish a mapping from retired `product_id` values to current ones.** One two-column
+   table would erase 74% of this problem permanently, for us and for every other consumer.
+   This is by far the highest-value item in this document per unit of your effort.
+2. **Or document that `raw` is not referentially complete**, so consumers use a LEFT JOIN
+   with an explicit orphan count rather than an INNER JOIN that silently shrinks their
+   data. Cheap, and it converts a silent 1.22% loss into a visible one.
+3. **Separately**, the 21 truncated URL-slug ids (mostly Loblaws, 2026-02-01) look like a
+   field-truncation bug in that day's extract, unrelated to the migration.
+
+**One note in your favour:** because `product` holds only the currently-listed catalogue,
+some of this is unavoidable — a delisted product's price history has to point somewhere.
+The 0.357% background rate after 2024-10-01 is that, and it seems reasonable. The 8.41%
+before it is the migration, and that part is fixable.
 
 ---
 
@@ -357,11 +392,16 @@ built on:
 | 2 | **Walmart field misalignment (§2)** | **Two fields corrupted at once: `units` unusable for half of Walmart, `brand` partly filled with price text** | Medium | Live data corruption, still being written daily. One root cause explains two separate symptoms, so one fix retires two findings |
 | 3 | `product.id` doc contradiction (§3) | Consumers over-engineer around a non-problem, or learn to ignore your warnings right before a breaking change | **One sentence** | Best effort-to-value ratio here — but it is a stale sentence, not corrupted data. A wrong description costs less than wrong values |
 | 4 | Stable product key (§4) | Every consumer re-derives identity defensively | Low | The guarantee itself, once §3 says what is true today |
-| 5 | Orphan rows (§5) | Every join needs a denominator caveat | Low (doc) / High (fix) | The doc fix alone captures most of the value |
+| 5 | **Orphan rows (§5)** | **1.22% of all price rows, 7.2% of Metro's, unjoinable — and 74% of it is one retired id scheme** | **Low: a two-column mapping table** | Re-ranked after diagnosis. We first read this as "some rows are missing"; it is a **non-retroactive primary-key migration**, and a published old-id → new-id mapping would erase three quarters of it in one shot. Highest value per unit of your effort in this document |
 | 6 | Small-basket date (§6) | A month of good data wrongly discarded | **Trivial** | Pure documentation error, near-zero cost |
 | 7 | UPC width + PLU (§7) | Cross-vendor matches silently split | Low | Affects the number most consumers care about most |
 | 8 | Duplicates (§8) | Consumers invent divergent tie-breaks | Medium | Real, but already documented and expected |
 | 9 | Batched smaller items (§9) | Friction, not error | Low each | Individually minor; collectively a nice afternoon |
+
+**§5 was re-ranked after we diagnosed it.** Its position is unchanged but its reasoning
+is not: the effort estimate moved from "Low (doc) / High (fix)" to genuinely low, because
+the fix turns out to be a mapping table rather than backfilling 878K rows. If you only act
+on one thing below the top three, this is the one.
 
 **On the top three.** §1 and §2 are both *live corruption* — every extract you publish
 from here on carries them. §3 is a sentence that is out of date. Ranking a documentation

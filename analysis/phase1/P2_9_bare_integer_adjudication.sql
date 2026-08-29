@@ -14,15 +14,33 @@
 -- within 7 days, and ask which reading -- raw, or raw/100 -- is closer.
 SET threads = 4;
 
+-- DETERMINISM NOTE (added in 5.8). The first version of this query keyed on the retired
+-- 64-bit hash and, worse, resolved multiple candidate reference prices with any_value(),
+-- which picks ARBITRARILY. Three runs over the same immutable snapshot and the same build
+-- returned 57,008 / 57,212 / 56,598 for the 100-999 cents count: a published number that
+-- moved by 614 between runs of the same query on the same data. That is honesty rule 4
+-- broken by non-determinism rather than by staleness, and it is harder to notice.
+--
+-- The header above says "nearest non-bare price within 7 days". It now actually does
+-- that: ranked by |day difference|, ties broken by the earlier date and then by price, so
+-- the choice is total and repeatable.
+--
+-- The partition is (key, date, BARE VALUE), not (key, date). Phase 0 B6 found the same
+-- product appearing many times in one day's scrape with CONFLICTING prices, so (key, date)
+-- is not unique and partitioning on it silently picks one of the conflicting values --
+-- which reintroduced the very non-determinism this note is about. Fixed after observing
+-- rows migrate between magnitude bands across runs. This is the third time on this
+-- dataset that a non-unique key has produced a moving number (see findings 1.4). The load-bearing claim was never affected -- zero
+-- rows >= 100 match a dollars reading in every run -- but the supporting counts were.
 CREATE OR REPLACE TEMP TABLE obs AS
-SELECT hash(p.vendor||'|'||p.sku) AS k, p.vendor, s.observed_date AS dt,
+SELECT p.product_key AS k, p.vendor, s.observed_date AS dt,
        s.current_price_raw AS txt,
        regexp_matches(s.current_price_raw, '^[0-9]+$')      AS is_bare,
        try_cast(s.current_price_raw AS DOUBLE)              AS bare_val,
        s.unit_price                                         AS parsed
-FROM stg_price s JOIN product p ON p.id = s.product_id
+FROM stg_price s JOIN stg_product p USING (product_key)
 WHERE p.vendor IN ('Walmart','Galleria')
-  AND p.sku IS NOT NULL AND trim(p.sku) <> ''
+  AND p.product_key_basis = 'vendor_sku'
   AND s.unit_price IS NOT NULL AND s.observed_date >= DATE '2024-06-11';
 
 -- reference price: same key, non-bare row, within 7 days
@@ -30,12 +48,16 @@ CREATE OR REPLACE TEMP TABLE ref AS
 SELECT k, vendor, dt, parsed AS ref_px FROM obs WHERE NOT is_bare;
 
 CREATE OR REPLACE TEMP TABLE adjud AS
-SELECT b.vendor, b.k, b.dt, b.bare_val,
-       any_value(r.ref_px) AS ref_px
-FROM obs b JOIN ref r
-  ON r.k = b.k AND abs(date_diff('day', b.dt, r.dt)) <= 7 AND r.dt <> b.dt
-WHERE b.is_bare
-GROUP BY 1,2,3,4;
+SELECT vendor, k, dt, bare_val, ref_px FROM (
+  SELECT b.vendor, b.k, b.dt, b.bare_val, r.ref_px,
+         row_number() OVER (PARTITION BY b.k, b.dt, b.bare_val
+                            ORDER BY abs(date_diff('day', b.dt, r.dt)),  -- nearest in time
+                                     r.dt,                               -- then earlier date
+                                     r.ref_px) AS rn                     -- then lowest price
+  FROM obs b JOIN ref r
+    ON r.k = b.k AND abs(date_diff('day', b.dt, r.dt)) <= 7 AND r.dt <> b.dt
+  WHERE b.is_bare)
+WHERE rn = 1;
 
 -- 1. Which reading matches the neighbouring non-bare price?
 SELECT vendor,
@@ -62,6 +84,6 @@ FROM adjud GROUP BY 1,2 ORDER BY 1,2;
 -- 3. Total exposure: all bare-integer rows, adjudicable or not.
 SELECT p.vendor, count(*) AS bare_integer_rows,
        count(*) FILTER (WHERE try_cast(s.current_price_raw AS DOUBLE) >= 100) AS at_least_100
-FROM stg_price s JOIN product p ON p.id = s.product_id
+FROM stg_price s JOIN stg_product p USING (product_key)
 WHERE regexp_matches(s.current_price_raw, '^[0-9]+$')
 GROUP BY p.vendor ORDER BY bare_integer_rows DESC;

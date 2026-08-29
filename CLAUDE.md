@@ -96,6 +96,12 @@ timestamp and sha256 per the immutability rule below.
 
 ## Honesty rules (non-negotiable)
 
+**Cite these by name, not by number alone.** Rules get inserted in the middle when a new
+one belongs next to a related one, and every insertion silently invalidates every "rule N"
+reference in the repo — this has now happened twice, and the second time it left stale
+references in four files. Write *honesty rule 7 (report the denominator)*, so a
+renumbering makes the reference redundant rather than wrong.
+
 1. **A missing day is not an unchanged price.** Never forward-fill a price across a gap
    without an explicit, named, documented rule. Gaps must be visible in the model, not
    smoothed away. This is the highest-risk failure mode in this project.
@@ -129,15 +135,83 @@ timestamp and sha256 per the immutability rule below.
 4. **Every published number is reproducible.** Each figure that appears in a writeup or
    dashboard has a committed SQL file that regenerates it. No number exists only in a
    chat message or a notebook cell.
-5. **Report the denominator.** Every percentage carries its n. Every exclusion states how
+
+   **Reproducible means reproducible twice.** A query that returns a different answer on
+   the same immutable snapshot and the same build is not reproducible, and this is harder
+   to notice than a stale number because nothing looks wrong. `any_value()` over a
+   non-unique group, and `row_number()` over a partition that is not the true grain, both
+   do this — Phase 1 §5.8 found a published figure that moved by 614 between runs of the
+   same query. **Any query whose result feeds a published number must impose a total
+   order on every tie-break**, and where it aggregates, the partition must be the grain
+   the source actually has. On this dataset that is rarely the obvious key: the same
+   product appears many times in one day with conflicting prices (Phase 0 B6).
+
+5. **Every published number carries the build stamp it was computed under.**
+   Each findings section states the `_build_stamp` `built_utc` and the short sha256 of
+   the model sources that produced its numbers, in a line at the top of the section:
+
+   ```
+   *Computed under build 2026-08-28T17:48:35Z — models d1f90ee/f6d7345/6d01e90/01ff1a1.*
+   ```
+
+   **Why:** `_build_stamp` records only the *current* build. It is a tripwire against
+   using a stale model, not an archive, and it cannot retroactively date a number already
+   written into a document. Git cannot either — on this project the model fix and the
+   section that quotes it have landed in the *same commit* every time, so commit order
+   proves nothing about which came first within the session.
+
+   That gap is not hypothetical. §2.6's figures were published from a build predating the
+   bare-integer-cents fix and were caught only because §5.5 forced an unrelated recompute;
+   §2.2's `basis_rescaled` count matches no state that can now be reconstructed at all.
+
+   **Consequences, all of them binding:**
+   - A section whose numbers were computed under different builds is **split**, or
+     recomputed under one build. One stamp per section, or the stamp means nothing.
+   - When a model or macro changes, **every section stamped with an older build is
+     re-run before the change is committed**, and the ones that moved are restated with
+     the delta shown, not silently overwritten.
+   - A number with no stamp is treated as **unverified**, not as correct.
+6. **A price row with no product row is excluded from headline numbers, kept, and
+   counted.** 878,559 rows (1.22%) in snapshot 1 have a `product_id` matching nothing in
+   `product` (Phase 0 E2). They carry a **NULL `product_key`** — not a shared placeholder,
+   which is what they had until Phase 1 §5.1 and which silently merged all 878,559 into
+   one product.
+
+   **Downstream semantics, decided (Phase 1 §5.9):**
+   - **D2 and D4 exclude rows with a NULL `product_key` from headline numbers**, at query
+     time, with the dropped count stated. D4's exclusion is **0 additional rows** — an
+     orphan has no product row, hence no UPC, hence no GTIN, so it could never reach the
+     basket. D2 loses **15,936 sale-flagged rows across 246 product ids**.
+   - They are **never deleted and never re-keyed to a placeholder.** They stay in
+     `stg_price` with their raw text and a NULL key, so the set stays countable and a
+     later decision can re-admit it.
+   - **They stay in row-count denominators** where the denominator is "rows we parsed"
+     (parse coverage is 100.000% of 71,809,333, orphans included) and are **absent from
+     per-vendor denominators**, because they have no vendor. Any per-vendor table must
+     say so and state the residual — the vendor rows sum to 70,930,774, not 71,809,333.
+
+   **Why exclusion, and why it is not the same call as rule 3.** An ambiguous price has an
+   identity and a doubtful value. An orphan row has a sound value — they parse at 99.999%
+   and the median is $5.89, an ordinary grocery price — and **no identity at all**.
+   Admitting one to D2 would mean keying a price series on `raw.product_id`, which locked
+   decision 5 forbids, `scripts/check_layering.py` blocks mechanically, and upstream has
+   announced will change type. The rows are not weak evidence; they are evidence we have
+   no owned key for.
+
+   **This is not a permanent verdict.** §5.9 established the cause is upstream, not us:
+   `product` holds only the *currently listed* catalogue, so a delisted product's price
+   history is orphaned, and 74% of the rows predate a retired `product_id` scheme. If
+   upstream ever publishes a product-history table the exclusion should be revisited.
+
+7. **Report the denominator.** Every percentage carries its n. Every exclusion states how
    many rows it dropped and why.
-6. **Never report a pass rate for tests that don't exist.** If there are no tests, the
+8. **Never report a pass rate for tests that don't exist.** If there are no tests, the
    answer is "0 of 0", not a percentage.
-7. **Do not invent numbers.** If you have not run the query, say you have not run the
+9. **Do not invent numbers.** If you have not run the query, say you have not run the
    query. An estimate must be labelled an estimate.
-8. **Volunteer bad news.** If a finding is weaker than it looks, if a number is
-   suspicious, if an earlier decision now looks wrong — say so unprompted, immediately,
-   before continuing.
+10. **Volunteer bad news.** If a finding is weaker than it looks, if a number is
+    suspicious, if an earlier decision now looks wrong — say so unprompted, immediately,
+    before continuing.
 
 ## File manifest (mandatory)
 
