@@ -18,6 +18,10 @@ SELECT r.gtin,
        f.vendor AS fuzzy_vendor,    f.product_name AS fuzzy_name,    f.units AS fuzzy_units
 FROM g r
 JOIN g f ON f.gtin = r.gtin AND r.tier='reliable' AND f.tier='fuzzy'
-QUALIFY row_number() OVER (PARTITION BY r.gtin ORDER BY r.vendor, f.vendor) = 1
+-- determinism-ok: total order within gtin -- reliable vendor, fuzzy vendor, then both
+-- product names. Two rows tying on all four are the same pair of names at the same pair
+-- of vendors, i.e. interchangeable for an eyeball sample.
+QUALIFY row_number() OVER (PARTITION BY r.gtin
+                            ORDER BY r.vendor, f.vendor, r.product_name, f.product_name) = 1
 ORDER BY hash(r.gtin)
 LIMIT 30;

@@ -55,7 +55,7 @@ SELECT cat, count(DISTINCT gtin) AS gtins_in_basket FROM (
 
 -- 3. A concrete look at the staples end of the basket.
 SELECT b.gtin, b.shared_days,
-       any_value(p.product_name) AS example_name,
+       min(p.product_name) AS example_name,
        string_agg(DISTINCT p.vendor, ',') AS vendors
 FROM basket b JOIN product p ON gtin14(p.upc)=b.gtin
 WHERE regexp_matches(lower(p.product_name), '(bread|milk|egg|butter|cheese|rice|coffee)')

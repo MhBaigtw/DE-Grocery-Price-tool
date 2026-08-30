@@ -26,7 +26,8 @@ SET threads = 4;
 -- 0. The collision itself, named rather than asserted.
 SELECT hash(vendor || '|' || sku)                       AS hash64,
        count(*)                                         AS md5_keys_sharing_it,
-       string_agg(vendor || ' / ' || sku || ' / ' || coalesce(product_name, ''), ' || ') AS members
+       string_agg(vendor || ' / ' || sku || ' / ' || coalesce(product_name, ''), ' || '
+                  ORDER BY vendor, sku) AS members
 FROM stg_product
 WHERE product_key_basis = 'vendor_sku'
 GROUP BY 1 HAVING count(*) > 1;

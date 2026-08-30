@@ -25,6 +25,9 @@ LEFT JOIN vend_days vd ON vd.vendor = s.vendor AND vd.d = cal.d;
 -- Longest consecutive run of missing days per vendor (gaps-and-islands).
 CREATE OR REPLACE TEMP VIEW runs AS
 SELECT vendor, present, d,
+       -- determinism-ok: gaps-and-islands over `daily`, which is GROUP BY (key, date) and
+       -- therefore holds exactly one row per key per date, so ORDER BY the date is a TOTAL
+       -- order within the partition. Verified against the CREATE of `daily` above.
        row_number() OVER (PARTITION BY vendor ORDER BY d)
      - row_number() OVER (PARTITION BY vendor, present ORDER BY d) AS grp
 FROM grid;

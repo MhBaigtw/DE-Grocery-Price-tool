@@ -5,12 +5,12 @@ CREATE OR REPLACE TEMP MACRO blank(x) AS (x IS NULL OR trim(x)='');
 
 -- (1) `units` literally containing the string 'error'
 SELECT 'units_is_error' AS defect, count(*) AS products, count(DISTINCT vendor) AS vendors,
-       string_agg(DISTINCT vendor,',') AS vendor_list
+       string_agg(DISTINCT vendor,',' ORDER BY vendor) AS vendor_list
 FROM product WHERE lower(trim(units)) = 'error';
 
 -- (2) non-breaking space (U+00A0) inside `units` -- invisible, breaks naive \s parsing
 SELECT 'nbsp_in_units' AS defect, count(*) AS products,
-       count(DISTINCT vendor) AS vendors, string_agg(DISTINCT vendor,',') AS vendor_list
+       count(DISTINCT vendor) AS vendors, string_agg(DISTINCT vendor,',' ORDER BY vendor) AS vendor_list
 FROM product WHERE contains(units, chr(160));
 
 -- (3) price_per_unit denominators that are not a sane basis

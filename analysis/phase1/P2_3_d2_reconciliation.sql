@@ -21,6 +21,8 @@ SET threads = 4;
 -- md5's hex output is also pure ASCII, which sidesteps the DuckDB statistics bug on
 -- VARCHAR sku columns that motivated the workaround in the first place.
 CREATE OR REPLACE TEMP TABLE keymap AS
+-- determinism-ok: grouped by product_key, which determines vendor 1:1 by construction
+-- (P3.5: md5 over vendor||chr(31)||sku, proved collision-free on both snapshots).
 SELECT product_key AS k, any_value(vendor) AS vendor
 FROM stg_product GROUP BY 1;
 
@@ -39,6 +41,9 @@ WHERE p.sku IS NOT NULL AND trim(p.sku) <> '' AND s.observed_date >= DATE '2024-
 GROUP BY 1,2;
 
 CREATE OR REPLACE TEMP TABLE runs AS
+-- determinism-ok: gaps-and-islands over `daily`, which is GROUP BY (key, date) and
+-- therefore holds exactly one row per key per date, so ORDER BY the date is a TOTAL
+-- order within the partition. Verified against the CREATE of `daily` above.
 SELECT *, row_number() OVER (PARTITION BY k ORDER BY d)
         - row_number() OVER (PARTITION BY k, on_sale ORDER BY d) AS grp
 FROM daily;

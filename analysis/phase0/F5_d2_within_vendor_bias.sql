@@ -36,6 +36,9 @@ GROUP BY 1,2,3;
 -- sale runs, so duration is available per event
 CREATE OR REPLACE TEMP TABLE runs AS
 SELECT vendor, sku, d, on_sale, dirty, multibuy, per_weight, px, oldpx, mb_unit_px,
+       -- determinism-ok: gaps-and-islands over `daily`, which is GROUP BY (key, date) and
+       -- therefore holds exactly one row per key per date, so ORDER BY the date is a TOTAL
+       -- order within the partition. Verified against the CREATE of `daily` above.
        row_number() OVER (PARTITION BY vendor,sku ORDER BY d)
      - row_number() OVER (PARTITION BY vendor,sku,on_sale ORDER BY d) AS grp,
        lag(on_sale) OVER (PARTITION BY vendor,sku ORDER BY d)         AS prev_on_sale

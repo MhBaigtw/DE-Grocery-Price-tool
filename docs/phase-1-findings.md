@@ -338,12 +338,19 @@ than silently priced.
 
 Repairs applied, each named and counted:
 
-> **Restated in §5.8.** This table previously showed four repairs and a `basis_rescaled`
-> count of **105,540**, which matches no state that can now be reconstructed — not the
-> current all-rows figure (106,264), not the current with-a-vendor figure (105,488). It
-> also **omitted `bare_integer_cents` entirely**, the largest repair rule in the phase, in
-> a table captioned "each named and counted". The §2.5 correction note below updated two
-> of the four rows and stopped. Five rules, all five counted:
+> **Restated in §5.8. The provenance of the old figure is LOST, not merely unexplained.**
+> This table previously showed four repairs and a `basis_rescaled` count of **105,540**.
+> That number matches no state that can be reconstructed — not the current all-rows figure
+> (106,264), not the current with-a-vendor figure (105,488) — and **it never will be**.
+> No build stamp records it, no committed macro change explains the 52-row gap, and the
+> build that produced it no longer exists. This is not an open question awaiting more
+> effort; it is a permanently unanswerable one, and it is recorded as such so nobody
+> re-opens the search. The build-stamp rule (honesty rule 5) prevents the next one; it
+> cannot recover this one.
+>
+> The table also **omitted `bare_integer_cents` entirely**, the largest repair rule in the
+> phase, in a table captioned "each named and counted". The §2.5 correction note below
+> updated two of the four rows and stopped. Five rules, all five counted:
 
 | Normalization | Rows (all) | Rows with a vendor | Vendors | Price range after repair |
 |---|---|---|---|---|
@@ -2050,6 +2057,20 @@ only disagreement between the two macros across all 71.8M rows is those 79,478 r
 the 52-row gap against the inner-join count has no committed explanation. The most likely
 candidate is the stale-table window documented in §3.8, but **I cannot reproduce it, and I
 am not going to invent a cause for it.**
+
+**Recorded verdict: provenance LOST, permanently.** This is stronger than "unexplained"
+and the distinction is the point. Unexplained invites another look; lost says there is
+nothing left to look at. The build that produced 105,540 was never stamped, is not
+recoverable from git (the macro sources are unchanged across the candidate window), and
+the materialised table it read has since been rebuilt four times. **No further
+investigation can resolve it, and none should be attempted.**
+
+This is the clearest possible argument for honesty rule 5, and also its clearest
+limitation: **the build-stamp rule fixes this forward, not backward.** Every number
+published from now on carries the build that produced it, so a future discrepancy is a
+lookup. Every number published before the rule existed — this one included — has no such
+record and never will. That asymmetry is permanent and is why the rule was worth adding
+even though it cannot help here.
 
 Worse than the wrong number: the table was captioned "**Repairs applied, each named and
 counted**" and listed **four** rules while the section's own summary table said "**5 repair

@@ -24,6 +24,8 @@
 SET threads = 4;
 
 CREATE OR REPLACE TEMP TABLE keymap AS
+-- determinism-ok: grouped by product_key, which determines vendor 1:1 by construction
+-- (P3.5: md5 over vendor||chr(31)||sku, proved collision-free on both snapshots).
 SELECT product_key AS k, any_value(vendor) AS vendor, any_value(sku) AS sku,
        any_value(product_name) AS product_name, any_value(units_raw) AS units
 FROM stg_product GROUP BY 1;
@@ -32,8 +34,13 @@ FROM stg_product GROUP BY 1;
 CREATE OR REPLACE TEMP TABLE d AS
 SELECT s.product_key AS k, s.price_basis, s.observed_date AS dt,
        avg(s.unit_price)          AS px,
-       any_value(s.normalization) AS norm,
-       any_value(s.offer_type)    AS otype
+       -- determinism-ok: min(), not any_value(). (key, basis, date) is NOT unique -- one
+       -- product appears many times a day with conflicting rows (Phase 0 B6) -- so an
+       -- arbitrary pick here varies between runs. min() is a total order over the string,
+       -- and it happens to prefer a NAMED repair over 'none' alphabetically, which is the
+       -- conservative reading for the one-side-repaired diagnostic below.
+       min(s.normalization)       AS norm,
+       min(s.offer_type)          AS otype
 FROM stg_price s JOIN product p ON p.id = s.product_id
 WHERE p.sku IS NOT NULL AND trim(p.sku) <> ''
   AND s.unit_price IS NOT NULL AND s.unit_price > 0

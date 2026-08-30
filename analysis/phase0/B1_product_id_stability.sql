@@ -27,7 +27,7 @@ GROUP BY vendor ORDER BY vendor;
 
 -- 2. The 20-product sample the brief asks for: 20 long-lived SKUs, showing how many
 --    distinct product_id values each carried.
-SELECT vendor, sku, any_value(product_name) AS product_name,
+SELECT vendor, sku, min(product_name) AS product_name,
        count(DISTINCT d) AS days_observed,
        count(DISTINCT product_id) AS distinct_product_ids,
        min(d) AS first_day, max(d) AS last_day

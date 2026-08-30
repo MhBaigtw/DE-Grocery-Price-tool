@@ -50,6 +50,9 @@ SELECT k, vendor, dt, parsed AS ref_px FROM obs WHERE NOT is_bare;
 CREATE OR REPLACE TEMP TABLE adjud AS
 SELECT vendor, k, dt, bare_val, ref_px FROM (
   SELECT b.vendor, b.k, b.dt, b.bare_val, r.ref_px,
+         -- determinism-ok: total order -- |day difference|, then r.dt, then r.ref_px. A residual
+         -- tie means two reference rows on the same date at the same price, which are
+         -- interchangeable for this comparison. Verified identical across 3 runs (5.8).
          row_number() OVER (PARTITION BY b.k, b.dt, b.bare_val
                             ORDER BY abs(date_diff('day', b.dt, r.dt)),  -- nearest in time
                                      r.dt,                               -- then earlier date

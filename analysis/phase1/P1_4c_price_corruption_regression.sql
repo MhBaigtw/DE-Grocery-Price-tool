@@ -55,6 +55,7 @@ SELECT b.product_id, b.nowtime, b.current_price AS corrupted_snap2,
 FROM s2.raw b
 JOIN raw a ON a.product_id = b.product_id AND a.nowtime = b.nowtime
 WHERE regexp_matches(b.current_price, '^[0-9]+\$$')
+ORDER BY b.product_id, b.nowtime
 LIMIT 20;
 
 -- 5. Recovery rate across ALL corrupted rows that exist in both snapshots.

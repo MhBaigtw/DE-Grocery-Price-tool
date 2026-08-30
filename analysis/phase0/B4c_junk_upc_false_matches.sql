@@ -23,7 +23,7 @@ SELECT trim(upc) AS junk_upc, length(digits(upc)) AS n_digits,
        count(DISTINCT vendor) AS vendors,
        string_agg(DISTINCT vendor, ',') AS vendor_list,
        count(*) AS product_rows,
-       any_value(product_name) AS example_name
+       min(product_name) AS example_name
 FROM product
 WHERE upc IS NOT NULL AND trim(upc)<>'' AND length(digits(upc)) < 11
 GROUP BY 1,2 HAVING count(DISTINCT vendor)>=2

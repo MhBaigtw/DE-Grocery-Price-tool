@@ -121,6 +121,8 @@ python scripts/test_check_schema.py    # proves the above actually fails when it
 python scripts/check_manifest.py       # docs/FILES.md vs the repo
 python scripts/check_layering.py       # product_id must not appear below staging
 python scripts/check_model_parity.py   # models/ and dbt/models/ must not have drifted
+python scripts/check_determinism.py    # SQL that could return a different answer twice
+python scripts/test_check_determinism.py # proves the above fails when it should  (8 of 8)
 python scripts/verify_reproducible.py  # the materialisation matches its own definition
 python scripts/run_dbt_tests.py        # 40 dbt tests, both snapshots
 python scripts/test_dbt_contracts.py   # proves each dbt test fails when it should  (23 of 23)

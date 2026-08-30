@@ -96,11 +96,29 @@ timestamp and sha256 per the immutability rule below.
 
 ## Honesty rules (non-negotiable)
 
-**Cite these by name, not by number alone.** Rules get inserted in the middle when a new
-one belongs next to a related one, and every insertion silently invalidates every "rule N"
-reference in the repo — this has now happened twice, and the second time it left stale
-references in four files. Write *honesty rule 7 (report the denominator)*, so a
-renumbering makes the reference redundant rather than wrong.
+### How this list changes
+
+**Rule numbers are identifiers. Identifiers do not move.**
+
+1. **New rules are APPENDED at the end. Never inserted.** Not even when a new rule
+   obviously belongs beside a related one — grouping is a reading convenience, and it is
+   not worth what it costs. Numbering has been broken twice by mid-list insertion; the
+   second time it left stale `rule N` references in four files, each of which then
+   pointed confidently at the wrong rule.
+2. **A withdrawn rule is marked withdrawn in place, not removed.** Its number is retired
+   with it and is never reused. A reference to a withdrawn rule should resolve to
+   "withdrawn, and here is why", never to a different rule that happens to have inherited
+   the number.
+3. **Related rules cross-reference each other by number** instead of sitting next to each
+   other. Rule 6 says how it differs from rule 3; that costs one sentence and survives
+   any amount of appending.
+
+**This is the same lesson as locked decision 5.** An identifier that reorders under you is
+not an identifier — that is exactly why `raw.product_id` is not a product identity, and
+the reasoning does not stop applying because the identifiers in question are ours. Citing
+a rule by name as well as number is still good practice and much of the repo does it, but
+it is a courtesy to the reader, not the mechanism. The mechanism is that the number never
+changes.
 
 1. **A missing day is not an unchanged price.** Never forward-fill a price across a gap
    without an explicit, named, documented rule. Gaps must be visible in the model, not
@@ -162,7 +180,10 @@ renumbering makes the reference redundant rather than wrong.
 
    That gap is not hypothetical. §2.6's figures were published from a build predating the
    bare-integer-cents fix and were caught only because §5.5 forced an unrelated recompute;
-   §2.2's `basis_rescaled` count matches no state that can now be reconstructed at all.
+   §2.2's `basis_rescaled` count matches no state that can now be reconstructed at all —
+   its provenance is recorded as **lost, permanently**, not as an open question. This rule
+   fixes that forward, not backward: numbers published before it existed have no record
+   and never will.
 
    **Consequences, all of them binding:**
    - A section whose numbers were computed under different builds is **split**, or

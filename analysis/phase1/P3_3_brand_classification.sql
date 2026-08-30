@@ -43,6 +43,8 @@ HAVING count(*) FILTER (WHERE brand_class NOT LIKE 'unclassifiable%') > 0
 ORDER BY understatement_pp DESC;
 
 -- 3. The junk values themselves, confirmed to land in unclassifiable_junk.
+-- determinism-ok: brand_class is a pure function of (vendor, brand_raw) via b_class(),
+-- which is the grouping key here, so it is constant within every group.
 SELECT vendor, brand_raw, count(*) AS products, any_value(brand_class) AS lands_in
 FROM stg_product WHERE brand_class = 'unclassifiable_junk'
 GROUP BY vendor, brand_raw ORDER BY products DESC;

@@ -63,6 +63,12 @@ Read these in order to understand the project from scratch:
 **Depends on:** `analysis/phase1/`, both snapshots.
 **Notes:** Records a methodological error of mine in §1.4 — a join on a non-unique key produced a false "upstream corrupted history" alarm — because the trap is a general hazard on this dataset, not a one-off. §1.5 isolates a defect (the `NNN$` cents-form price) that Phase 0 had lumped into an uncharacterised bucket.
 
+### docs/phase-2-brief.md
+**Purpose:** The Phase 2 assignment: the two findings the project rests on (D2 sale honesty, D4 basket comparison), with D1 demoted to a bounded secondary. Section 1 is an exclusion ledger and bias audit that must complete before any finding is computed.
+**Breaks if removed:** No way to audit whether Phase 2 answered what was asked, and the ordering constraint — bias audit first, findings second — loses its written justification.
+**Depends on:** `docs/phase-1-findings.md`; every section is justified by a Phase 0 or Phase 1 number.
+**Notes:** Section 1 is a gate, and it is a gate because of a specific past failure: Phase 0's F1 tested the D2 bias question on the wrong axis and the correct test changed the answer categorically. Section 4's demotion of D1 is a *selection-versus-outcome* argument — products with stable listings are disproportionately products with stable prices — and it explicitly cannot be fixed by improving the sample.
+
 ### analysis/phase1/
 **Purpose:** Numbered queries behind every Phase 1 number, same rule as `analysis/phase0/`: no figure exists without a committed query that regenerates it.
 **Breaks if removed:** Every number in `docs/phase-1-findings.md` becomes unverifiable.
@@ -116,6 +122,30 @@ Read these in order to understand the project from scratch:
 **Breaks if removed:** `dbt test` still works by hand, but two things it exists to prevent come back. It resolves the database paths to absolute values, and it prints "N of M tests passed" rather than a percentage.
 **Depends on:** `dbt-duckdb`, `dbt/`, and a database built by `scripts/build_models.py`.
 **Notes:** The absolute-path job is not defensive programming — it is a fix for a real failure. dbt resolves `path:` in `profiles.yml` against the **current working directory**, not against the profile, so the original `../hammer.duckdb` pointed one level above the repo when dbt was run from the repo root; DuckDB created an empty database there and dbt reported a missing-macro catalog error, which looks nothing like the cause. The dangerous half is the other outcome: a suite that passes against an empty database. The counts rule comes from brief 5.4 and CLAUDE.md honesty rule 8 ("report a pass rate only for tests that exist") — the number is scoped to the tests that exist and is never a pass rate for the phase.
+
+### scripts/check_determinism.py
+**Purpose:** Flags SQL that can return a different answer on the same data — `any_value`/`first`/`last`/`arg_min`/`arg_max` over a group not proven unique, ranking functions whose `ORDER BY` may not be a total order (or is absent entirely), `LIMIT` without `ORDER BY`, and `string_agg` without `ORDER BY`. Each hazard must either be made deterministic or carry an adjacent `-- determinism-ok: <reason>` annotation.
+**Breaks if removed:** The project's only *preventive* control against its most-repeated defect class returns to being detective-only. "Reproducible twice" (honesty rule 4) catches this after the fact and only if someone re-runs; this catches it before the number exists.
+**Depends on:** `analysis/`, `models/`, `dbt/`. Standard library only.
+**Notes:** Written after the **third** incident of the same class — a 64-bit hash collision moving a D2 count by 6, an `any_value()` moving a published figure by 614 across three runs, and then the fix for that second one partitioning by `(key, date)`, which is not the grain because one product appears many times a day with conflicting prices (Phase 0 B6). The annotation is deliberately a *claim about the data* rather than a suppression: it states why the group is unique or the order total, next to the code, where a reviewer can check it. A ranking function with **no** `ORDER BY` is the one case an annotation cannot silence — no fact about the data can make it deterministic. A justification under three words is rejected, so `determinism-ok: fine` does not pass. It found 44 hazards on first run: 16 were made deterministic for free (`min()` instead of `any_value()` on display columns, `ORDER BY` added to `string_agg`), 28 were justified, and one — `P2_7`'s `any_value` over `(key, basis, date)` — was a real latent defect of exactly the kind that had already bitten twice.
+
+### scripts/test_check_determinism.py
+**Purpose:** Proves `check_determinism.py` fails when it should. Eight cases, including two controls asserting the repo is clean before and after.
+**Breaks if removed:** The lint becomes an untested assertion — the same standard `test_check_schema.py` and `test_dbt_contracts.py` are held to.
+**Depends on:** `scripts/check_determinism.py`.
+**Notes:** The case worth reading is `row_number_without_order_by_cannot_be_annotated_away`: it writes a probe carrying a confident-sounding `determinism-ok` annotation and asserts the check **still** fails. An escape hatch that can silence a construct with no correct form is not an escape hatch, it is a hole. The probe file is written into a scanned directory and removed in a `finally`, and the trailing control case would catch it if it were ever left behind.
+
+### docs/phase-2-findings.md
+**Purpose:** The Phase 2 deliverable. Section 1 is the exclusion ledger and bias audit, which by design completes *before* any finding is computed.
+**Breaks if removed:** The bias verdicts disappear, and with them the reason D2 must be framed the way it is. The ledger is also the only place the three exclusion classes are counted together with their overlaps.
+**Depends on:** `analysis/phase2/`, the Phase 1 models, `docs/phase-2-brief.md`.
+**Notes:** Every section carries a build stamp (honesty rule 5). §1's headline is that one of the three exclusions **is** biased rather than merely large: orphaning removes 26.766% of Metro's 2024 D2 sale events against 0.409% of its 2025 events, which constrains what Section 2 is allowed to plot. It also records a correction to its own method — the pooled "orphans are 1.70× sale-enriched" figure is largely a Metro composition artifact and falls to 1.22× once vendor is controlled for, which is the Phase 0 F1 mistake caught before publication rather than after. §1.3 documents a defect the determinism lint could not catch and running twice did.
+
+### analysis/phase2/
+**Purpose:** Numbered queries behind every Phase 2 number, same rule as the earlier phases: no figure exists without a committed query that regenerates it.
+**Breaks if removed:** Every number in `docs/phase-2-findings.md` becomes unverifiable.
+**Depends on:** `hammer.duckdb` with the Phase 1 models built.
+**Notes:** `Q1`/`Q1b` are the exclusion ledger and bias audit, and they run **before** any finding on purpose — Phase 0's F1 asked the bias question on the wrong axis and got a categorically wrong answer, which was cheap only because nothing had been published yet. `Q1b` exists as a separate file because its whole job is the *control* for `Q1`'s headline: the pooled orphan sale-enrichment of 1.70× is largely a Metro composition effect, and only a within-vendor comparison separates the two.
 
 ### scripts/check_layering.py
 **Purpose:** Enforces that `product_id` appears nowhere below the staging layer — the rule that keeps the announced upstream `raw.product_id` type change an ingest-layer event.

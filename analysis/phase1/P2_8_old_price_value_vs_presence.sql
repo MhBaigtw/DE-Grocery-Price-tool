@@ -40,6 +40,9 @@ GROUP BY 1,2;
 
 CREATE OR REPLACE TEMP TABLE ev AS
 SELECT k, min(dt) AS sale_start, max(old_has_value) AS old_has_value, max(cur_missing) AS cur_missing
+-- determinism-ok: gaps-and-islands over `daily`, which is GROUP BY (key, date) and
+-- therefore holds exactly one row per key per date, so ORDER BY the date is a TOTAL
+-- order within the partition. Verified against the CREATE of `daily` above.
 FROM (SELECT *, row_number() OVER (PARTITION BY k ORDER BY dt)
              - row_number() OVER (PARTITION BY k, on_sale ORDER BY dt) AS grp FROM daily)
 WHERE on_sale = 1 GROUP BY k, grp;
@@ -53,6 +56,8 @@ WINDOW w AS (PARTITION BY k ORDER BY dt RANGE BETWEEN INTERVAL 14 DAY PRECEDING 
 -- workaround hash. The per-vendor figures below were verified unchanged by the switch --
 -- the single collision fell outside the Loblaws keys these numbers depend on.
 CREATE OR REPLACE TEMP TABLE keymap AS
+-- determinism-ok: grouped by product_key, which determines vendor 1:1 by construction
+-- (P3.5: md5 over vendor||chr(31)||sku, proved collision-free on both snapshots).
 SELECT product_key AS k, any_value(vendor) AS vendor FROM stg_product GROUP BY 1;
 
 SELECT m.vendor,

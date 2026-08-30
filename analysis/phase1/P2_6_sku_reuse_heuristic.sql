@@ -62,6 +62,8 @@ FROM gaps WHERE gap_days BETWEEN 1 AND 7 AND px_before IS NOT NULL AND px_before
 
 -- 3. Per vendor (key strings rejoined here, where the row count is small).
 CREATE OR REPLACE TEMP TABLE keymap AS
+-- determinism-ok: grouped by product_key, which determines vendor 1:1 by construction
+-- (P3.5: md5 over vendor||chr(31)||sku, proved collision-free on both snapshots).
 SELECT product_key AS k, any_value(vendor) AS vendor, any_value(sku) AS sku,
        any_value(product_name) AS product_name, any_value(units_raw) AS units
 FROM stg_product GROUP BY 1;

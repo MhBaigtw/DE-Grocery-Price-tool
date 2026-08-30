@@ -46,6 +46,9 @@ GROUP BY 1,2;
 
 CREATE OR REPLACE TEMP TABLE ev AS
 SELECT sku, min(d) AS sale_start, max(old_cents) AS old_cents, max(cur_cents) AS cur_cents
+-- determinism-ok: gaps-and-islands over `daily`, which is GROUP BY (key, date) and
+-- therefore holds exactly one row per key per date, so ORDER BY the date is a TOTAL
+-- order within the partition. Verified against the CREATE of `daily` above.
 FROM (SELECT *, row_number() OVER (PARTITION BY sku ORDER BY d)
                - row_number() OVER (PARTITION BY sku, on_sale ORDER BY d) AS grp FROM daily)
 WHERE on_sale = 1 GROUP BY sku, grp;

@@ -27,6 +27,8 @@ GROUP BY 1,2,3,4;
 
 -- 1. Coverage feasibility per window per vendor.
 SELECT window_label, vendor,
+       -- determinism-ok: window_days is a constant per window_label, so it is identical for
+       -- every row in the (window_label, vendor) group -- any pick returns the same value.
        any_value(window_days)                                            AS window_days,
        count(*)                                                          AS skus_seen_at_all,
        count(*) FILTER (WHERE days_present >= 0.90*window_days)           AS skus_90pct_coverage,

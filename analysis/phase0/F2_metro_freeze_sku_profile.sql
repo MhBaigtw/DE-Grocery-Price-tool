@@ -8,8 +8,8 @@ SET threads = 4;
 
 CREATE OR REPLACE TEMP TABLE metro_win AS
 SELECT p.sku,
-       any_value(p.product_name)                                   AS product_name,
-       any_value(p.brand)                                          AS brand,
+       min(p.product_name)                                         AS product_name,
+       min(p.brand)                                                AS brand,
        count(DISTINCT try_cast(substr(r.nowtime,1,10) AS DATE))    AS days_present
 FROM raw r JOIN product p ON p.id = r.product_id
 WHERE p.vendor = 'Metro'

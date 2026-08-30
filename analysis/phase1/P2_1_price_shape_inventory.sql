@@ -37,15 +37,15 @@ FROM px WHERE cp IS NOT NULL AND trim(cp) <> ''
 GROUP BY 1 ORDER BY rows DESC LIMIT 40;
 
 -- 2. current_price: non-scalar shapes only, per vendor -- who must the parser serve?
-SELECT vendor, sig(cp) AS shape, count(*) AS rows, any_value(cp) AS example
+SELECT vendor, sig(cp) AS shape, count(*) AS rows, min(cp) AS example
 FROM px
 WHERE cp IS NOT NULL AND trim(cp) <> '' AND try_cast(cp AS DOUBLE) IS NULL
 GROUP BY 1,2 ORDER BY rows DESC LIMIT 40;
 
 -- 3. old_price: same census. old_price drives D2, so its shapes matter as much.
 SELECT sig(op) AS shape, count(*) AS rows,
-       count(DISTINCT vendor) AS vendors, any_value(op) AS example,
-       (try_cast(any_value(op) AS DOUBLE) IS NOT NULL) AS casts_cleanly
+       count(DISTINCT vendor) AS vendors, min(op) AS example,
+       (try_cast(min(op) AS DOUBLE) IS NOT NULL) AS casts_cleanly
 FROM px WHERE op IS NOT NULL AND trim(op) <> ''
 GROUP BY 1 ORDER BY rows DESC LIMIT 25;
 

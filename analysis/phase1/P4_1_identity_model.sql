@@ -35,6 +35,8 @@ FROM int_upc_match;
 
 -- 4. Cross-vendor overlap by vendor count, reconciling B4's breakdown.
 WITH g AS (
+  -- determinism-ok: n_vendors_on_gtin and n_fuzzy_vendors_on_gtin are computed per gtin14
+  -- in int_upc_match, so they are constant within a gtin14 group by construction.
   SELECT gtin14, any_value(n_vendors_on_gtin) AS nv,
          any_value(n_fuzzy_vendors_on_gtin) AS nf
   FROM int_upc_match WHERE gtin14 IS NOT NULL GROUP BY gtin14)
@@ -56,7 +58,7 @@ GROUP BY 1, 2 ORDER BY 1, products DESC;
 -- 6. PLU-style short codes: kept and tiered, not silently dropped or silently mixed in.
 SELECT count(*)                              AS plu_short_products,
        count(DISTINCT vendor)                AS vendors,
-       string_agg(DISTINCT vendor, ',')      AS vendor_list
+       string_agg(DISTINCT vendor, ',' ORDER BY vendor) AS vendor_list
 FROM int_upc_match WHERE match_tier = 'plu_short';
 
 -- 7. Reconcile B4d's co-observation figure: of the reliable-only GTINs, how many are
