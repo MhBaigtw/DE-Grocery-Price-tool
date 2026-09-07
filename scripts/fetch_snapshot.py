@@ -25,7 +25,18 @@ ARCHIVES = {
     "hammer-3-compressed.zip": f"{BASE}/hammerdata/hammer-3-compressed.zip",
 }
 LASTUPDATED_URL = f"{BASE}/hammerdata/hammer-lastupdated.txt"
-UA = "Mozilla/5.0 (Project Hammer downstream analysis; +https://github.com/MhBaigtw/DE-Grocery-Price-tool)"
+# Identify ourselves to the upstream host. A contact point is the courteous thing for any
+# automated fetcher to carry -- it lets a maintainer say "stop" or "slow down" without
+# guessing who we are. It should be the REPOSITORY, not a person: a personal address in a
+# public repo is harvested by address scrapers within days, and the repo URL is a better
+# contact anyway because it does not go stale when a person changes address.
+#
+# Set REPO_URL to the published repository once the remote exists. Until then the UA
+# carries no contact at all, which is honest -- an unreachable or invented URL would be
+# worse than none.
+REPO_URL = ""  # e.g. "https://github.com/<owner>/<repo>"
+UA = ("Mozilla/5.0 (Project Hammer downstream analysis"
+      + (f"; +{REPO_URL}" if REPO_URL else "") + ")")
 CHUNK = 1 << 20
 
 

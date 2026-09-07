@@ -33,6 +33,12 @@ Read these in order to understand the project from scratch:
 **Depends on:** Nothing.
 **Notes:** Its honesty rules are cited **by name as well as number** throughout the repo, because rules have twice been inserted mid-list and each insertion invalidates every bare "rule N" reference — the second renumbering left stale references in four files before they were caught. Two statements in it are contradicted by the data and are flagged in `docs/phase-0-findings.md` §2.1 and §2.2 — the small-basket end date (Jul 10/11 vs the actual 2024-06-11) and the claim that `product.id` changes daily. Neither was silently worked around. Its "File manifest (mandatory)" section is what requires this file, and requires `scripts/check_manifest.py` to pass before any phase is reported complete. Its "Upstream volatility" section is what requires `config/expected_schema.json` and `scripts/check_schema.py`.
 
+### LICENSE
+**Purpose:** MIT licence for the code and documentation in this repository.
+**Breaks if removed:** Default copyright applies and nobody may reuse anything here — the state the repo was in before it was published.
+**Depends on:** Nothing.
+**Notes:** Carries an explicit scope note, because the failure mode is a reader assuming one licence covers everything they can see. It covers **our** code and docs; it does **not** cover the Project Hammer dataset, which is not ours to license, is not redistributed here, and carries its own attribution requirement. README.md states the same split under "Two licences, and they are not the same".
+
 ### README.md
 **Purpose:** Entry point. What the project is, the Toronto-pickup scope caveat, current status, layout, reproduction commands.
 **Breaks if removed:** A newcomer has no orientation and may miss the scope limit, which is the easiest thing in this project to get wrong in public.
@@ -195,7 +201,7 @@ Read these in order to understand the project from scratch:
 **Purpose:** Downloads both dataset distributions into `data/snapshots/<utc-stamp>/`, streaming to disk while hashing, and writes `manifest.json` with the URL, start/finish timestamps, byte size and sha256 of each archive, plus the upstream `hammer-lastupdated.txt` value captured at download time.
 **Breaks if removed:** No reproducible way to acquire a snapshot with provenance. Locked decision #2 (snapshot immutability with timestamp and sha256) becomes a manual, forgettable step.
 **Depends on:** Network access to `jacobfilipp.com`. Standard library only.
-**Notes:** Refuses to overwrite an existing snapshot directory and `chmod 0o444`s each archive after download — immutability enforced by the filesystem, not by good intentions. It captures `hammer-lastupdated.txt` *alongside* the download because staleness is only meaningful relative to when the copy was pulled. Archives total ~1.4 GB.
+**Notes:** Its User-Agent identifies the project by **repository URL**, never by a personal address — a contact point is the courteous thing for an automated fetcher to carry, but an email in a public repo is harvested within days, and a repo URL does not go stale when a person changes address. `REPO_URL` is empty until the remote exists, and the UA then carries no contact at all, which is honester than an invented one. Refuses to overwrite an existing snapshot directory and `chmod 0o444`s each archive after download — immutability enforced by the filesystem, not by good intentions. It captures `hammer-lastupdated.txt` *alongside* the download because staleness is only meaningful relative to when the copy was pulled. Archives total ~1.4 GB.
 
 ### scripts/load_snapshot.py
 **Purpose:** Extracts the SQLite member from a snapshot and copies `product` and `raw` into a fresh DuckDB file, then writes a `_snapshot_provenance` table into that database.

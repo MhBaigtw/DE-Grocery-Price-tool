@@ -191,22 +191,31 @@ cites the snapshot id and build stamp it was computed under, so a rebuild can be
 against them — but a *newly downloaded* snapshot is a different snapshot and will not
 reproduce them exactly. That is the point of the immutability rule, not a defect.
 
-## Code licence
+## Two licences, and they are not the same
 
-**Not yet chosen.** The code in this repository carries no licence, which means default
-copyright applies and others have no right to reuse it. If this repo is made public, a
-licence file should be added deliberately in its own commit. The *data* licence below is
-separate and is settled.
+Readers conflate these constantly, so they are stated separately and plainly.
 
-## Data licence and attribution
+### The code: MIT
 
-The maintainer has confirmed that publishing derived analysis and redistributing the
-dataset are both permitted, and that redistribution is encouraged.
+Everything authored in this repository — the Python scripts, the SQL models and queries,
+the dbt project, and the documentation — is **MIT licensed**. See [LICENSE](LICENSE). Use
+it, fork it, ship it commercially; keep the copyright notice.
 
-Required attribution, used here and in every writeup and dashboard footer:
+### The data: Project Hammer's, not ours
+
+The grocery price data is **not ours and is not licensed by us**. It belongs to
+[Project Hammer](https://projecthammer.org) and is used here as a downstream consumer.
+
+**It is also not in this repository.** `data/snapshots/` and the DuckDB files are
+gitignored. Cloning this repo gets you the code and the findings, never the dataset.
+
+The maintainer has confirmed by email that publishing derived analysis and redistributing
+the dataset are both permitted, and that redistribution is encouraged. That permission
+comes with a required attribution, used here and in every writeup and dashboard footer:
 
 > The underlying data was sourced from ProjectHammer.org
 
-Snapshot archives are gitignored because ~1.4 GB of binaries is the wrong payload for git
-history, not because redistribution is restricted. Get your own copy from
-[jacobfilipp.com/hammer](https://jacobfilipp.com/hammer/), or run `scripts/fetch_snapshot.py`.
+**What this means in practice:** MIT lets you take the code. It does **not** give you any
+right to the data, and it does **not** transfer the attribution obligation away from you —
+if you republish numbers derived from Project Hammer, the attribution requirement is yours
+to carry, not something the MIT licence on our code discharges.
