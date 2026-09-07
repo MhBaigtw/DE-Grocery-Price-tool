@@ -105,6 +105,18 @@ Read these in order to understand the project from scratch:
 **Depends on:** `docs/phase-2-findings.md` consolidated record; `docs/phase-3-brief.md` §1.
 **Notes:** Proposes a **different load-bearing claim** from the brief's sketch — that the methodological choices moved the answer more than the retailers did, evidenced by four independent measurements — and records the case for that substitution rather than making it silently. It also corrects a factual error in the brief's sketch, which joined the 84.61% "no consistent cheaper vendor" figure (Metro vs Save-On-Foods) to the Walmart claim, where the real figure is ~50%. Carries an explicit "what would make me withdraw this thesis" section, because a thesis that cannot be abandoned is not a draft.
 
+### docs/writeup.md
+**Purpose:** The Phase 3 written piece — the argument, for a reader who will never open the repo.
+**Breaks if removed:** The results stay locked in a 1,900-line findings document that only a technical reader will finish, and the project has no public artefact.
+**Depends on:** `docs/phase-2-findings.md` for every figure; `docs/phase-3-thesis.md` for the argument it makes; `analysis/phase2/*.sql`, which it links per claim.
+**Notes:** Written against the "what must never be said" list in the findings, which is binding — no "cheapest supermarket" claim, no accusation of dishonesty, no cross-vendor promotion ranking, no freeze-compliance figure, nothing national. Every headline claim carries its qualifier **inside the sentence** rather than in a footnote, because a qualifier a reader can skip is a qualifier that will be skipped. The Walmart section explicitly closes the nihilist reading — a result that survives its own measurement choices is a different object from one that has never been tested — rather than leaving the reader to infer it. Method results are deliberately absent; they live in `method-note.md` so the piece is about grocery prices rather than about us.
+
+### docs/method-note.md
+**Purpose:** The companion note evidencing that the writeup's numbers are trustworthy: the seven controls, and four occasions where those controls caught our own errors.
+**Breaks if removed:** The writeup's central claim — that measurement choices dominate — loses its own foundation, since a reader has no way to check that *our* measurements were controlled.
+**Depends on:** `docs/phase-2-findings.md`, `docs/phase-1-findings.md`, and the check scripts it links.
+**Notes:** Deliberately leads with the failures rather than the controls. A reader deciding whether to believe an analysis is better served by its error rate than by its test count, and the four described here — a pooled comparison overturned three separate times by one control, a figure that moved 614 between runs, two runs that crashed identically and passed a byte-comparison, and a number whose provenance is permanently lost — are the strongest evidence in the repository that the rest was checked.
+
 ### docs/retention-design.md
 **Purpose:** Proposes a two-tier snapshot scheme — full archives at low cadence for the public mirror, plus a slim per-product metadata delta at high cadence for shrinkflation detection. For decision before Phase 2.
 **Breaks if removed:** The retention cadence gets decided on the cost of full archives (1.38 GB each), which prices the wrong artifact and makes weekly observation look impossible when it costs 420 MB a year.
