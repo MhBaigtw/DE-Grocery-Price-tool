@@ -93,6 +93,18 @@ Read these in order to understand the project from scratch:
 **Depends on:** `models/`, a loaded snapshot database.
 **Notes:** Asserts row count in == row count out and refuses to continue on a mismatch — silent row loss is the failure mode this catches. Defaults to a view; `--materialize table` trades ~2.1 GB of disk for query speed, which is what the current build uses because the regex parse over 71.8M rows made every downstream query cost minutes.
 
+### docs/phase-3-brief.md
+**Purpose:** The Phase 3 assignment — turn Phase 2's results into a written piece and a small dashboard for someone who will never open the repo.
+**Breaks if removed:** The constraints that keep the writeup honest lose their source: qualifiers in the sentence rather than in footnotes, R1 as a bracket, no accusation the data does not support, and the withdrawals appearing in the piece rather than only in the repo.
+**Depends on:** `docs/phase-2-findings.md`, whose "what must never be said" section it declares binding.
+**Notes:** §3.3 forbids a basket price lookup outright — a shopper typing a list and getting "Walmart is cheapest" is exactly the claim the findings forbid, so the honest default is not to build it. §1 invites the argument to be replaced if the evidence supports a better one, which is what `phase-3-thesis.md` does.
+
+### docs/phase-3-thesis.md
+**Purpose:** The single paragraph the written piece argues, drafted and held for review before any prose is written.
+**Breaks if removed:** Phase 3 would start writing without an agreed argument, which is how a piece ends up as a tour of the analysis rather than a claim.
+**Depends on:** `docs/phase-2-findings.md` consolidated record; `docs/phase-3-brief.md` §1.
+**Notes:** Proposes a **different load-bearing claim** from the brief's sketch — that the methodological choices moved the answer more than the retailers did, evidenced by four independent measurements — and records the case for that substitution rather than making it silently. It also corrects a factual error in the brief's sketch, which joined the 84.61% "no consistent cheaper vendor" figure (Metro vs Save-On-Foods) to the Walmart claim, where the real figure is ~50%. Carries an explicit "what would make me withdraw this thesis" section, because a thesis that cannot be abandoned is not a draft.
+
 ### docs/retention-design.md
 **Purpose:** Proposes a two-tier snapshot scheme — full archives at low cadence for the public mirror, plus a slim per-product metadata delta at high cadence for shrinkflation detection. For decision before Phase 2.
 **Breaks if removed:** The retention cadence gets decided on the cost of full archives (1.38 GB each), which prices the wrong artifact and makes weekly observation look impossible when it costs 420 MB a year.
