@@ -1195,6 +1195,157 @@ they predate assertion 2 and should be re-verified under the new checker when ne
 
 ---
 
+## Section 3 — D4, basket comparison
+
+*Computed under build `2026-08-28T17:48:35Z` — models `d1f90ee`/`f6d7345`/`6d01e90`/`01ff1a1`/`b584c32`/`b2f47b3`/`bfc7be8`. Verified with `verify_twice.py`: 16 result sets, both runs clean and identical.*
+
+**Status: design settled and survival measured. No price comparison computed yet.**
+
+### 3.0 The comparison design, decided and justified
+
+The availability problem is the shape of this finding, not a preprocessing step, so the
+design is argued before any number exists.
+
+**Rejected — a fixed basket summed per vendor.** Vendors do not stock the same products on
+the same days, so a fixed basket forces one of two errors: drop every date on which any
+member is missing anywhere, which is an availability filter masquerading as a price measure
+and collapses the sample; or carry the last known price forward, which honesty rule 1
+forbids outright.
+
+**Rejected — an all-vendors-at-once intersection.** The reliable tier is four vendors, so
+a four-way intersection is the ceiling and is the product of four availability constraints.
+Measured rather than assumed (result 5 below): **81 GTINs across 600 dates**. Real, but
+2.3% of the basket.
+
+**Chosen — pairwise, per date, on the intersection.** For each vendor pair and date, take
+the GTINs where both vendors have a usable price that day on a matching `price_basis`, and
+compare within that set. **n is reported for every (pair, date).**
+
+- *Why pairwise:* it preserves n. Each pair keeps its own comparable set instead of every
+  pair being cut down to what all four vendors happen to stock.
+- *Why per date:* pooling lets one vendor's cheap week be compared against another's
+  expensive week. Holding the date fixed removes that.
+- **The cost, stated plainly:** pairwise comparisons need not be transitive. If A<B and
+  B<C it does not follow that A<C, because each comparison runs on a different GTIN set.
+  That is a real limitation, and it is exactly why 3.3 asks whether the answer is *stable*
+  rather than asking for a ranking.
+
+### 3.1 What survives the design
+
+The basket reconstructs Phase 0's published population exactly: **5,222 reliable-only
+GTINs, 4,152 ever co-observed, 3,477 at 90+ co-observed days, 1,560 at 365+.** B4d's 3,477
+is reproduced independently here.
+
+| Vendor pair | GTINs shared ever | **% of the 3,477** | Median GTINs per date | Dates with overlap |
+|---|---|---|---|---|
+| Metro vs SaveOnFoods | 2,245 | **64.57%** | 915 | 667 |
+| Metro vs Walmart | 1,842 | **52.98%** | 628 | 713 |
+| SaveOnFoods vs Walmart | 1,665 | **47.89%** | 807 | 606 |
+| **Galleria vs Metro** | 282 | **8.11%** | 134 | 779 |
+| **Galleria vs Walmart** | 248 | **7.13%** | 127 | 716 |
+| **Galleria vs SaveOnFoods** | 187 | **5.38%** | 116 | 671 |
+
+**The answer to "are most pairs thin" is no — but it splits cleanly in half, and the split
+is one vendor.** Three pairs carry 48–65% of the basket with 600–900 GTINs on a typical
+date. The other three carry 5–8%, and all three contain Galleria.
+
+The cause is not subtle. A pair can only be as thick as its thinner side:
+
+| Vendor | GTINs in the basket | Dates present | Observations |
+|---|---|---|---|
+| Metro | 2,958 | 780 | 1,067,136 |
+| SaveOnFoods | 2,702 | 671 | 1,353,047 |
+| Walmart | 2,347 | 717 | 987,702 |
+| **Galleria** | **438** | 783 | 274,128 |
+
+**Galleria contributes 438 of the basket's GTINs against 2,347–2,958 for the others.** It
+is present on more dates than anyone (783), so this is not an extract-failure problem — its
+catalogue simply overlaps the others' by very little.
+
+Intersection sizes are healthy where they exist:
+
+| Intersection size | (pair, date, basis) cells | % |
+|---|---|---|
+| 1 GTIN | 1 | 0.02% |
+| 2–9 | 6 | 0.14% |
+| 10–29 | 26 | 0.63% |
+| 30–99 | 746 | 17.97% |
+| **100+** | **3,373** | **81.24%** |
+
+**81.24% of comparison cells carry 100+ GTINs**, and under 1% carry fewer than 30. So the
+design has plenty to work with; the constraint is *which pairs*, not *how thin the days are*.
+
+**Consequence, binding on 3.3:** the three Galleria pairs will be reported with their n and
+their 5–8% coverage attached, and Galleria will not be ranked against the others on a
+basket that shares a twentieth of its contents with theirs. The three non-Galleria pairs
+are the ones capable of supporting a comparison.
+
+### 3.2 Exclusions applied before any comparison
+
+| Measure | Rows |
+|---|---|
+| Basket price rows | 5,066,397 |
+| Dropped — ambiguous | 676 |
+| Dropped — unparsed | 0 |
+| Dropped — no `unit_price` | 0 |
+| Dropped — before 2024-06-11 (pre-full-catalogue) | *(reported in the query)* |
+| Dropped — orphan | **0, by construction** |
+
+`price_basis` is matched inside every comparison, so an each-price is never compared
+against a per-weight price.
+
+### 3.4 Basket composition — and the limitation that governs everything D4 can say
+
+> ### The basket contains exactly ONE private-label product.
+
+| Brand class | Products in basket | Products in catalogue |
+|---|---|---|
+| national_brand | 5,924 | 99,540 |
+| unclassifiable_blank | 2,085 | 20,372 |
+| unclassifiable_no_vendor_data | 438 | 50,559 |
+| **private_label** | **1** | **16,106** |
+| unclassifiable_junk | 0 | 451 |
+
+**This is structural, not a sampling accident.** The basket is built from GTINs carried by
+two or more vendors. Private label does not cross vendors by definition — President's
+Choice is Loblaws', Selection is Metro's — so a cross-vendor UPC match can never contain
+it. Of 16,106 private-label products in the catalogue, exactly one appears here.
+
+**Therefore D4 measures national-brand prices and nothing else.** It cannot answer "is
+Metro cheaper than Save-On-Foods for a shopper", because a real shopper's basket contains
+private label, and private label is where the price competition between banners is
+sharpest. Any D4 result must be phrased as *"on identical national-brand products, vendor
+A is X% cheaper than vendor B"* — never as "vendor A is cheaper".
+
+This is a harder limit than the availability thinness above, and it is not fixable by
+better matching: the products genuinely do not exist at two vendors.
+
+Category composition is a milder skew:
+
+| Category | % of basket | % of catalogue | Ratio |
+|---|---|---|---|
+| beverages | 15.70 | 11.11 | **1.41** |
+| dairy | 20.48 | 14.77 | **1.39** |
+| produce | 15.35 | 12.70 | 1.21 |
+| bread & bakery | 4.12 | 3.91 | 1.05 |
+| eggs | 1.68 | 1.70 | 0.99 |
+| pantry staples | 6.68 | 7.40 | 0.90 |
+| other | 29.94 | 39.38 | 0.76 |
+| **meat & fish** | 6.06 | 9.04 | **0.67** |
+
+The basket leans toward branded packaged goods with barcodes that travel — dairy,
+beverages, produce — and away from meat and fish, which are frequently sold loose or under
+store-specific packaging. No category is more than 1.41× over- or 1.49× under-represented,
+which is far milder than D1's 474 Metro SKUs, but it is not a random sample of groceries
+and should not be described as one.
+
+*Source: `Q3a_basket_design_and_survival.sql`.*
+
+**Next: the pairwise price comparison itself (3.3), on the three non-Galleria pairs as the
+headline and the three Galleria pairs reported with their coverage caveat.**
+
+---
+
 ## What would change these conclusions
 
 - **The Metro 2024 bias disappears** if upstream publishes a mapping from retired
@@ -1206,6 +1357,17 @@ they predate assertion 2 and should be re-verified under the new checker when ne
 - **The ambiguous exclusion shrinks** if Galleria's bare integers are ever adjudicated —
   26,306 of the 46,884 are Galleria, held ambiguous for want of evidence, not because the
   evidence is against them.
+
+**On D4 specifically:**
+
+- **The private-label limit is permanent.** No amount of better matching puts private
+  label in a cross-vendor basket, because the products do not exist at two vendors. Only a
+  different method — matching on product *description* rather than barcode, which Phase 1
+  §4.3 declined for good reasons — could address it, and that is a Phase 3 decision with
+  its own accuracy problem.
+- **Galleria's three pairs would thicken** only if Galleria's catalogue overlapped the
+  others' more. It is present on 783 dates — more than any other vendor — so this is not
+  fixable by collecting more data.
 
 **On 2A specifically:**
 
@@ -1226,4 +1388,7 @@ they predate assertion 2 and should be re-verified under the new checker when ne
 **Section 1 complete** (1.1–1.5). **Section 2 complete** (2A, 2B). Every number computed
 twice and compared byte-for-byte, sequentially and alone.
 
-**Section 3 (D4 basket comparison) and Section 4 (D1 bounded secondary) are not started.**
+**Section 3 (D4):** design settled, survival and composition measured (§3.0–3.2, §3.4).
+The pairwise price comparison (§3.3) is not computed yet.
+
+**Section 4 (D1 bounded secondary) is not started.**
