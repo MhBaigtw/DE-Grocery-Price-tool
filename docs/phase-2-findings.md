@@ -1346,6 +1346,420 @@ headline and the three Galleria pairs reported with their coverage caveat.**
 
 ---
 
+### 3.5 The private-label blind spot — a structural property of UPC matching, not of this dataset
+
+*Verified with `verify_twice.py`: 16 result sets, both runs clean and identical.*
+
+> ### Any UPC-matched cross-vendor price comparison is blind to private label, by construction — and that is 15.05% of observed rows and 22.64% of price-weighted shelf exposure at the vendors D4 uses.
+
+**Why it is structural.** A cross-vendor basket built on GTIN can only contain products
+carrying the *same barcode at two or more vendors*. A store brand has one seller by
+definition: President's Choice is Loblaws', Selection is Metro's, Great Value is Walmart's.
+It therefore has no cross-vendor barcode match and can never enter the basket.
+
+This would be true of **any** UPC-matched comparison on **any** grocery dataset. It is not
+a coverage gap that more data or better matching closes — it is what UPC matching *is*. And
+it removes precisely the segment where banner-versus-banner price competition is sharpest,
+which is the question a reader believes D4 answers.
+
+| Measure | Value |
+|---|---|
+| Private-label products in the catalogue | **16,106** |
+| Private-label products in the basket | **1** |
+| All basket products | 8,448 |
+| **Share of the basket that is private label** | **0.0118%** |
+
+#### The size of the blind spot, three ways
+
+| Vendor | Price rows | % of rows private label | **% of price-weighted exposure** | Median PL price | Median national price |
+|---|---|---|---|---|---|
+| SaveOnFoods | 6,836,788 | 22.76% | **28.78%** | $6.59 | $5.99 |
+| Metro | 8,157,010 | 19.01% | **30.60%** | $5.99 | $5.69 |
+| Walmart | 6,337,236 | 1.63% | 1.42% | $4.48 | $4.94 |
+| Galleria | 5,838,494 | 0.00% | — | — | — *(no brand data at all)* |
+| **Pooled (the three with brand data)** | **21,331,034** | **15.05%** | **22.64%** | | |
+
+**"Price-weighted exposure" is deliberately not called spend.** This dataset carries no
+quantities sold, so nothing here is a basket share. It is the sum of observed unit prices
+across price rows — *how much of the observed shelf, weighted by price* — and it is
+labelled that way because calling it spend would be inventing a quantity we do not have.
+
+**At Metro and Save-On-Foods, roughly 30% of price-weighted shelf exposure is invisible to
+D4.** Walmart's 1.63% is not a contradiction: Walmart's private label is classified
+differently in the source and its brand field is 79.92% blank (§1.4), so its true share is
+almost certainly higher than 1.63% and this figure is a floor.
+
+#### The blind spot compounds where the basket is already weakest
+
+Private-label share of catalogue, by category, at the three vendors with brand data:
+
+| Category | % private label | Basket representation (§3.4) |
+|---|---|---|
+| **meat & fish** | **14.87%** | **0.67× — the basket's weakest category** |
+| bread & bakery | 11.80% | 1.05× |
+| produce | 10.10% | 1.21× |
+| other | 9.50% | 0.76× |
+| dairy | 9.18% | 1.39× |
+| beverages | 7.31% | 1.41× |
+| pantry staples | 6.07% | 0.90× |
+| eggs | 4.31% | 0.99× |
+
+**Meat and fish is simultaneously the most private-label-heavy category and the one the
+basket under-represents most.** The two gaps stack rather than offset.
+
+**Every D4 number in §3.8 therefore reads "on identical national-brand products, A is X%
+cheaper than B" — in the sentence itself, not in a footnote.**
+
+---
+
+### 3.6 What the 3,477 actually are
+
+Products that clear a cross-vendor co-observation filter are not a random sample of
+groceries, and a reader will assume they are unless told.
+
+| Axis | Basket | Rest of catalogue |
+|---|---|---|
+| Median size (g) | 260 g | 300 g |
+| Median size (mL) | 558 mL | 500 mL |
+| **Products with no parseable size** | **6.72%** | **23.92%** |
+| Median price | **$5.49** | $5.79 |
+| p25 / p75 | $3.97 / $7.79 | $3.79 / $8.98 |
+| **p95** | **$13.99** | **$20.04** |
+
+Three things follow.
+
+- **The basket is far better described than the catalogue.** 6.72% missing size against
+  23.92% — barcoded, standard-pack goods are exactly the products whose units parse.
+- **The basket truncates the expensive tail.** p95 is $13.99 against $20.04, a 30% lower
+  ceiling, while the medians are within 5%. D4 measures ordinary mid-market groceries and
+  says nothing about the expensive end.
+- **Sizes are close to typical**, so this is not a small-pack or bulk slice.
+
+**Brand concentration is low, which is the reassuring finding here:** 1,459 distinct brands
+carry the basket; the top 10 account for **8.1%** of basket products and the top 50 for
+**24.83%**. It is not a handful of multinationals. The leaders are Club House (69), Cadbury
+(60), Christie (60), Starbucks (55), Gatorade (52).
+
+*(Minor caveat on that count: the brand field is not case- or accent-normalised, so
+`Starbucks`/`STARBUCKS` and `Nestlé`/`Nestle` appear as separate brands. 1,459 is therefore
+a slight over-count of distinct brands; the concentration percentages are unaffected in
+direction.)*
+
+---
+
+### 3.7 Galleria's exclusion is a result about Galleria, not about our coverage
+
+§3.1 measured Galleria's pairs at 5–8% basket overlap against 48–65% for the other three.
+The obvious reading is that we failed to match Galleria's barcodes. **That reading is
+wrong, and the data says so clearly.**
+
+| Vendor | Products | % with a UPC | **% with a usable GTIN** |
+|---|---|---|---|
+| SaveOnFoods | 16,158 | 97.49% | **95.20%** |
+| **Galleria** | 10,697 | 86.23% | **86.23%** |
+| Metro | 26,311 | 74.82% | **73.78%** |
+| Walmart | 37,914 | 29.12% | **28.86%** |
+
+**Galleria has the second-best barcode coverage of the four** — better than Metro, three
+times Walmart's. Its products are identified perfectly well. The question is what they are:
+
+| Vendor | GTINs carried | Shared with another reliable vendor | **% shared** |
+|---|---|---|---|
+| Walmart | 10,932 | 5,903 | **54.00%** |
+| SaveOnFoods | 15,382 | 7,172 | **46.63%** |
+| Metro | 19,413 | 8,093 | **41.69%** |
+| **Galleria** | **9,201** | **1,024** | **11.13%** |
+
+**Nine in ten of Galleria's barcoded products are carried by none of the other three
+reliable vendors.** That is a four-fold gap against the next lowest, on excellent
+identification.
+
+**This is informative about the retailer, not about our pipeline.** Galleria is a Korean
+grocery banner; a substantially disjoint product range is what one would expect, and the
+data confirms it rather than merely permitting it. Its 438 basket members are concentrated
+in the categories where international and domestic ranges overlap — dairy (8.50% of its
+dairy catalogue reaches the basket), eggs (9.52%), beverages (5.92%), produce (5.28%) —
+and almost absent from bread and bakery (0.59%) and pantry staples (1.54%), which is where
+a specialist grocer's range diverges most.
+
+**Consequence:** Galleria cannot be price-compared against the others on a meaningful
+basket, and no amount of additional data changes that. It is excluded from §3.8's
+comparison for a stated, measured reason rather than a convenient one.
+
+---
+
+### 3.8 The pairwise comparison — the aggregate answer is stable, the product-level answer is not
+
+*Verified with `verify_twice.py`: 14 result sets, both runs clean and identical.*
+
+> ### On identical national-brand products, Walmart is cheaper than Metro, and Metro is cheaper than Save-On-Foods — on every one of 600–713 dates. But at the level of an individual product, roughly half the time there is no consistent winner, and for Metro vs Save-On-Foods that rises to 85%.
+
+A ratio below 1.00 means the **first-named** vendor is cheaper.
+
+| Pair | n GTIN-days | n GTINs | n dates | Median ratio | Geometric mean | % first cheaper | % second cheaper | % within 1% |
+|---|---|---|---|---|---|---|---|---|
+| Metro / SaveOnFoods | 627,325 | 2,222 | 667 | **0.9475** | 0.9511 | 55.28% | 33.50% | 11.22% |
+| Metro / Walmart | 423,817 | 1,827 | 713 | **1.1447** | 1.1498 | 17.59% | 71.99% | 10.42% |
+| SaveOnFoods / Walmart | 479,137 | 1,650 | 606 | **1.2186** | 1.2175 | 15.06% | 78.06% | 6.88% |
+
+**On identical national-brand products: Metro is ~5.3% cheaper than Save-On-Foods,
+Walmart ~12.6% cheaper than Metro, and Walmart ~17.9% cheaper than Save-On-Foods.**
+
+#### Stability across dates: total
+
+| Pair | n dates | Median of daily medians | p10 | p90 | % of dates first cheaper |
+|---|---|---|---|---|---|
+| Metro / SaveOnFoods | 666 | 0.9499 | 0.9182 | 0.9967 | **91.74%** |
+| Metro / Walmart | 711 | 1.1412 | 1.0931 | 1.2028 | **0.00%** |
+| SaveOnFoods / Walmart | 606 | 1.2181 | 1.1916 | 1.2553 | **0.00%** |
+
+**Walmart is cheaper than both on 100% of dates**, and the p10–p90 bands never cross 1.00.
+Metro beats Save-On-Foods on 91.74% of dates with a p90 of 0.9967 — also never crossing.
+This is not a marginal or noisy ordering.
+
+#### Stability across categories: near-total
+
+Metro is cheaper than Save-On-Foods in **7 of 8** categories; the single exception is eggs
+at exactly 1.0000 — a tie, on 19 GTINs. Walmart is cheaper than both Metro and
+Save-On-Foods in **all 8 categories**, ranging 1.06–1.20 against Metro and 1.16–1.25
+against Save-On-Foods.
+
+#### Stability across basket subsets: **this is where it depends**
+
+Price tertiles, by the price of the second-named vendor:
+
+| Pair | Tertile | Median price | Median ratio | Cheaper |
+|---|---|---|---|---|
+| Metro / SaveOnFoods | 1 (cheap) | $3.49 | **1.0000** | *tie* |
+| Metro / SaveOnFoods | 2 | $5.99 | 0.9482 | Metro |
+| Metro / SaveOnFoods | 3 (dear) | $8.99 | **0.9035** | Metro |
+| Metro / Walmart | 1 (cheap) | $2.98 | **1.2105** | Walmart |
+| Metro / Walmart | 3 (dear) | $7.97 | **1.0913** | Walmart |
+| SaveOnFoods / Walmart | 1 (cheap) | $2.97 | **1.3137** | Walmart |
+| SaveOnFoods / Walmart | 3 (dear) | $7.97 | **1.1605** | Walmart |
+
+**The dependence is on price level, not on category or date.**
+
+- **Metro's advantage over Save-On-Foods grows with price** — nil on the cheapest third
+  (exactly 1.0000), 9.7% on the dearest.
+- **Walmart's advantage shrinks with price** — 21% on cheap items down to 9% on dear ones
+  against Metro, 31% down to 16% against Save-On-Foods.
+
+So a shopper buying cheap staples sees a much larger Walmart advantage than one buying
+mid-priced branded goods, and a shopper choosing between Metro and Save-On-Foods sees no
+difference at all at the cheap end.
+
+#### At the product level, the answer largely does not hold
+
+| Pair | n GTINs | First cheaper on ≥90% of days | Second cheaper on ≥90% | **Mixed** | **% mixed** |
+|---|---|---|---|---|---|
+| Metro / SaveOnFoods | 2,151 | 191 | 141 | 1,820 | **84.61%** |
+| Metro / Walmart | 1,664 | 22 | 795 | 848 | **50.96%** |
+| SaveOnFoods / Walmart | 1,546 | 7 | 776 | 766 | **49.55%** |
+
+**For 84.61% of products, neither Metro nor Save-On-Foods is consistently cheaper.** For
+the Walmart pairs it is about half. The vendor-level ordering is an aggregate that
+individual products frequently contradict — which is the honest form of "it depends".
+
+#### Intransitivity, measured rather than noted
+
+The design's stated weakness is that each pair runs on a different GTIN set, so A<B and
+B<C need not give A<C. Every pair was recomputed on the **three-way common set** (212,667
+GTIN-day cells, 1,215 GTINs, 602 dates) where all three vendors priced the same product on
+the same day:
+
+| Pair | Median on own intersection | Median on common set | Difference |
+|---|---|---|---|
+| Metro / SaveOnFoods | 0.9475 | 0.9523 | 0.5% |
+| Metro / Walmart | 1.1447 | 1.1499 | 0.5% |
+| SaveOnFoods / Walmart | 1.2186 | 1.2146 | 0.3% |
+
+And the transitivity identity on the common set:
+
+| Quantity | Value |
+|---|---|
+| Metro / SaveOnFoods | 0.9523 |
+| SaveOnFoods / Walmart | 1.2146 |
+| Implied Metro / Walmart (chained) | 1.1566 |
+| **Measured Metro / Walmart** | **1.1499** |
+| **Transitivity residual** | **1.0059 — a 0.59% deviation** |
+
+**The ordering is transitive to within 0.59%, and restricting to a common basket moves no
+pairwise figure by more than 0.5%.** The design caveat is real in principle and negligible
+in this data. Recording that as a measurement rather than leaving it as a warning is the
+point — it could easily have gone the other way.
+
+#### What this supports, and what it does not
+
+**Supported:** *On identical national-brand products co-observed on the same day, Walmart
+is roughly 12–13% cheaper than Metro and 18% cheaper than Save-On-Foods, and Metro is
+roughly 5% cheaper than Save-On-Foods. The ordering holds on every observed date and in
+every category, and is transitive to within 0.6%.*
+
+**Not supported:**
+
+- **"Walmart is the cheapest grocery store."** D4 is blind to private label — 22.64% of
+  price-weighted shelf exposure, ~30% at Metro and Save-On-Foods — which is where banner
+  competition is sharpest, and Walmart's own private-label share is under-measured.
+- **Any statement about an individual product.** Half to 85% of products have no
+  consistent cheaper vendor.
+- **Any statement including Galleria** (§3.7), Loblaws, No Frills, T&T or Voila, which are
+  fuzzy-tier and excluded by honesty rule 2.
+- **Anything about the expensive end.** The basket's p95 is $13.99 against the
+  catalogue's $20.04.
+
+*Source: `Q3b_basket_blindspot.sql`, `Q3c_pairwise_stability.sql`.*
+
+---
+
+## Section 4 — D1, bounded secondary
+
+*Computed under build `2026-08-28T17:48:35Z` — models `d1f90ee`/`f6d7345`/`6d01e90`/`01ff1a1`/`b584c32`/`b2f47b3`/`bfc7be8`. Verified with `verify_twice.py`: 13 result sets, both runs clean and identical.*
+
+> ### No result in this section verifies or refutes any company's price-freeze claim, and no per-vendor compliance rate is published. That prohibition stands — but the brief's stated reason for it turns out to be wrong in direction, and the corrected reason is stronger.
+
+### 4.1 The window, and who can even be measured in it
+
+The 2025-11-01 → 2026-02-05 window. All eight vendors cover it essentially fully (97
+observed days; Metro 95).
+
+| Vendor | Products in window | Continuously listed (≥90% of days) | **% continuous** | Present <50% of days |
+|---|---|---|---|---|
+| Galleria | 9,317 | 9,088 | **97.54%** | 98 |
+| Voila | 16,692 | 13,501 | 80.88% | 1,236 |
+| TandT | 8,689 | 5,957 | 68.56% | 1,386 |
+| SaveOnFoods | 11,090 | 7,427 | 66.97% | 1,504 |
+| **Metro** | 10,989 | 6,217 | **56.57%** | 2,378 |
+| Walmart | 11,633 | 4,424 | 38.03% | 4,900 |
+| NoFrills | 16,802 | 4,649 | 27.67% | 1,540 |
+| **Loblaws** | 22,505 | 5,444 | **24.19%** | 2,629 |
+
+**Loblaws and No Frills lose roughly three quarters of their in-window catalogue to the
+continuity filter.** Any freeze statement about them would rest on a quarter of their
+products, selected by a mechanism correlated with the outcome.
+
+### The correction: the survivorship bias does not run the direction the brief assumed
+
+The Phase 2 brief argued that measuring a freeze on continuously-listed products "asks
+whether prices held among the products least likely to move", and that the survivorship
+"runs one direction and flatters the retailer". **Measured, it runs the other way.**
+
+| Listing stability | Products | Median distinct prices | **% that never changed price** | Median price range |
+|---|---|---|---|---|
+| continuously listed | 56,707 | 2.0 | **42.27%** | 9.11% |
+| partial | 35,339 | 2.0 | 40.57% | 8.73% |
+| **brief (<50% of days)** | 15,671 | **1.0** | **67.47%** | **0.00%** |
+
+Per vendor, the same reversal:
+
+| Vendor | % flat among **continuous** | % flat among **brief** |
+|---|---|---|
+| Metro | 20.77% | **57.95%** |
+| SaveOnFoods | 12.76% | **41.62%** |
+| Voila | 37.91% | **82.44%** |
+| Walmart | 46.09% | **75.71%** |
+| NoFrills | 34.42% | **69.74%** |
+| Loblaws | 34.17% | **63.71%** |
+| TandT | 60.15% | 73.38% |
+| Galleria | 82.85% | 76.53% |
+
+**Briefly-listed products look far MORE price-stable than continuously-listed ones**, at
+seven of eight vendors. Restricting to survivors therefore makes prices look *less* stable,
+not more.
+
+**This is not evidence against the brief's mechanism. It is a confound the brief did not
+name: observation length.** A product observed on 20 days has far fewer opportunities to
+exhibit a price change than one observed on 95. Its median distinct-price count is 1
+because it was barely watched, not because its price was held. The brief's concern — a
+product that changed price and was *then* delisted — is real and is a different mechanism;
+it is simply swamped by the arithmetic of short observation windows and cannot be isolated
+with this metric.
+
+**Consequence: neither number is trustworthy, and 4.2's prohibition is reinforced rather
+than weakened.** The brief said a survivors-only rate would flatter the retailer. The truth
+is worse — it is biased by an amount and in a direction that depends on the vendor's
+listing churn, so it is not even reliably wrong in a knowable direction. There is no
+correction to apply.
+
+### 4.2 What a compliance rate would have said — shown only to justify not publishing one
+
+Both figures together, so neither can be quoted alone:
+
+| Vendor | n survivors | % flat, **survivors only** | n all window | % flat, **all window** | Gap |
+|---|---|---|---|---|---|
+| Metro | 6,217 | 20.77% | 10,989 | 30.04% | **9.3 pp** |
+| Walmart | 4,424 | 46.09% | 11,633 | 59.38% | **13.3 pp** |
+| NoFrills | 4,649 | 34.42% | 16,802 | 42.83% | 8.4 pp |
+| Loblaws | 5,444 | 34.17% | 22,505 | 40.94% | 6.8 pp |
+| Voila | 13,501 | 37.91% | 16,692 | 43.09% | 5.2 pp |
+| SaveOnFoods | 7,427 | 12.76% | 11,090 | 17.54% | 4.8 pp |
+| TandT | 5,957 | 60.15% | 8,689 | 62.99% | 2.8 pp |
+| Galleria | 9,088 | 82.85% | 9,317 | 82.12% | −0.7 pp |
+
+**The gap ranges from −0.7 pp to 13.3 pp and is not a constant.** A number that moves by up
+to 13 percentage points depending on a sample-construction choice, in a direction that
+varies by vendor, is not a compliance rate. **Nothing in this table is published as a
+finding**, and it appears here only as the argument for the prohibition.
+
+**Neither column measures freeze compliance in any case.** "Percentage of products whose
+price never changed" is not "compliance with a price freeze": a freeze claim is scoped to
+particular products and particular kinds of change, and a product whose price *fell* has
+not violated a freeze. Nothing here attempts that distinction.
+
+### 4.1 (cont.) The 2025-26 composition check Phase 0 never ran
+
+Phase 0 characterised D1's 2024-25 Metro slice — 474 SKUs that turned out to be a
+frozen-and-packaged cut — and never ran the equivalent on 2025-26. Run now:
+
+**Metro's continuously-listed slice, by brand class.** Metro's claim is scoped to *"all
+private label and national brand grocery products"*, so this is the axis its own wording
+names:
+
+| Brand class | Continuously listed | In window | % of class surviving |
+|---|---|---|---|
+| national_brand | 4,486 | 8,147 | **55.06%** |
+| private_label | 1,138 | 1,873 | **60.76%** |
+| unclassifiable_blank | 593 | 969 | 61.20% |
+
+**Private label survives the continuity filter at 60.76% against national brand's 55.06%
+— a 5.7 pp difference.** The slice is not badly skewed on the axis Metro's claim names,
+which is the one mildly reassuring result in this section. It does not rescue the measure,
+because the selection problem above is not about composition.
+
+Price level and size, continuous slice vs full window:
+
+| Vendor | Median price, continuous | Median price, all window | Median size, continuous | Median size, all |
+|---|---|---|---|---|
+| Metro | $4.99 | $5.99 | 349 g | 340 g |
+| Loblaws | $6.00 | $6.49 | 400 g | 340 g |
+| SaveOnFoods | $5.99 | $6.29 | 300 g | 298 g |
+| NoFrills | $4.99 | $5.00 | 400 g | 355 g |
+
+**The continuously-listed slice is systematically cheaper than the full window** — most
+sharply at Metro ($4.99 against $5.99, a 17% gap). Sizes are close. So the surviving slice
+is a cheaper cut of the catalogue, which is a further reason not to read a rate computed on
+it as representative.
+
+### Verdict on D1
+
+**D1 is bounded and stays bounded.** Recorded, in the form 4.1 requires:
+
+> *Among continuously-listed products only — a selection that removes 43% of Metro's and
+> 76% of Loblaws' in-window catalogue, and whose survivorship runs in a direction that
+> varies by vendor and is confounded with observation length — the share of products whose
+> price never changed during 2025-11-01 → 2026-02-05 ranges from 12.76% (Save-On-Foods) to
+> 82.85% (Galleria). This is not a freeze-compliance rate and must not be read as one.*
+
+**No per-vendor compliance rate is published (4.2).** No company's claim is verified or
+refuted. The reason is stated above in a form that can be argued with: it is a
+selection-versus-outcome problem compounded by an observation-length confound, and it is
+not fixable by improving the sample's composition — a better-composed sample of survivors
+is still a sample of survivors.
+
+*Source: `Q4_d1_bounded.sql`.*
+
+---
+
 ## What would change these conclusions
 
 - **The Metro 2024 bias disappears** if upstream publishes a mapping from retired
@@ -1388,7 +1802,7 @@ headline and the three Galleria pairs reported with their coverage caveat.**
 **Section 1 complete** (1.1–1.5). **Section 2 complete** (2A, 2B). Every number computed
 twice and compared byte-for-byte, sequentially and alone.
 
-**Section 3 (D4):** design settled, survival and composition measured (§3.0–3.2, §3.4).
-The pairwise price comparison (§3.3) is not computed yet.
+**Section 3 (D4) complete** (§3.0–3.8). **Section 4 (D1) complete and bounded.**
 
-**Section 4 (D1 bounded secondary) is not started.**
+Section 5 (the findings document itself) is this file; §5.2's "what would change this"
+appears below and §5.3's upstream-feedback update is outstanding.
