@@ -562,12 +562,14 @@ than prices.
 
 ### 2A — Pre-sale price inflation
 
-> ### Headline: 3.39% of sale events advertise a regular price the retailer never charged in the 14 days before the sale.
+> ### Headline: between 3.39% and 21.27% of 2025–26 sale events advertise a regular price not supported by the fortnight before the sale.
 >
-> **Not 21%.** The naive statistic says 21.27%, and the overwhelming majority of that is a
-> genuine price increase followed by a sale — an innocent explanation that has to be
-> subtracted before anything is claimed. The defensible number is the residual that
-> survives every innocent explanation we could quantify.
+> **A bracket, not a point — see §2.6.** The lower bound is built to exonerate (one high
+> observation anywhere in 14 days clears the retailer, including a price held for a single
+> day). The upper bound is built to accuse (a genuine mid-window price rise flags a
+> truthful claim). Most of the gap between them is genuine price increases followed by
+> sales, which is quantified below — so the truth sits nearer the lower bound, but
+> "nearer" is not a number and neither bound may be quoted alone.
 
 #### The cohort, and every step that narrows it
 
@@ -748,9 +750,18 @@ table. It is not explained here.
 
 ### 2B — Sale frequency
 
-> ### Headline: at Save-On-Foods and Metro, the median product is on sale a quarter to a third of the days it is observed — and about one product in five is on sale more than half the time.
+> ### Headline (WITHIN VENDOR ONLY — the cross-vendor ranking is withdrawn, see §2.7).
 >
-> A product on sale most of the time does not have a sale price. It has a price.
+> At Save-On-Foods the median product carries a struck-out price on **32.12%** of its
+> observed days and **21.08%** of its products do so on more than half of them; at Metro,
+> **26.44%** and **18.28%**. A product on sale most of the time does not have a sale
+> price — it has a price.
+>
+> **These are not comparable across vendors.** §2.7 found that `old_price` presence is
+> corroborated by an independent promotional signal on 99.50% of rows at No Frills and
+> **21.46%** at Save-On-Foods, with Metro untestable — and Save-On-Foods and Metro are
+> exactly the two vendors this table ranks first and second. Every table below is a
+> within-vendor statement.
 
 **2B.3 — this finding is untouched by the `was` loss, and here is the number proving it.**
 2B uses `old_price` as a **flag only**, never as a value. §2.7 found 869,495 rows carrying
@@ -832,6 +843,13 @@ The permanent extreme is genuinely rare:
 
 #### Where the always-on-sale products concentrate
 
+> **WITHDRAWN as a pooled result (§2.7).** The two tables below pool all vendors, which
+> weights them by their flag rates — and those rates are not measuring the same thing
+> (99.50% corroboration at No Frills against 21.46% at Save-On-Foods). Save-On-Foods and
+> Metro together supply most of the ≥50% population, so a pooled category mix is close to
+> a Save-On-Foods-and-Metro mix. Retained below as a description of the pooled data, not
+> as a cross-vendor finding; re-deriving it within vendor is Section 3 work.
+
 Category, as a concentration ratio against each category's share of the whole cohort:
 
 | Category | % of all products | % of ≥50% products | Ratio |
@@ -883,18 +901,297 @@ period.
 
 *Source: `Q2b_sale_frequency.sql`.*
 
-#### What 2A and 2B say together
+#### What 2A and 2B say together — and how much less than it first appeared
 
-They point in different directions and that is worth stating plainly. **2A finds that most
-apparent pre-sale inflation is explained away** — the residual is 3.39%. **2B finds that
-frequent promotion is not rare at all** — a fifth of Save-On-Foods' catalogue is on sale
-more than half the time.
+The first version of this section synthesised the two findings into a claim about
+"these two vendors". **§2.7 removed the basis for that**, and the synthesis is narrowed
+accordingly.
 
-The honest synthesis is that at these two vendors the "regular price" is doing less work
-than the label implies: not because it is usually fabricated (2A says it usually is not),
-but because the product is so often on promotion that the regular price is the exception
-rather than the rule. **That is a claim about promotional cadence, not about honesty**, and
-Phase 2 should not be read as having found retailers lying about prices.
+What still holds, within vendor:
+
+- **2A**: between 3.39% and 21.27% of sale events advertise a regular price not supported
+  by the prior fortnight, with most of the gap attributable to genuine price rises.
+- **2B**: at Save-On-Foods, 21.08% of products carry a struck-out price on more than half
+  their observed days; at Metro, 18.28%.
+
+What does **not** hold: any statement that Save-On-Foods or Metro promote *more than* other
+vendors, because their flag is the least corroborated of the eight and Metro's cannot be
+corroborated at all.
+
+**Phase 2 has not found retailers lying about prices, and it has not found that any
+retailer discounts more than another.** It has found that the struck-out price is often
+not supported by the recent past (bracketed, mostly explicable), and that at two vendors
+the struck-out price is present on a large share of days — which may be promotional cadence
+or may be a field populated for other reasons. Distinguishing those needs a signal this
+dataset does not carry.
+
+---
+
+### 2.5 Galleria's 2A cohort — characterised, and 24.08% is now quotable only with its qualifier
+
+*Computed under build `2026-08-28T17:48:35Z`. Verified with `verify_twice.py`: 14 result sets, both runs clean and identical.*
+
+**The concern was correct.** Galleria's 2A cohort is not a sample of Galleria; it is a
+sample of one corner of Galleria.
+
+#### The selection funnel
+
+| Step | Products |
+|---|---|
+| Galleria products in catalogue | **10,697** |
+| with any price row | 10,651 |
+| with any sale flag | **658** |
+| with a usable `old_price` **value** | **658** |
+
+**658 of 10,697 — 6.15% of the catalogue supplies the entire cohort.** Row-level, 53,487
+of 5,864,799 rows carry a sale flag: **0.912%**, which reproduces Phase 0 C4's 0.92%
+independently.
+
+Note that sale-flag products and usable-value products are the *same* 658. Unlike Loblaws,
+Galleria has no `was` problem — when it populates `old_price` it populates a number.
+
+#### Composition against the full catalogue
+
+| Category | % of catalogue | % of eligible | **Over-representation** |
+|---|---|---|---|
+| **pantry staples** | 12.15 | 25.84 | **2.13×** |
+| eggs | 0.79 | 1.06 | 1.35× |
+| dairy | 7.04 | 6.84 | 0.97× |
+| meat & fish | 8.51 | 8.36 | 0.98× |
+| other | 49.14 | 45.74 | 0.93× |
+| produce | 11.32 | 9.73 | 0.86× |
+| **bread & bakery** | 1.58 | 0.46 | **0.29×** |
+| **beverages** | 9.48 | 1.98 | **0.21×** |
+
+| Unit type | % of catalogue | % of eligible |
+|---|---|---|
+| **g** (dry/packaged) | 73.75 | **84.35** |
+| **ml** (liquids) | 19.22 | **8.51** |
+| unparsed | 5.94 | 5.02 |
+| count | 1.09 | 2.13 |
+
+**The cohort is skewed toward packaged dry pantry goods and away from beverages and
+liquids** — pantry staples 2.13× over-weighted, beverages 0.21× and bread 0.29×
+under-weighted, and mass-denominated products 84.35% of the cohort against 73.75% of the
+catalogue.
+
+This is structurally the same finding Phase 0 made about D1's 474 Metro SKUs: the slice
+that survives a coverage filter is a *kind* of product, not a random draw.
+
+#### The ambiguous overlap: essentially nil
+
+| Measure | Value |
+|---|---|
+| Galleria products with ambiguous bare-integer rows | 90 |
+| Galleria ambiguous rows | 26,305 |
+| 2A-eligible products | 658 |
+| **Overlap** | **2 products** |
+| Overlapping products | `CHEETOS PUFFS`, `CHEETOS CRUNCHY` (each ~1% ambiguous) |
+| **Eligible rows on an ambiguous product** | **14 of 53,487 — 0.026%** |
+
+**The ambiguous exclusion does not touch Galleria's 24.08%.** The two populations are
+effectively disjoint, so no pre-window maximum in the Galleria cohort is computed from a
+thinned set of observations. That question is closed.
+
+#### Verdict
+
+**24.08% is quotable, but only as this sentence:** *"24.08% of the 1,138 evaluable sale
+events at Galleria — drawn from 658 products, 6.15% of its catalogue, over-weighted 2.13×
+to packaged pantry staples and under-weighted 5× to beverages — advertise a regular price
+never charged in the 14 days prior."*
+
+It is **not** quotable as "Galleria's rate", and it must never be ranked against other
+vendors' rates without that qualifier, because the other vendors' cohorts are not selected
+the same way. Galleria's 0.912% flag coverage makes its cohort roughly 30× more selected
+than Save-On-Foods' (32.394% of rows carry a flag).
+
+*Source: `Q2c_galleria_cohort.sql`.*
+
+---
+
+### 2.6 Direction of error — the 2A finding is a bracket, not a point
+
+**The previous framing gave 3.39% as "the finding" and 21.27% as "the naive statistic".
+That was wrong in a specific way: it presented the lower bound as the answer.** Both are
+bounds, both err, and they err in opposite directions.
+
+| Statistic | Rate | **Direction of error** | Why |
+|---|---|---|---|
+| **modal** | **21.27%** | **over-detects** | A genuine mid-window price rise leaves the *old, lower* price as the mode, so a truthful claim about the *new* regular price is flagged. Every real price increase followed by a sale counts as a hit. |
+| median | 20.59% | over-detects | Same mechanism, marginally less sensitive to a short high spell. |
+| last observed | 4.41% | mixed | Captures a genuine rise (the claim matches the new level, no flag) but is a single observation — one anomalous day before the sale either exonerates or condemns on n=1. |
+| **max observed** | **3.39%** | **under-detects** | **One** high observation anywhere in 14 days clears the retailer, including a price held for a single day. A price raised for one day specifically to justify a struck-out claim is scored innocent. |
+
+**The finding is therefore: between 3.39% and 21.27% of 2025–26 sale events advertise a
+regular price not supported by the fortnight before the sale — with the lower bound
+constructed to exonerate and the upper bound constructed to accuse.**
+
+Per vendor, the bracket:
+
+| Vendor | n | **Lower (max-observed)** | **Upper (modal)** | Width |
+|---|---|---|---|---|
+| Galleria | 1,138 | **24.08%** | **34.27%** | 10.2 pp |
+| SaveOnFoods | 67,952 | 3.24% | 28.88% | 25.6 pp |
+| Metro | 22,611 | 6.20% | 26.70% | 20.5 pp |
+| NoFrills | 29,231 | 4.97% | 21.55% | 16.6 pp |
+| Voila | 56,222 | 0.85% | 17.48% | 16.6 pp |
+| Loblaws | 31,068 | 3.41% | 15.81% | 12.4 pp |
+| TandT | 14,934 | 5.02% | 8.26% | 3.2 pp |
+| Walmart | 5,452 | 2.27% | 5.28% | 3.0 pp |
+| **Pooled** | **228,608** | **3.39%** | **21.27%** | **17.9 pp** |
+
+**Where in the bracket the truth sits is not uniform across vendors**, and the bracket
+width is itself informative. T&T and Walmart have narrow brackets (3.0–3.2 pp): their
+flagged events are mostly *not* explained by an intra-window price rise, so the two bounds
+nearly agree. Save-On-Foods has a 25.6 pp bracket: almost all of its apparent inflation is
+absorbed by observed prices, which is why its innocent-explanation rate is 88.77%.
+
+**Neither bound should be quoted alone.** The earlier headline ("3.39%, not 21%") is
+replaced by the bracket. Reporting only the lower bound understates in exactly the
+direction that flatters retailers, which is the failure mode honesty rule 10 exists for —
+and it is the same error, in the same direction, that F5 caught pre-parse in Phase 0.
+
+*Source: `Q2a_presale_inflation.sql` results 14 and 16.*
+
+---
+
+### 2.7 The 2B sale flag is NOT semantically equivalent across vendors — the cross-vendor comparison is withdrawn
+
+*Verified with `verify_twice.py`: 8 result sets, both runs clean and identical.*
+
+> ### Verdict: equivalence fails. 2B is republished as a within-vendor result only.
+
+#### `other` is a per-vendor vocabulary, not a shared flag
+
+| Vendor | Example `other` content | Rows |
+|---|---|---|
+| Voila | `SALE` | 1,923,684 |
+| Walmart | `Rollback`, also `Best seller`, `Made In Canada`, `1000+ bought in past month` | 353,568 |
+| Loblaws | `sale\n$3.50 MIN 2` (multibuy promo text) | 86,764 |
+| SaveOnFoods | `2 for $7` (multibuy text, no "sale" word) | 88,036 |
+| Galleria | `Out of Stock` (availability, not promotion) | 2,082,759 |
+| NoFrills | `Low Stock` (availability, not promotion) | 285,449 |
+
+`other` therefore cannot be a cross-vendor sale signal. It can, however, act as an
+**independent witness**: if `old_price` presence means "on sale" everywhere, then at
+vendors whose `other` carries promotional vocabulary the two should corroborate at
+comparable rates.
+
+| Vendor | % of rows with promotional `other` | **% of `old_price` rows corroborated** |
+|---|---|---|
+| NoFrills | 14.13% | **99.50%** |
+| Loblaws | 24.07% | **99.06%** |
+| Voila | 19.39% | **98.20%** |
+| Walmart | 17.11% | **79.02%** |
+| **SaveOnFoods** | 8.62% | **21.46%** |
+| **TandT** | 0.88% | **0.04%** |
+| Galleria | **0.00%** | untestable — no promotional `other` |
+| **Metro** | **0.00%** | untestable — **`other` is empty on all 6,003,385 rows** |
+
+**Spread across the six testable vendors: 0.04% to 99.50% — 99.46 percentage points.**
+
+That is not "comparable rates". At No Frills, Loblaws and Voila the two mechanisms are
+effectively the same signal. At Save-On-Foods, **fewer than a quarter** of `old_price`-
+present rows carry any promotional text. At T&T, essentially none do.
+
+#### Why this specifically breaks 2B's headline
+
+**The two vendors 2B ranked first and second are precisely the two whose flag cannot be
+corroborated.**
+
+| Vendor | 2B median % of days on sale | Corroboration of the flag |
+|---|---|---|
+| **SaveOnFoods** | **32.12%** (rank 1) | **21.46%** |
+| **Metro** | **26.44%** (rank 2) | **untestable — no `other` data at all** |
+| Loblaws | 12.12% | 99.06% |
+| Voila | 11.41% | 98.20% |
+| NoFrills | 8.98% | 99.50% |
+
+Save-On-Foods populates `old_price` in a large set of situations that its own free-text
+field does not describe as promotional. That may be a genuine promotion the vendor simply
+does not label, or it may be `old_price` carrying a list price, a former price, or a
+unit-size comparison. **This analysis cannot distinguish those**, and until it can, "Save-On-
+Foods discounts more often than Loblaws" is not a supported claim — it may be "Save-On-
+Foods populates `old_price` more often than Loblaws".
+
+Ordering under the two mechanisms differs materially:
+
+| Vendor | % rows `old_price` present | % rows promotional `other` |
+|---|---|---|
+| SaveOnFoods | **32.39%** (1st) | 8.62% (5th) |
+| Metro | 28.98% (2nd) | 0.00% (7th=) |
+| Voila | 19.12% (3rd) | 19.39% (2nd) |
+| Loblaws | 17.78% (4th) | **24.07%** (1st) |
+| NoFrills | 14.11% (5th) | 14.13% (4th) |
+| Walmart | 12.24% (6th) | 17.11% (3rd) |
+
+**The vendor ranking depends on which flag you pick.** Save-On-Foods is first under one
+and fifth under the other; Loblaws is fourth under one and first under the other. A
+cross-vendor ranking that reverses under an equally defensible definition of the same
+concept is not a finding.
+
+#### What 2B still supports
+
+- **Within-vendor statements stand.** "At Save-On-Foods, the median product carries a
+  struck-out price on 32.12% of observed days, and 21.08% of its products do so on more
+  than half of them" is a claim about Save-On-Foods' own data under one consistent
+  definition. It is unaffected by what `old_price` means at Metro.
+- **Within-vendor comparisons over time stand**, for the same reason.
+- **The category and brand-class breakdowns stand within vendor** but not pooled, since
+  pooling weights vendors by their flag rates.
+
+#### What is withdrawn
+
+- The cross-vendor **ranking** of sale frequency.
+- The pooled category concentration table and pooled brand-class table in 2B, which mix
+  vendors with 99.50% and 21.46% flag corroboration.
+- Any statement of the form "vendor X promotes more than vendor Y".
+
+**Also corrected:** §2.7 of Phase 1 established that `old_price` presence and value diverge
+only at Loblaws (71.33% of present rows carry a value; every other vendor is ~100%). That
+remains true and is a *different* problem from this one. Presence-vs-value is about whether
+the number is usable; this is about whether the presence means the same thing at all.
+
+*Source: `Q2d_flag_semantics.sql`.*
+
+---
+
+### 2.8 The compute-twice check, hardened
+
+**The hole:** `diff run1 run2` reports agreement when **both runs fail the same way**.
+§1.3 already recorded the near-miss — paired runs that differed because one had OOM'd. The
+dangerous case is the symmetric one: both runs OOM at the same statement, both truncate
+identically, and the check passes.
+
+`scripts/verify_twice.py` replaces the bare diff and asserts, in order:
+
+| # | Assertion | Catches |
+|---|---|---|
+| 1 | both runs exited 0 | outright failure |
+| 2 | no failure marker in either output (`!! statement`, `Out of Memory`, `Binder Error`, `Segmentation fault`, …) | **two runs failing identically** |
+| 3 | both runs produced the same **number of result sets** | truncation |
+| 4 | every result set has the same row count | partial divergence |
+| 5 | `--min-rows`: no result set unexpectedly empty | a silently empty upstream temp table |
+| 6 | **then** byte-identity | non-determinism |
+
+`--expect-statements N` pins the result-set count, so a query that quietly loses a
+statement fails here rather than being certified reproducible.
+
+`scripts/test_verify_twice.py` proves it fails when it should — **5 of 5 cases**, including
+the one that matters: a probe forced to OOM deterministically, where both runs truncate to
+identical output and the checker **still refuses**. A plain `diff` passes that probe.
+
+One note on building the test itself: the non-determinism probe first used
+`ORDER BY random()` over 3 rows, which returned the same order twice often enough to make
+the *test* flaky. It now uses 200 rows. A flaky test for flakiness would have been a poor
+advertisement.
+
+**Every Section 2 number from this point is verified with `verify_twice.py`, not with
+`diff`.** §1's numbers were verified before this existed; they were re-run sequentially and
+alone at the time, and their result-set counts and row counts are recorded in the logs, but
+they predate assertion 2 and should be re-verified under the new checker when next touched.
+
+*Source: `scripts/verify_twice.py`, `scripts/test_verify_twice.py`.*
 
 ---
 

@@ -147,6 +147,18 @@ Read these in order to understand the project from scratch:
 **Depends on:** `hammer.duckdb` with the Phase 1 models built.
 **Notes:** `Q1`/`Q1b` are the exclusion ledger and bias audit, and they run **before** any finding on purpose — Phase 0's F1 asked the bias question on the wrong axis and got a categorically wrong answer, which was cheap only because nothing had been published yet. `Q1b` exists as a separate file because its whole job is the *control* for `Q1`'s headline: the pooled orphan sale-enrichment of 1.70× is largely a Metro composition effect, and only a within-vendor comparison separates the two.
 
+### scripts/verify_twice.py
+**Purpose:** Runs a query file twice and verifies the two runs both **succeeded** and agree — exit codes, absence of failure markers, matching result-set counts, matching per-statement row counts, an optional non-empty floor, and only then byte-identity.
+**Breaks if removed:** The compute-twice check reverts to `diff run1 run2`, which reports agreement whenever **both runs fail the same way**. Two runs that OOM at the same statement truncate identically and pass a diff.
+**Depends on:** `scripts/run_query.py`.
+**Notes:** Written after Phase 2 §1.3 recorded the near-miss — paired runs that differed only because one had hit an out-of-memory error under contention. That case was caught because the runs differed; the symmetric case, where both crash identically, was invisible. Order matters: byte-identity is checked **last**, because a crashed pair is a more serious finding than a divergent one and should be reported as such rather than as "not identical". `--expect-statements` pins the result-set count so a query that quietly loses a statement fails rather than being certified reproducible.
+
+### scripts/test_verify_twice.py
+**Purpose:** Proves `verify_twice.py` fails when it should. Five cases, including a probe forced to OOM deterministically so both runs truncate to identical output.
+**Breaks if removed:** The hardened check becomes an untested assertion, held to a lower standard than `check_schema`, `check_determinism` and the dbt contracts.
+**Depends on:** `scripts/verify_twice.py`.
+**Notes:** The case worth reading is `both_runs_failing_identically_is_NOT_agreement` — a plain `diff` passes that probe and the checker must not. The non-determinism probe uses 200 rows rather than 3, because `ORDER BY random()` over three values repeats an order often enough to make the test for flakiness itself flaky.
+
 ### scripts/check_layering.py
 **Purpose:** Enforces that `product_id` appears nowhere below the staging layer — the rule that keeps the announced upstream `raw.product_id` type change an ingest-layer event.
 **Breaks if removed:** The rule reverts to discipline. A downstream model could start keying on `product_id`, and the breaking change would then propagate into every mart built on it.
