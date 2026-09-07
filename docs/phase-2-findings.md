@@ -138,8 +138,9 @@ correctness.
 | Class | Time | Promotion type | Depth | Category / brand | D2 impact | D4 impact |
 |---|---|---|---|---|---|---|
 | **ambiguous** | concentrated, immaterial | **distinct type** (sale-*depleted*) | random slice | **distinct type** | negligible | negligible |
-| **orphan** | **BIASED — severe** | **distinct type**, inconsistent by vendor | **random slice** | **untestable** | **material** | none |
+| **orphan** | **BIASED — severe** | **distinct type**, inconsistent by vendor | **random slice** | **random slice** (§1.4, 76.3% coverage) | **material** | none |
 | **unparsed** | untestable (n=28) | untestable (n=28) | untestable | untestable | negligible | none |
+| **`vendor_sku` filter** *(§1.5)* | **2024-concentrated** | **distinct type** (2.3× multibuy) | shorter runs | **distinct type** | **biased but immaterial — 539 of 280,138 evaluable** | none |
 
 ---
 
@@ -255,12 +256,14 @@ of it:** 676 rows and 27 of 5,222 basket GTINs, none majority-ambiguous.
 Brand class shows the same skew, driven by Galleria's absent brand data:
 `unclassifiable_no_vendor_data` is 56.16% of ambiguous against 34.14% of retained.
 
-**A limitation I cannot test, stated plainly: the category and brand axes cannot be
-evaluated for orphan rows at all.** Category and brand live in `product`, and an orphan row
-has no product row. This is not an oversight; it is unanswerable with the data we have.
-**The orphan exclusion could be category-biased and we would not know.** The mitigating
-facts are that its D4 impact is exactly zero, and that its per-vendor composition is known
-even where its per-category composition is not.
+> **Superseded by §1.4.** This section originally recorded category and brand as
+> **untestable** for orphan rows, because both live in `product` and an orphan has no
+> product row. That was true of the *join* and false of the *data*: 76.28% of orphan rows
+> carry the retired `vendor~name@units^brand` id, which contains both fields. §1.4 parses
+> them and returns a verdict — **category is a random slice** for the Metro-dominated 89.66%
+> of that population, and **private-label share is 1.09×**, near-neutral. The residual
+> 23.72% carries the `vendor||sku` id form, which has no name or brand, and remains
+> genuinely untestable. The limitation shrank from all orphans to a quarter of them.
 
 ---
 
@@ -303,9 +306,599 @@ Fixed by adding `vendor` as a tiebreak to every non-total `ORDER BY` in
 `analysis/phase2/`, after which both files return byte-identical output across
 consecutive runs.
 
+**A practical note on how the twice-check must be run.** Two of the paired runs for §1.4
+and §1.5 initially came back different, and neither was a determinism failure — one run of
+each pair had hit an out-of-memory error because it was competing with another query for
+the same 3 GB budget. **A crashed run and a non-deterministic run look identical to a
+byte-comparison.** The pairs are therefore run sequentially and alone, and a pair that
+differs is inspected before being called a defect rather than after. Re-run that way,
+`Q1c` and `Q1d` are both byte-identical across two clean runs, as are `Q1` and `Q1b`.
+
 ---
 
-### What would change these conclusions
+---
+
+### 1.4 Orphan category and brand bias — tested, not untestable
+
+*Computed under build `2026-08-28T17:48:35Z` — models `d1f90ee`/`f6d7345`/`6d01e90`/`01ff1a1`/`b584c32`/`b2f47b3`/`bfc7be8`. Computed twice and compared.*
+
+**§1.2 recorded category and brand as "untestable" for orphan rows. That was true of the
+join and false of the data, and it is now replaced with a result.** 76.28% of orphan rows
+carry a `product_id` in the retired `vendor~name@units^brand` form, which contains the
+name and the brand outright. Parsed — not joined, not keyed.
+
+**On locked decision 5.** This is not a breach and the distinction is worth stating.
+Locked decision 5 forbids the supplied row id as a **product identity** — keying, joining,
+matching, or following a product through time — and its stated hazard is that the id
+"changes daily", which is a claim about identity *over time*. `Q1c` parses descriptive
+text out of a string and counts distributions: no key, no join on the id, no product
+tracked across dates, no orphan row admitted to any finding. The precedent was accepted at
+Section 1 sign-off, where `Q1b` derived the orphan vendor prefix from `product_id` and
+sized orphan events on it. `check_layering.py` governs `models/`; this is `analysis/`, and
+the check still passes.
+
+#### Coverage, stated before the result
+
+| Measure | Value |
+|---|---|
+| Orphan rows | 878,559 |
+| **Parsable (`vendor~name@units^brand`)** | **670,189 — 76.28%** |
+| Rows with an empty name slot | **0** |
+| Rows with an empty brand slot | 27,451 (4.10% of parsable) |
+
+**The uncovered 23.72% is genuinely untestable and stays that way.** Those rows carry the
+`vendor||sku` id form, which contains no name and no brand — there is nothing to parse.
+The limitation shrinks from *all* orphans to *a quarter* of them; it does not vanish.
+
+**The parsable set is not Metro-only, but it is Metro-dominated:**
+
+| Vendor | Parsable rows | % of parsable |
+|---|---|---|
+| **Metro** | 600,909 | **89.66%** |
+| Walmart | 38,533 | 5.75% |
+| TandT | 13,897 | 2.07% |
+| Galleria | 4,334 | 0.65% |
+| Voila | 3,507 | 0.52% |
+| NoFrills | 3,090 | 0.46% |
+| Loblaws | 3,074 | 0.46% |
+| SaveOnFoods | 2,845 | 0.42% |
+
+The parse is legible on inspection — `Metro / Old Cheddar Cheese Slices / Cracker Barrel`,
+`Walmart / Rao's Tomato Basil Sauce, 660ml / Rao's Homemade` — rather than trusted.
+
+#### The pooled result is wrong, and the within-vendor result is the answer
+
+Pooled across vendors, brand looks dramatic: national brand 1.79×, private label 1.73×,
+`unclassifiable_no_vendor_data` 0.10×. **That is the F1 confound for the third time in one
+audit.** 89.66% of parsable orphans are Metro, while the retained pool includes Voila,
+T&T and Galleria — all 100% `unclassifiable_no_vendor_data` (§3.3). The retained side is
+diluted with brandless vendors that barely appear in the orphan set.
+
+Within vendor, for Metro — the 89.66% that carries the result:
+
+| Category | % orphan | % retained | Ratio |
+|---|---|---|---|
+| bread & bakery | 4.68 | 5.12 | 0.91 |
+| dairy | 17.85 | 18.11 | **0.99** |
+| eggs | 0.74 | 1.02 | 0.73 |
+| produce | 13.58 | 12.67 | 1.07 |
+| meat & fish | 7.00 | 8.77 | 0.80 |
+| pantry staples | 9.10 | 6.98 | 1.30 |
+| beverages | 12.55 | 12.26 | **1.02** |
+| other | 34.50 | 35.07 | **0.98** |
+
+**Verdict on category: random slice.** No Metro category departs from its retained share
+by more than 30%, and the four largest categories are within 2%. Walmart shows a real skew
+(produce 1.81×, meat & fish 1.78×) but is 5.75% of the parsable set; T&T's beverages run
+2.11× on 13,897 rows.
+
+| Metro brand class | % orphan | % retained | Ratio |
+|---|---|---|---|
+| national_brand | 79.35 | 73.48 | **1.08** |
+| private_label | 20.61 | 18.95 | **1.09** |
+| unclassifiable_blank | 0.04 | 7.56 | 0.01 |
+
+**Private-label share, the number D4 would inherit: 20.608% orphan against 18.950%
+retained — 1.09×.** Near-neutral.
+
+#### A limitation in the method itself, volunteered
+
+**The brand comparison is partly measuring the parse condition, not orphaning.** The
+`vendor~name@units^brand` form *requires* a brand slot, so parsable orphans are selected
+toward rows that have a brand recorded at all. That is why `unclassifiable_blank` runs
+0.01× at Metro and 0.17× at Walmart — those rows are largely in the unparsable 23.72%, not
+absent from the orphan population.
+
+The conditioning bites least where the retained blank rate is already low. Metro's retained
+rows are 7.56% blank, so Metro's ratios are close to honest. **Walmart's retained rows are
+79.92% blank**, which is why its brand ratios read 4.22× and 5.23× — those are the parse
+condition, not a finding, and they should not be quoted as one.
+
+**So: category is a random slice for the dominant population and mildly skewed for two
+small ones; brand is near-neutral where it can be measured cleanly and confounded where it
+cannot.** The verdict table is updated from "untestable" to "random slice (category) /
+near-neutral where measurable (brand), 76.28% coverage".
+
+*Source: `Q1c_orphan_attribute_bias.sql`.*
+
+---
+
+### 1.5 The `vendor_sku` filter — a fourth exclusion class, undeclared until now
+
+*Computed under the same build. Computed twice and compared.*
+
+**Where it came from.** Phase 0's F5 partitioned literally by `(vendor, sku)`. A blank sku
+under that partition collapses every blank-sku product at a vendor into one price series,
+so F5 **had** to write `WHERE p.sku IS NOT NULL AND trim(p.sku) <> ''`. The filter was
+never a judgement about which products deserve measuring; it was a consequence of the key.
+
+`P2_3` inherited it verbatim, for the stated reason that "definitions are held identical to
+F5 so the comparison is like-for-like". But `P2_3` keys on `product_key`, and §4.1 built
+the `concatted` fallback **specifically so the 25,728 blank-sku products would have a
+key**. The filter now removes exactly the population the owned key was designed to cover,
+for a reason that no longer applies.
+
+#### The reconciliation: 576,200 → 566,564, line by line
+
+Every cell counted, none derived by subtraction:
+
+| Population | Events |
+|---|---|
+| **A.** all keys, all dates *(Q1b)* | **576,200** |
+| **B.** all keys, date ≥ 2024-06-11 | 575,078 |
+| **C.** `vendor_sku` only, all dates | 567,403 |
+| **D.** `vendor_sku` only, date ≥ 2024-06-11 *(P2_3)* | **566,564** |
+
+| Effect | Events |
+|---|---|
+| Total difference A − D | **9,636** |
+| Lost to the date floor (all keys) | **1,122** |
+| Lost to the sku filter (all dates) | **8,797** |
+| Overlap — lost to both | **283** |
+| **1,122 + 8,797 − 283** | **= 9,636** ✓ |
+
+**The two are reconciled exactly.** The undeclared sku filter removes **8× more events
+than the declared date floor** — 8,797 against 1,122.
+
+The date floor is recomputed rather than filtered after the fact, because the floor
+*truncates* an event spanning it rather than removing it, and a filtered-afterwards count
+would get that wrong.
+
+#### Per vendor and year — and it lands almost entirely on 2024
+
+| Vendor | 2024 removed | 2024 % | 2025 % | 2026 % |
+|---|---|---|---|---|
+| **Walmart** | 2,568 | **26.293%** | 0.000% | 0.000% |
+| **Galleria** | 130 | **21.886%** | 0.000% | 0.000% |
+| Metro | 2,406 | 7.475% | 0.000% | 0.000% |
+| TandT | 479 | 5.933% | 0.000% | 0.000% |
+| Voila | 772 | 3.322% | 0.000% | 0.000% |
+| NoFrills | 442 | 2.136% | 0.018% | 0.030% |
+| Loblaws | 419 | 1.876% | 0.024% | 0.039% |
+| SaveOnFoods | 18 | 0.092% | 0.000% | 0.000% |
+
+**This is the second exclusion that concentrates in 2024, and it stacks on the first.**
+2024 already loses 26.8% of Metro's events to orphaning; it also loses 26.3% of Walmart's
+and 21.9% of Galleria's to the sku filter. The two classes hit different vendors hardest,
+which makes a 2024 cross-vendor comparison worse than either number alone suggests.
+
+#### Is the removed set a random slice? No.
+
+| Measure | Removed (`vendor_concatted`) | Kept (`vendor_sku`) | Ratio |
+|---|---|---|---|
+| Events | 8,514 | 566,564 | — |
+| Median run days | **6.0** | 8.0 | 0.75 |
+| % with an `old_price` value | 99.58 | 98.56 | 1.01 |
+| **% multibuy** | **5.485** | 2.371 | **2.31** |
+| national_brand share | 76.60% | 59.02% | 1.30 |
+| **private_label share** | **4.02%** | 10.41% | **0.39** |
+| beverages share | 16.65% | 10.91% | 1.53 |
+| dairy share | 15.12% | 19.31% | 0.78 |
+
+**Verdict: distinct type, on every axis tested.** Blank-sku events are shorter, 2.3× richer
+in multibuy, 1.3× more national-brand, 2.6× less private-label, and almost entirely 2024.
+
+#### But at the level D2 is actually built on, it is 539 events
+
+The evaluable cohort — events with 14 days of continuous pre-window history, which is what
+every D2 number rests on:
+
+| Basis | Evaluable events |
+|---|---|
+| `vendor_sku` | **279,599** *(matches P2_3 exactly)* |
+| `vendor_concatted` | **539** |
+
+**Admitting blank-sku products adds 539 events to 279,599 — 0.19%.** The 8,797 sale events
+collapse to 539 evaluable ones because blank-sku products are short-lived and sparsely
+observed (median run 6 days, overwhelmingly 2024 small-basket era), so few accumulate 14
+continuous pre-window days.
+
+**So the class is biased and immaterial at the same time**, and both halves have to be said
+together. Reporting only "distinct type on every axis" would overstate it; reporting only
+"0.19%" would hide that the 0.19% is not a random 0.19%.
+
+#### Decision: the filter is removed as a filter and replaced by a reported tier
+
+Justified on current grounds, not inherited ones:
+
+1. **Its original necessity is gone.** F5 needed it because of the `(vendor, sku)`
+   partition. `product_key` covers blank-sku products via `concatted`, which is the whole
+   reason §4.1 built the fallback.
+2. **Keeping it silently breaks honesty rule 7.** It has been removing 8,797 sale events
+   with no count stated anywhere — larger than the date floor, which *is* documented.
+3. **Admitting them unmarked would break honesty rule 2.** `vendor_concatted` is a weaker
+   identity: §1.4 found 12 rows where upstream re-keyed a product from the concatted form
+   to `vendor||sku` after recovering a sku, so a concatted key can split one product into
+   two series across snapshots. Match confidence is first-class; a weaker tier is flagged
+   and kept, never deleted and never silently mixed in.
+4. **The choice barely moves the headline either way** — 0.19% of the evaluable cohort.
+   That makes the honest option cheap, which is the best reason to take it.
+
+**Implementation for Section 2:** D2 headline figures are computed on
+`product_key_basis = 'vendor_sku'` and the `vendor_concatted` contribution is reported
+alongside with its count and its bias verdict — the same pattern honesty rule 2 prescribes
+for match tiers. Nothing is dropped at load time and the count is always answerable.
+
+**This does not change any published Phase 1 number.** §2.3's 566,564 / 279,599 stand
+exactly as published; what changes is that the filter behind them is now declared, counted
+and tiered rather than inherited and invisible.
+
+*Source: `Q1d_sku_filter_audit.sql`.*
+
+---
+
+---
+
+## Section 2 — D2, sale honesty
+
+*Computed under build `2026-08-28T17:48:35Z` — models `d1f90ee`/`f6d7345`/`6d01e90`/`01ff1a1`/`b584c32`/`b2f47b3`/`bfc7be8`.*
+
+**Scope is set by §1's bias audit, not by preference. Headline window: 2025-01-01 →
+2026-08-21.** Every vendor-year in it loses under 4.5% of its events to orphaning and
+essentially 0% to the sku filter. **2024 is reported separately and never pooled**, because
+it loses 26.8% of Metro's events to orphaning, 26.3% of Walmart's and 21.9% of Galleria's
+to the sku filter, and a cross-vendor comparison across those measures exclusions rather
+than prices.
+
+### 2A — Pre-sale price inflation
+
+> ### Headline: 3.39% of sale events advertise a regular price the retailer never charged in the 14 days before the sale.
+>
+> **Not 21%.** The naive statistic says 21.27%, and the overwhelming majority of that is a
+> genuine price increase followed by a sale — an innocent explanation that has to be
+> subtracted before anything is claimed. The defensible number is the residual that
+> survives every innocent explanation we could quantify.
+
+#### The cohort, and every step that narrows it
+
+| Step | Events |
+|---|---|
+| a. sale events, all keys, all dates ≥ 2024-06-11 | 575,036 |
+| b. + 14 continuous pre-window days | 279,962 |
+| c. + a usable claimed regular (`old_price` value) | 275,779 |
+| d. + `vendor_sku` tier only | 275,240 |
+| **e. HEADLINE: 2025–2026** | **228,608** |
+
+The identity-tier split, per §1.5 — reported, not dropped:
+
+| Tier | Events | of which 2025–26 |
+|---|---|---|
+| `vendor_sku` | 275,240 | 228,608 |
+| `vendor_concatted` | **539** | 81 |
+
+**539 — the same number `Q1d` produced by a completely different route.** §1.5 reached it
+from the sku-filter side; 2A reaches it from the cohort side. An independent
+cross-validation of the §1.5 decision.
+
+#### The comparison statistic is an argument, and the argument matters enormously
+
+Three candidates for "what was the price before the sale", all computed:
+
+| Statistic | n | % of events where the claimed regular exceeds it |
+|---|---|---|
+| **modal** (most frequently charged in the 14 days) | 228,608 | **21.27%** |
+| median | 228,608 | 20.59% |
+| **last observed** (day before the sale) | 228,608 | **4.41%** |
+| **max observed** (strictest — exceeds *every* price seen) | 228,608 | **3.39%** |
+
+**A 6× spread between the loosest and strictest reading.** Any single number quoted from
+this without its statistic named is meaningless, which is why the sensitivity table is part
+of the headline rather than an appendix.
+
+The headline uses **modal** for the flag and **max observed** for the finding. Modal
+answers "what was the shopper habitually paying" — "regular" means habitually charged, not
+centrally located. But modal alone cannot distinguish a fabricated regular price from a
+real price rise, which is what the innocent-explanation analysis below is for.
+
+#### 2A.3 Per vendor, with n
+
+| Vendor | n events | % above modal | % above median | % above last | **% above MAX** |
+|---|---|---|---|---|---|
+| Galleria | 1,138 | 34.27 | 34.36 | 30.40 | **24.08** |
+| SaveOnFoods | 67,952 | 28.88 | 28.94 | 3.26 | **3.24** |
+| Metro | 22,611 | 26.70 | 26.44 | 6.79 | **6.20** |
+| NoFrills | 29,231 | 21.55 | 19.08 | 8.81 | **4.97** |
+| Voila | 56,222 | 17.48 | 17.38 | 0.86 | **0.85** |
+| Loblaws | 31,068 | 15.81 | 13.46 | 5.73 | **3.41** |
+| TandT | 14,934 | 8.26 | 8.15 | 6.41 | **5.02** |
+| Walmart | 5,452 | 5.28 | 5.23 | 3.32 | **2.27** |
+
+**Loblaws' under-sampling is in the result, not beneath it:** §2.7 established that 3,979
+of Loblaws' 43,253 evaluable events (9.20%) carry a sale flag with no usable `old_price`
+value, because 869,495 rows hold the literal string `was`. Those events cannot enter 2A at
+all — 2A requires a claimed *value*. **Loblaws' 31,068 here is a 90.80% sample of its
+eligible events; every other vendor is at 100%.** Loblaws' figures are therefore computed
+on a slightly different base and should not be ranked against the others without that
+stated.
+
+Magnitude of the excess where it exists, against modal:
+
+| Vendor | n flagged | median excess | p25 | p75 | p95 |
+|---|---|---|---|---|---|
+| Galleria | 390 | 30.04% | 20.35 | 43.12 | 73.21 |
+| SaveOnFoods | 19,627 | 29.75% | 16.62 | 45.08 | 76.33 |
+| Voila | 9,830 | 28.03% | 16.69 | 49.67 | 87.72 |
+| Metro | 6,038 | 25.06% | 12.52 | 46.73 | 100.40 |
+| Walmart | 288 | 20.51% | 11.26 | 37.78 | 74.31 |
+| NoFrills | 6,298 | 20.00% | 11.60 | 34.50 | 69.90 |
+| Loblaws | 4,912 | 18.63% | 10.00 | 33.33 | 71.14 |
+| TandT | 1,233 | 10.03% | 10.01 | 24.75 | 55.16 |
+
+#### 2A.4 Innocent explanations, quantified before anything is concluded
+
+Three explanations would each produce a flag with no dishonesty. All three are measured on
+the flagged events:
+
+| Vendor | n flagged | Claim **was** actually charged in the window | Price **rose** during the window | Volatile window (>2 prices) |
+|---|---|---|---|---|
+| Voila | 9,830 | **95.15%** | 96.11% | 2.16% |
+| SaveOnFoods | 19,627 | **88.77%** | 92.48% | 6.59% |
+| Loblaws | 4,912 | **78.46%** | 73.25% | 6.45% |
+| NoFrills | 6,298 | **76.93%** | 71.78% | 3.24% |
+| Metro | 6,038 | **76.78%** | 81.53% | 3.46% |
+| Walmart | 288 | 56.94% | 46.53% | 7.64% |
+| TandT | 1,233 | 39.17% | 36.98% | 5.60% |
+| Galleria | 390 | 29.74% | 25.90% | 3.85% |
+
+**Between 77% and 95% of flagged events at the five largest vendors are explained by the
+retailer having genuinely charged that price at some point in the 14 days**, and a similar
+share show the price rising within the window. That is a price increase followed by a sale
+— entirely ordinary retail behaviour, and not what "pre-sale inflation" means.
+
+**This is the bad news for the naive reading and it is the main result of 2A.** A headline
+of "21% of sales advertise an inflated regular price" would have been wrong, and it would
+have been wrong in the direction that generates a story.
+
+#### The residual: the claim exceeds *every* price observed in the 14-day window
+
+No innocent explanation above covers these. The retailer struck out a price it did not
+charge at any point in the fortnight before the sale.
+
+| Vendor | n events | Claim never charged | **%** | Median excess over the highest observed |
+|---|---|---|---|---|
+| **Galleria** | 1,138 | 274 | **24.08%** | 28.62% |
+| **Metro** | 22,611 | 1,402 | **6.20%** | 12.53% |
+| TandT | 14,934 | 750 | 5.02% | 10.01% |
+| NoFrills | 29,231 | 1,453 | 4.97% | 14.50% |
+| Loblaws | 31,068 | 1,058 | 3.41% | 11.60% |
+| SaveOnFoods | 67,952 | 2,204 | 3.24% | 6.36% |
+| Walmart | 5,452 | 124 | 2.27% | 20.00% |
+| Voila | 56,222 | 477 | 0.85% | 6.40% |
+| **Pooled** | **228,608** | **7,742** | **3.39%** | — |
+
+**Galleria's 24.08% is the standout and its n is 1,138 — the smallest cohort of any
+vendor.** It is a real rate on a small base, not a large finding, and it must be quoted
+with its n every time.
+
+**Caveats that belong in the headline, not a footnote:**
+
+- The window is **14 days**. A regular price charged 20 days before the sale and raised in
+  between would be flagged here and is not necessarily dishonest. A longer window would
+  lower the residual; we have not measured by how much.
+- The residual is a **lower bound on innocence, not an upper bound on dishonesty**: it
+  excludes every event where the claim matched a price actually charged, even if that price
+  was charged for a single day specifically to justify the claim. This analysis cannot
+  distinguish that from ordinary repricing, and it does not try.
+- `min()` is used for the daily charged price where a product has conflicting same-day rows
+  (Phase 0 B6). That is the **conservative** choice for this test: it lowers the observed
+  level, which makes a claim *more* likely to be flagged, so the residual is if anything
+  slightly overstated.
+
+#### 2A.2 Basis and multibuy handling
+
+Comparisons are made only within a matching `price_basis`; the cohort is 226,758 `each`
+and 1,850 `per_100g`. Multibuy events compare on derived `unit_price` with `min_qty`
+stated:
+
+| | n events | median `min_qty` | % above modal |
+|---|---|---|---|
+| single-unit | 227,806 | 1 | 21.19% |
+| **multibuy** | **802** | **2** | **42.14%** |
+
+Multibuy events flag at twice the rate — but **n = 802**, and this is a flag rate against
+modal, not the residual. It is a lead for Phase 3, not a finding.
+
+#### 2024, separately caveated
+
+Never pooled with the headline. Reported so the difference is visible:
+
+| Vendor | 2024 n / % above modal | 2025 | 2026 |
+|---|---|---|---|
+| Metro | 861 / 35.31% | 4,505 / 35.87% | 18,106 / 24.42% |
+| SaveOnFoods | 11,380 / 29.77% | 49,248 / 28.64% | 18,704 / 29.51% |
+| NoFrills | 8,783 / 20.76% | 16,146 / 23.67% | 13,085 / 18.93% |
+| Voila | 10,681 / 18.06% | 34,607 / 18.10% | 21,615 / 16.50% |
+| Loblaws | 8,205 / 15.99% | 17,074 / 14.24% | 13,994 / 17.73% |
+| TandT | 3,924 / 17.71% | 7,474 / 12.56% | 7,460 / 3.94% |
+| Galleria | 285 / 31.93% | 715 / 32.31% | 423 / 37.59% |
+| Walmart | 2,513 / 5.33% | 3,510 / 4.50% | 1,942 / 6.69% |
+
+**Metro's 2024 n is 861 against 18,106 in 2026** — a 21× difference in sample size for the
+same vendor, which is exactly the orphaning loss §1.2 measured. Any 2024-to-2025 movement
+for Metro is uninterpretable, and this table is presented for completeness rather than as
+a trend.
+
+**T&T falls from 17.71% to 3.94% across the three years.** That is a large movement in a
+vendor with no material exclusion problem, and it is the most interesting thing in this
+table. It is not explained here.
+
+*Source: `Q2a_presale_inflation.sql`.*
+
+---
+
+### 2B — Sale frequency
+
+> ### Headline: at Save-On-Foods and Metro, the median product is on sale a quarter to a third of the days it is observed — and about one product in five is on sale more than half the time.
+>
+> A product on sale most of the time does not have a sale price. It has a price.
+
+**2B.3 — this finding is untouched by the `was` loss, and here is the number proving it.**
+2B uses `old_price` as a **flag only**, never as a value. §2.7 found 869,495 rows carrying
+the literal string `was`, and the exposure is entirely Loblaws:
+
+| Vendor | Sale rows (2025–26) | With no usable value | % flag-only |
+|---|---|---|---|
+| **Loblaws** | 2,012,425 | 577,054 | **28.67%** |
+| NoFrills | 1,247,314 | 5,521 | 0.44% |
+| every other vendor | — | 0 | **0.00%** |
+
+**28.67% of Loblaws' sale rows carry a flag with no value.** 2A cannot use those rows at
+all; 2B uses every one of them. That is the entire reason for running two independent D2
+findings rather than one.
+
+#### Cohort
+
+| Step | Products |
+|---|---|
+| observed at all in 2025–26 | 163,118 |
+| + observed on 90+ days | 117,910 |
+| **+ `vendor_sku` tier (headline)** | **117,803** |
+
+Tier split per §1.5: `vendor_concatted` contributes **107 products** with a median
+on-sale share of 0.88%, against 117,803 at 9.91%. Reported, not dropped.
+
+**The denominator is days OBSERVED, never days elapsed.** Honesty rule 1: a day a product
+was not observed is not a day it was off sale. This matters on a dataset with a 19-day
+dataset-wide blackout and 271 missing vendor-days (Phase 0 E9), and it is why the 90-day
+observation floor is applied before any share is computed.
+
+#### 2B.1 Distribution per vendor
+
+| Vendor | n products | median days observed | **median % of days on sale** | p75 | p90 | mean |
+|---|---|---|---|---|---|---|
+| **SaveOnFoods** | 12,389 | 545 | **32.12%** | 46.49 | 61.01 | 32.20 |
+| **Metro** | 14,970 | 298 | **26.44%** | 43.72 | 60.99 | 28.48 |
+| Loblaws | 24,323 | 412 | 12.12% | 27.55 | 43.68 | 17.02 |
+| Voila | 18,854 | 509 | 11.41% | 31.06 | 45.66 | 17.25 |
+| NoFrills | 18,638 | 383 | 8.98% | 23.17 | 32.26 | 12.70 |
+| Walmart | 9,750 | 338 | 2.62% | 17.37 | 29.43 | 10.23 |
+| TandT | 9,299 | 487 | 1.38% | 9.84 | 18.23 | 5.93 |
+| **Galleria** | 9,580 | 489 | **0.00%** | 0.00 | 0.00 | 0.78 |
+
+**Galleria's median, p75 and p90 are all zero.** Phase 0 established Galleria's `old_price`
+coverage at 0.92% — the lowest of any vendor — so this is a measurement of Galleria's
+*reporting*, not of its promotional behaviour. Galleria should not be read as "never
+discounts"; it should be read as "does not publish a struck-out price". Stated here rather
+than left for a reader to infer.
+
+#### 2B.2 "Always on sale"
+
+| Vendor | n products | ≥50% of days | **%** | ≥75% | % | ≥90% | % |
+|---|---|---|---|---|---|---|---|
+| **SaveOnFoods** | 12,389 | 2,611 | **21.08%** | 482 | 3.89% | 132 | 1.07% |
+| **Metro** | 14,970 | 2,737 | **18.28%** | 511 | 3.41% | 126 | 0.84% |
+| Loblaws | 24,323 | 1,515 | 6.23% | 292 | 1.20% | 202 | 0.83% |
+| Voila | 18,854 | 1,048 | 5.56% | 17 | 0.09% | 2 | 0.01% |
+| Walmart | 9,750 | 172 | 1.76% | 88 | 0.90% | 73 | 0.75% |
+| NoFrills | 18,638 | 108 | 0.58% | 17 | 0.09% | 0 | 0.00% |
+| Galleria | 9,580 | 42 | 0.44% | 30 | 0.31% | 16 | 0.17% |
+| TandT | 9,299 | 12 | 0.13% | 2 | 0.02% | 1 | 0.01% |
+
+**More than one in five Save-On-Foods products, and nearly one in five Metro products, is
+advertised as on sale for at least half the days it appears.** The steep fall from ≥50% to
+≥75% (21.08% → 3.89% at Save-On-Foods) says this is a broad pattern of frequent promotion
+rather than a small set of permanently-discounted items.
+
+The permanent extreme is genuinely rare:
+
+| Vendor | On sale on **every** observed day | % | median days observed |
+|---|---|---|---|
+| Loblaws | 140 | 0.576% | 175 |
+| SaveOnFoods | 32 | 0.258% | 105 |
+| Walmart | 16 | 0.164% | 101 |
+| Metro | 10 | 0.067% | 120 |
+| Galleria | 2 | 0.021% | 290 |
+| NoFrills / TandT / Voila | 0 | 0.000% | — |
+
+#### Where the always-on-sale products concentrate
+
+Category, as a concentration ratio against each category's share of the whole cohort:
+
+| Category | % of all products | % of ≥50% products | Ratio |
+|---|---|---|---|
+| **dairy** | 15.03 | 19.85 | **1.32** |
+| beverages | 10.68 | 12.59 | 1.18 |
+| produce | 13.04 | 14.37 | 1.10 |
+| eggs | 1.32 | 1.36 | 1.03 |
+| pantry staples | 7.87 | 7.45 | 0.95 |
+| bread & bakery | 3.59 | 3.17 | 0.88 |
+| other | 39.04 | 34.37 | 0.88 |
+| **meat & fish** | 9.43 | 6.84 | **0.73** |
+
+**No category exceeds 1.32×.** Frequent promotion is spread broadly across the catalogue
+rather than concentrated in one aisle — dairy leans in mildly, meat and fish lean out.
+
+By brand class:
+
+| Brand class | n products | median % on sale | % ≥50% |
+|---|---|---|---|
+| national_brand | 54,655 | 19.75% | 10.58% |
+| **private_label** | 12,258 | 9.87% | 9.15% |
+| unclassifiable_blank | 13,149 | 3.03% | 1.79% |
+| unclassifiable_no_vendor_data | 37,733 | 0.00% | 2.92% |
+
+**National brands are promoted about twice as often as private label at the median**
+(19.75% vs 9.87%), while the share crossing the 50% threshold is close (10.58% vs 9.15%).
+The `unclassifiable_no_vendor_data` median of 0.00% is Galleria, T&T and Voila — the three
+vendors with no brand data — and is a reporting artifact, not behaviour.
+
+#### 2024, separately caveated
+
+| Vendor | n products | median % on sale 2024 | % ≥50% 2024 |
+|---|---|---|---|
+| SaveOnFoods | 8,339 | 35.11% | 31.77% |
+| Metro | 5,591 | 26.72% | 22.68% |
+| Loblaws | 16,453 | 13.71% | 19.60% |
+| Voila | 12,079 | 9.95% | 13.39% |
+| NoFrills | 14,079 | 3.23% | 3.44% |
+| Galleria | 4,945 | 0.00% | 1.31% |
+| TandT | 6,954 | 0.00% | 0.04% |
+| Walmart | 7,608 | 0.00% | 0.71% |
+
+Not pooled with the headline. The vendor ordering is stable between 2024 and 2025–26,
+which is mild reassurance that the exclusion concentration in 2024 has not reversed the
+ranking — but Metro's 2024 product count is 5,591 against 14,970 in 2025–26, so its 2024
+figures rest on a third of the sample and should not be differenced against the later
+period.
+
+*Source: `Q2b_sale_frequency.sql`.*
+
+#### What 2A and 2B say together
+
+They point in different directions and that is worth stating plainly. **2A finds that most
+apparent pre-sale inflation is explained away** — the residual is 3.39%. **2B finds that
+frequent promotion is not rare at all** — a fifth of Save-On-Foods' catalogue is on sale
+more than half the time.
+
+The honest synthesis is that at these two vendors the "regular price" is doing less work
+than the label implies: not because it is usually fabricated (2A says it usually is not),
+but because the product is so often on promotion that the regular price is the exception
+rather than the rule. **That is a claim about promotional cadence, not about honesty**, and
+Phase 2 should not be read as having found retailers lying about prices.
+
+---
+
+## What would change these conclusions
 
 - **The Metro 2024 bias disappears** if upstream publishes a mapping from retired
   `product_id` values to current ones — the single fix that would erase 74% of the orphan
@@ -316,3 +909,24 @@ consecutive runs.
 - **The ambiguous exclusion shrinks** if Galleria's bare integers are ever adjudicated —
   26,306 of the 46,884 are Galleria, held ambiguous for want of evidence, not because the
   evidence is against them.
+
+**On 2A specifically:**
+
+- **A longer pre-window would lower the 3.39% residual**, and we have not measured by how
+  much. 14 days is inherited from F1/F5 and is a choice, not a fact. Recomputing at 28 and
+  60 days is the single most valuable robustness check outstanding.
+- **A price charged for one day to justify a claim is counted as innocent here.** This
+  analysis cannot separate that from ordinary repricing. Doing so would need either
+  intraday data or a model of what a "real" price spell looks like — the first does not
+  exist in this dataset and the second is a modelling choice we have not made.
+- **Galleria's 24.08% rests on n = 1,138**, the smallest cohort of any vendor. A second
+  snapshot with more Galleria history would move it more than any methodological change.
+
+---
+
+## Status
+
+**Section 1 complete** (1.1–1.5). **Section 2 complete** (2A, 2B). Every number computed
+twice and compared byte-for-byte, sequentially and alone.
+
+**Section 3 (D4 basket comparison) and Section 4 (D1 bounded secondary) are not started.**
