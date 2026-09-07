@@ -5,6 +5,124 @@ number, its denominator, its build stamp, and — for every exclusion — a bias
 
 Every number comes from a committed query in [analysis/phase2/](../analysis/phase2/).
 
+**All numbers computed under build `2026-08-28T17:48:35Z`** (models
+`d1f90ee`/`f6d7345`/`6d01e90`/`01ff1a1`/`b584c32`/`b2f47b3`/`bfc7be8`), on snapshot
+`20260822T134045Z`, and verified twice with `scripts/verify_twice.py`.
+
+---
+
+# Consolidated record — the version Phase 3 writes from
+
+Everything below is expanded, with its query and its denominator, in the sections that
+follow. **Nothing here may be quoted without the qualifier attached to it in the same
+sentence** — the qualifiers are not caveats, they are part of the finding.
+
+## The three results
+
+### R1 — Pre-sale price inflation (D2). A bracket.
+
+> **Between 3.39% and 21.27% of 2025–26 sale events advertise a "regular" price not
+> supported by the fortnight before the sale.** n = 228,608 events, `vendor_sku` tier.
+
+- **Lower bound (3.39%)** is built to *exonerate*: one high observation anywhere in the
+  14 days clears the retailer, including a price held for a single day.
+- **Upper bound (21.27%)** is built to *accuse*: a genuine mid-window price rise leaves
+  the old lower price as the mode, flagging a truthful claim.
+- **Most of the gap is ordinary repricing.** At the five largest vendors, 77–95% of
+  flagged events are explained by the retailer having actually charged that price during
+  the window. The truth sits nearer the lower bound; "nearer" is not a number.
+- Per vendor the bracket width ranges from 3.0 pp (Walmart) to 25.6 pp (Save-On-Foods).
+
+**Phase 2 has not found any retailer lying about prices.** (§2A, §2.6)
+
+### R2 — Sale frequency (D2). Within-vendor only.
+
+> **At Save-On-Foods the median product carries a struck-out price on 32.12% of its
+> observed days, and 21.08% of its products do so on more than half of them. At Metro,
+> 26.44% and 18.28%.** n = 117,803 products observed 90+ days.
+
+**The cross-vendor ranking is withdrawn** (see W1). These are statements about each
+vendor's own data under one consistent definition, and they are unaffected by Loblaws'
+`was`-string loss because this uses the flag only. (§2B, §2.7)
+
+### R3 — Cross-vendor price comparison (D4). National brand only.
+
+> **On identical national-brand products co-observed on the same day: Walmart is ~12.6%
+> cheaper than Metro, Walmart ~17.9% cheaper than Save-On-Foods, and Metro ~5.3% cheaper
+> than Save-On-Foods.**
+
+- **Stable in aggregate.** Walmart is cheaper on **100% of 606–713 dates** against both;
+  Metro beats Save-On-Foods on 91.74% of dates and in 7 of 8 categories.
+- **Transitive.** Recomputed on the three-way common set, no pairwise median moves more
+  than 0.5% and the transitivity residual is **1.0059**.
+- **It depends on price level.** Metro's advantage over Save-On-Foods grows with price
+  (nil on the cheapest third, 9.7% on the dearest); Walmart's shrinks (21% → 9% vs Metro).
+- **It does not hold per product.** 84.61% of Metro/Save-On-Foods GTINs have no
+  consistent cheaper vendor; ~50% for the Walmart pairs.
+
+**Blind to private label — 22.64% of price-weighted shelf exposure, 30.60% at Metro.**
+(§3.5, §3.8)
+
+## Every withdrawal, with its reason
+
+| # | What was withdrawn | Why | Where |
+|---|---|---|---|
+| **W1** | The **cross-vendor ranking of sale frequency**, plus 2B's pooled category and brand tables and any "vendor X promotes more than Y" | The sale flag is not semantically equivalent across vendors. An independent promotional signal corroborates `old_price` presence on **99.50%** of rows at No Frills and **21.46%** at Save-On-Foods, and cannot be tested at all at Metro — and Save-On-Foods and Metro were ranked 1st and 2nd. The vendor order also reverses between the two mechanisms. | §2.7 |
+| **W2** | The point estimate "**3.39%, not 21%**" for pre-sale inflation | It presented the lower bound as the answer. Both are bounds and they err in opposite directions. Replaced by the bracket in R1. | §2.6 |
+| **W3** | Galleria from the D4 comparison | Its pairs share 5–8% of the basket against 48–65% for the others. Not a coverage failure — Galleria has the second-best barcode coverage of the four, but only 11.13% of its GTINs are carried by any other reliable vendor. A genuinely disjoint catalogue. | §3.7 |
+| **W4** | Any **D1 per-vendor freeze-compliance rate** | Selection-versus-outcome, compounded by an observation-length confound. A survivors-only rate differs from an all-window rate by −0.7 pp to 13.3 pp depending on vendor — not reliably wrong in a knowable direction, so no correction applies. | §4.2 |
+| **W5** | Phase 1 §2.6's Walmart marketplace-ID recommendation *(carried forward)* | Rested on 416 events of which 367 were our own 100× parse error. | Phase 1 §5.5 |
+
+## The exclusion ledger
+
+n = 71,809,333 price rows. The four rows sum to it exactly.
+
+| Class | Rows | % | Bias verdict |
+|---|---|---|---|
+| retained | 70,883,862 | 98.7112% | — |
+| **orphan** (NULL `product_key`) | **878,559** | **1.2235%** | **BIASED on time — removes 26.8% of Metro's 2024 D2 events vs 0.4% of its 2025 events.** Random slice on depth and on category. |
+| ambiguous | 46,884 | 0.0653% | Distinct type (sale-*depleted*, produce-heavy); negligible for D2 (25 of 576,200 events) and D4 (676 rows, 27 of 5,222 GTINs) |
+| unparsed | 28 | 0.00004% | Untestable, n = 28 |
+
+Classes are **not disjoint**: 5 rows are both orphan and unparsed, which is why 28 appears
+here and 33 in Phase 1 §2.2.
+
+**A fourth, previously undeclared class:** the `vendor_sku` filter, inherited from F5 where
+it was forced by a `(vendor, sku)` partition. It removes **8,797 sale events — 8× more than
+the documented date floor** — concentrated in 2024 (Walmart 26.3%, Galleria 21.9%), and is
+not a random slice on any axis. **But it is 539 of 280,138 evaluable events (0.19%).**
+Biased *and* immaterial. Now reported as a tier rather than applied as a filter. (§1.5)
+
+**Reconciliation, every cell counted:** 576,200 (all keys, all dates) → 566,564
+(`vendor_sku`, date floor) = 1,122 lost to the date floor + 8,797 to the sku filter − 283
+overlap = **9,636**. Exact.
+
+## What must never be said
+
+- **"Walmart is the cheapest grocery store."** D4 is blind to private label — 22.64% of
+  price-weighted shelf exposure — which is where banner competition is sharpest, and
+  Walmart's own private-label share is under-measured (its brand field is 79.92% blank).
+- **"Retailer X inflates prices before sales."** The finding is a bracket and most of it is
+  ordinary repricing.
+- **"Vendor X promotes more than vendor Y."** Withdrawn (W1).
+- **"Vendor X complied with its price freeze."** Not computed and not computable (W4).
+- **Anything about Loblaws, No Frills, T&T or Voila in a cross-vendor price claim** —
+  fuzzy tier, excluded by honesty rule 2.
+- **Anything national, provincial or "Canadian."** One Toronto neighbourhood, pickup price.
+- **Anything about the expensive end.** The D4 basket's p95 is $13.99 against the
+  catalogue's $20.04.
+
+## Method controls that changed a result
+
+Recorded because Phase 3 should know which numbers moved and why.
+
+| Control | What it caught |
+|---|---|
+| Vendor-controlled comparison (the F1 lesson) | The pooled "orphans are 1.70× sale-enriched" collapsed to **1.22×** within vendor, with the direction inconsistent across vendors. Caught **three times** in this phase — orphan sale rate, orphan multibuy, orphan brand mix. |
+| `scripts/check_determinism.py` | 44 hazards across the repo; one real latent defect (`P2_7`'s `any_value()` over a non-unique group) |
+| `scripts/verify_twice.py` | `Q3c` failed **identically on both runs**, producing byte-identical output. A plain `diff` would have reported agreement. |
+| Recomputation under one build (§5.8, Phase 1) | §2.6's figures were stale; §2.2's `basis_rescaled` provenance is **lost, permanently** |
+
 ---
 
 ## Section 1 — Exclusion accounting and bias audit
@@ -1799,10 +1917,21 @@ is still a sample of survivors.
 
 ## Status
 
-**Section 1 complete** (1.1–1.5). **Section 2 complete** (2A, 2B). Every number computed
-twice and compared byte-for-byte, sequentially and alone.
+**Phase 2 complete.**
 
-**Section 3 (D4) complete** (§3.0–3.8). **Section 4 (D1) complete and bounded.**
+| Section | Status |
+|---|---|
+| 1 — exclusion ledger and bias audit (§1.1–1.5) | complete |
+| 2 — D2 sale honesty (2A, 2B, §2.5–2.8) | complete |
+| 3 — D4 basket comparison (§3.0–3.8) | complete |
+| 4 — D1 bounded secondary | complete, bounded |
+| 5.1 — this document | complete; consolidated record at the top |
+| 5.2 — "what would change this" | complete, below |
+| 5.3 — upstream feedback | complete — items 10 and 11 added 2026-09-08 |
 
-Section 5 (the findings document itself) is this file; §5.2's "what would change this"
-appears below and §5.3's upstream-feedback update is outstanding.
+Every number was computed twice and verified with `scripts/verify_twice.py`, which checks
+successful completion and matching row counts before byte-identity — sequentially and
+alone, because two runs that crash the same way compare as agreement.
+
+**Phase 3 is the writeup and dashboard, and is separately briefed. Nothing in this
+document is a public claim until it carries the qualifier attached to it above.**

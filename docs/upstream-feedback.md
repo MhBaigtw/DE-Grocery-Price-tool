@@ -1,10 +1,18 @@
 # Project Hammer — ergonomics feedback from a downstream consumer
 
 **From:** a downstream analysis project consuming the published dataset.
-**Based on:** snapshot `20260822T134045Z`, SQLite distribution, sha256
-`2da260be76b3e441f632c92b22c0b7ffece495d18f80bf69a0199c6508ad2cc9`, downloaded
-2026-08-22, covering 2024-02-28 → 2026-08-21 (71,809,333 `raw` rows, 187,028 `product`
-rows).
+**Last updated:** 2026-09-08. Items 1–9 were written 2026-08-22; items 10–11 are new.
+
+**Based on two snapshots:**
+
+| | Snapshot 1 | Snapshot 2 |
+|---|---|---|
+| id | `20260822T134045Z` | `20260824T132829Z` |
+| downloaded | 2026-08-22 | 2026-08-24 |
+| covers | 2024-02-28 → 2026-08-21 | 2024-02-28 → 2026-08-23 |
+| `raw` rows | 71,809,333 | 72,022,652 |
+| `product` rows | 187,028 | 187,070 |
+| sha256 (SQLite) | `2da260be76b3e441…` | `5307d80f30d250f5…` |
 
 The underlying data was sourced from ProjectHammer.org.
 
@@ -363,6 +371,120 @@ These are each cheap and none is individually urgent.
 
 ---
 
+---
+
+## Status as of our latest snapshot — please ignore anything you have already fixed
+
+You mentioned you are working through post-processing changes, so this section says
+**what we can and cannot see**, to save you re-reading items that are already done.
+
+**Our newest data is the 2026-08-23 extract, downloaded 2026-08-24. As of today
+(2026-09-08) that is 16 days old.** Anything fixed in the last two weeks is invisible to
+us, and this table should be read as "still present as of 2026-08-23", never as "still
+broken today".
+
+| Item | Verified against the 2026-08-23 extract | Status |
+|---|---|---|
+| **1** — non-scalar `current_price` | cents-form 48,342 rows; `Now$NNN` 12,476; multibuy 680,161 | **still present** |
+| **2** — Walmart field misalignment | 7,057 Walmart products (18.61%) have the product name in `concatted`'s units slot; unit parse rate 51.42% | **still present**, marginally wider than the 6,898 / 18.19% we first reported |
+| **3** — `product.id` documentation | documentation, not data — we cannot verify from a snapshot | unknown |
+| **4** — explicit `product_key` | no such column present | not present |
+| **5** — orphan `raw` rows | 880,787 rows still join to nothing | **still present** |
+| **6** — small-basket end date | documentation — cannot verify from a snapshot | unknown |
+| **7** — UPC width | unchanged | **still present** |
+| **8** — duplicate rows | unchanged | **still present** |
+| **E12** — `old_price` holding the literal string `was` | 870,720 rows | **still present** |
+
+**None of this is a complaint about pace.** It is a status list so you can skip what is
+done. If you tell us an item is fixed we will pull a fresh snapshot and confirm rather
+than asking you again.
+
+---
+
+## 10. Galleria's catalogue barely overlaps the other vendors' — worth documenting
+
+**Not a defect. A property of the data that a consumer will misread as one.**
+
+Anyone building a cross-vendor comparison will reasonably assume the eight vendors are
+broadly comparable catalogues with different prices. For Galleria that is not true, and
+the gap is large enough to change what an analysis can do.
+
+| Vendor | Products | **% with a usable GTIN** | GTINs carried | **% of those GTINs carried by ≥1 other reliable-tier vendor** |
+|---|---|---|---|---|
+| Save-On-Foods | 16,158 | 95.20% | 15,382 | **46.63%** |
+| **Galleria** | 10,697 | **86.23%** | 9,201 | **11.13%** |
+| Metro | 26,311 | 73.78% | 19,413 | **41.69%** |
+| Walmart | 37,914 | 28.86% | 10,932 | **54.00%** |
+
+**Galleria has the second-best barcode coverage of the four vendors whose UPCs come
+directly from the vendor — better than Metro's — and yet nine in ten of its barcoded
+products are carried by none of the others.** The next lowest overlap is 41.69%, so this
+is a four-fold gap and not a gradient.
+
+**Why this matters to a consumer.** We spent real time checking whether we had a matching
+bug, because 11% looked like a pipeline failure. It is not: Galleria is a Korean grocery
+banner and a substantially distinct product range is exactly what one should expect. The
+data is right and our expectation was wrong.
+
+**Smallest fix: one sentence in the documentation** — something like *"vendors differ
+substantially in catalogue composition; Galleria in particular carries a largely distinct
+product range, so cross-vendor matches involving it will be sparse."* That would have
+saved us the investigation, and it will save it for everyone after us.
+
+**We are not asking you to change any data here.** This is the cheapest item in this
+document and it is purely documentation.
+
+---
+
+## 11. Document that UPC matching is structurally blind to private label
+
+**Also not a defect — a limit of the UPC fields that every consumer will rediscover
+independently.**
+
+A cross-vendor basket built on UPC/GTIN can only contain products carrying the same
+barcode at two or more vendors. Private label cannot: President's Choice is Loblaws',
+Selection is Metro's, Great Value is Walmart's. A store brand has one seller by
+definition, so it has no cross-vendor barcode, so it can never appear in such a basket.
+
+We built the reliable-tier basket (GTINs at 2+ vendors whose UPCs come from the vendor
+directly) and measured what it contains:
+
+| Measure | Value |
+|---|---|
+| Products in the basket | 8,448 |
+| **Private-label products in the basket** | **1** |
+| Private-label products in the catalogue | 16,106 |
+
+And the size of what that removes, at the vendors involved:
+
+| Vendor | % of price rows that are private label | **% of price-weighted shelf exposure** |
+|---|---|---|
+| **Metro** | 19.01% | **30.60%** |
+| Save-On-Foods | 22.76% | 28.78% |
+| Walmart | 1.63% | 1.42% |
+| **Pooled** | **15.05%** | **22.64%** |
+
+*("Price-weighted exposure" is the sum of observed unit prices across price rows. It is
+deliberately not called spend — the dataset carries no quantities sold, and we are not
+going to imply one.)*
+
+**So any UPC-matched cross-vendor price comparison built on this dataset is blind to
+roughly 22.6% of price-weighted shelf exposure, and about 30% at Metro** — and it is blind
+to exactly the segment where banner-versus-banner price competition is sharpest.
+
+This is not a criticism of the UPC fields, which are doing their job. It is a limit that
+is invisible until you measure it, and every consumer who builds a basket will hit it.
+
+**Smallest fix: a line in the documentation** noting that UPC-based cross-vendor matching
+excludes private label by construction, so comparisons built on it are national-brand
+comparisons.
+
+**Where we would push back on ourselves:** the obvious remedy — matching on product
+description instead of barcode — is one we considered and rejected for our own use, because
+it has an accuracy problem we could not bound. We are not asking you to build it. We are
+asking for the sentence that stops the next consumer assuming their basket is
+representative.
+
 ## What is already good, and worth not losing
 
 Stated because feedback documents skew negative, and because these are properties we
@@ -397,6 +519,16 @@ built on:
 | 7 | UPC width + PLU (§7) | Cross-vendor matches silently split | Low | Affects the number most consumers care about most |
 | 8 | Duplicates (§8) | Consumers invent divergent tie-breaks | Medium | Real, but already documented and expected |
 | 9 | Batched smaller items (§9) | Friction, not error | Low each | Individually minor; collectively a nice afternoon |
+| **10** | **UPC blind to private label (§11)** | Every consumer builds a basket believing it is representative; it silently omits ~22.6% of price-weighted shelf exposure and ~30% at Metro | **One sentence** | New. Ranked low only because it costs you nothing and changes no data — but it is the item most likely to produce a confidently wrong *published* number by someone downstream, and that argues for doing it early despite the rank |
+| **11** | **Galleria catalogue disjointness (§10)** | A consumer reads 11% cross-vendor overlap as their own matching bug and goes looking for it, as we did | **One sentence** | New. Purely documentation, and the cheapest item in this document |
+
+**On the two new items (§10, §11), added 2026-09-08.** Both are documentation-only and
+both sit at the bottom of the ranking, which understates §11. Its cost is not to us — we
+have already measured the blind spot and can caveat around it — but to the next consumer
+who publishes a "which supermarket is cheapest" number without knowing that private label
+is structurally absent from it. One sentence from you prevents a class of wrong public
+claims. If the ranking were by *risk of someone else being wrong in public* rather than by
+cost to us, §11 would be third.
 
 **§5 was re-ranked after we diagnosed it.** Its position is unchanged but its reasoning
 is not: the effort estimate moved from "Low (doc) / High (fix)" to genuinely low, because
