@@ -12,6 +12,7 @@ only meaningful relative to when we pulled.
 No third-party dependencies. Re-running creates a NEW snapshot directory; it never
 overwrites an existing one.
 """
+import argparse
 import datetime
 import hashlib
 import json
@@ -78,8 +79,33 @@ def fetch_archive(url: str, dest: pathlib.Path) -> dict:
 
 
 def main() -> int:
+    # Argument parsing exists so that `--help` PRINTS HELP rather than starting a 1.4 GB
+    # download. Before this, the script ignored argv entirely: any argument -- including
+    # `--help` -- fell straight through to creating a snapshot directory and opening a
+    # network connection. That was found by following the README's reproduce steps
+    # literally instead of reading them, which is the point of doing it that way.
+    ap = argparse.ArgumentParser(
+        description="Download a Project Hammer snapshot into data/snapshots/<utc-stamp>/ "
+                    "with provenance (sha256, download timestamps, upstream "
+                    "hammer-lastupdated.txt). Downloads ~1.4 GB. Never overwrites an "
+                    "existing snapshot.")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="report what would be downloaded and exit without writing "
+                         "anything or fetching an archive")
+    args = ap.parse_args()
+
     repo = pathlib.Path(__file__).resolve().parent.parent
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+    if args.dry_run:
+        print(f"would create : {repo / 'data' / 'snapshots' / stamp}")
+        for name, url in ARCHIVES.items():
+            print(f"would fetch  : {url}")
+        print(f"would record : {LASTUPDATED_URL}")
+        print()
+        print("dry run - nothing downloaded, nothing written.")
+        return 0
+
     snap = repo / "data" / "snapshots" / stamp
     if snap.exists():
         print(f"refusing to overwrite existing snapshot {snap}", file=sys.stderr)

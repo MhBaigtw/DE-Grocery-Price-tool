@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What grocery price data can and cannot tell you</title>
+<style>
+  :root{
+    --bg:#fbfaf8; --fg:#1b1b1a; --muted:#666; --rule:#e2ded7;
+    --card:#fff; --accent:#1f5f4e; --warn:#8a4b1f; --dim:#9a9a96;
+    --w:#2f6f9f; --m:#7a4b8f; --s:#b0693a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme=light]){
+      --bg:#16171a; --fg:#e9e7e3; --muted:#a4a29d; --rule:#33353a;
+      --card:#1e2024; --accent:#6fc0a6; --warn:#d59a63; --dim:#75777c;
+      --w:#7bb6e0; --m:#c39ad8; --s:#e0a071;
+    }
+  }
+  :root[data-theme=dark]{
+    --bg:#16171a; --fg:#e9e7e3; --muted:#a4a29d; --rule:#33353a;
+    --card:#1e2024; --accent:#6fc0a6; --warn:#d59a63; --dim:#75777c;
+    --w:#7bb6e0; --m:#c39ad8; --s:#e0a071;
+  }
+  body{background:var(--bg);color:var(--fg);
+       font:16px/1.6 ui-serif,Georgia,"Times New Roman",serif;
+       margin:0;padding:0 20px 80px}
+  .wrap{max-width:860px;margin:0 auto}
+  header{padding:56px 0 8px;border-bottom:1px solid var(--rule)}
+  h1{font-size:2rem;line-height:1.2;margin:0 0 10px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:1.02rem;margin:0 0 18px}
+  .meta{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+        font-size:.74rem;color:var(--dim);margin:0 0 22px;line-height:1.7}
+  h2{font-size:1.3rem;margin:52px 0 6px;letter-spacing:-.01em}
+  .qual{color:var(--warn);font-size:.86rem;font-weight:600;margin:0 0 4px}
+  .lede{color:var(--muted);font-size:.95rem;margin:0 0 18px}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:8px;
+        padding:18px 18px 14px;margin:0 0 10px}
+  .chart-note{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+              font-size:.7rem;color:var(--dim);margin:8px 0 0;line-height:1.6}
+  svg{display:block;width:100%;height:auto;overflow:visible}
+  .ax{stroke:var(--rule);stroke-width:1}
+  .gl{stroke:var(--rule);stroke-width:1;stroke-dasharray:2 4}
+  .par{stroke:var(--fg);stroke-width:1.2;stroke-dasharray:4 3;opacity:.55}
+  .tick{fill:var(--dim);font-family:ui-monospace,Menlo,monospace;font-size:9px}
+  .lbl{fill:var(--fg);font-family:ui-monospace,Menlo,monospace;font-size:10px}
+  table{border-collapse:collapse;width:100%;font-size:.86rem;
+        font-family:ui-sans-serif,system-ui,sans-serif}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--rule)}
+  th{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+  td.n{text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:.82rem}
+  .bar{height:9px;border-radius:2px;display:block}
+  .unavail{border-left:3px solid var(--warn);padding:14px 16px;background:var(--card);
+           border-radius:0 8px 8px 0;margin:14px 0 0}
+  .unavail b{color:var(--warn)}
+  footer{margin:64px 0 0;padding:22px 0 0;border-top:1px solid var(--rule);
+         color:var(--muted);font-size:.84rem}
+  a{color:var(--accent)}
+  .attr{font-weight:600;color:var(--fg)}
+  @media (max-width:560px){ h1{font-size:1.55rem} .wrap{font-size:15px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>What grocery price data can and cannot tell you</h1>
+  <p class="sub">Four charts from an audit of 71.8&nbsp;million Canadian grocery price observations —
+     including the comparison that could not be made, and why.</p>
+  <p class="meta" id="meta">loading…</p>
+</header>
+
+<p class="lede" style="margin-top:26px">
+  This is a companion to <a href="../docs/writeup.md">the written piece</a>, not a shopping tool.
+  It shows what the data supports and, just as deliberately, what it does not.
+  <strong>There is no basket lookup here on purpose</strong> — see the last panel.
+</p>
+
+<!-- 1 -->
+<h2>1. Price comparison over time</h2>
+<p class="qual">On identical national-brand products stocked by both chains on the same day.</p>
+<p class="lede">Above the dashed line, the first-named chain is dearer. Every point is one day's
+   median across the products both chains stocked that day.</p>
+<div class="card">
+  <svg id="c1" viewBox="0 0 860 300" role="img" aria-label="Median price ratio by date for three chain pairs"></svg>
+  <p class="chart-note" id="n1"></p>
+</div>
+
+<!-- 2 -->
+<h2>2. What the comparison cannot see</h2>
+<p class="qual">Store brands, as a share of each chain's price-weighted shelf presence.</p>
+<p class="lede">A store brand has one seller, so it has no barcode shared with a competitor and
+   can never enter a barcode-matched basket. This is the size of that blind spot.</p>
+<div class="card">
+  <svg id="c2" viewBox="0 0 860 190" role="img" aria-label="Store-brand share of shelf presence by chain"></svg>
+  <p class="chart-note" id="n2"></p>
+</div>
+
+<!-- 3 -->
+<h2>3. How often products are on sale</h2>
+<p class="qual">Within each chain only. These bars must not be compared against each other.</p>
+<p class="lede">Share of observed days on which the median product carries a struck-out price.</p>
+<div class="card">
+  <svg id="c3" viewBox="0 0 860 290" role="img" aria-label="Median share of days on sale, within each chain"></svg>
+  <p class="chart-note" id="n3"></p>
+</div>
+<div class="unavail">
+  <b>The cross-chain comparison is unavailable, and that is a finding.</b>
+  A struck-out price does not mean the same thing at every chain. Where a product has one,
+  independent promotional text confirms it on <b id="corrHi">…</b> of rows at one chain and
+  <b id="corrLo">…</b> at another — and at Metro the check is impossible, because its
+  promotional-text field is empty on every row. Ranking chains by these bars would rank them
+  by how they populate a field. <a href="../docs/writeup.md">Why this matters →</a>
+  <div style="margin-top:10px"><table id="corrTable"></table></div>
+</div>
+
+<!-- 4 -->
+<h2>4. What was excluded, and whether it was biased</h2>
+<p class="qual">Every exclusion counted; each one checked for whether it resembles what remains.</p>
+<div class="card">
+  <table id="ledger"></table>
+  <p class="chart-note" id="n4"></p>
+</div>
+
+<h2>Why there is no “cheapest basket” tool here</h2>
+<p class="lede">
+  A shopper typing a list and getting “Walmart is cheapest” is precisely the claim this
+  analysis does not support. The comparison above covers <em>identical national-brand
+  products</em> and is blind to roughly a quarter of the shelf; for about half the individual
+  products in it, neither chain is reliably cheaper. A lookup tool would hide both facts
+  behind a single answer, so it was not built.
+</p>
+
+<footer>
+  <p class="attr">The underlying data was sourced from ProjectHammer.org.</p>
+  <p>In-store pickup prices for one neighbourhood in Toronto. Not a national, provincial or
+     Canadian price. Analysis code MIT licensed; the dataset is not mine and is not
+     redistributed here.</p>
+  <p><a href="../docs/writeup.md">The written piece</a> ·
+     <a href="../docs/method-note.md">Method note</a> ·
+     <a href="../docs/phase-2-findings.md">Full findings</a> ·
+     <a href="https://projecthammer.org">Project Hammer</a></p>
+</footer>
+
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const J = p => fetch(p).then(r => r.json());
+const fmt = n => n.toLocaleString('en-CA');
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+Promise.all([
+  J('data/pairwise_over_time.json'), J('data/blindspot.json'),
+  J('data/sale_frequency.json'),     J('data/flag_corroboration.json'),
+  J('data/exclusion_ledger.json'),   J('data/headline.json')
+]).then(([pair, blind, freq, corr, ledger, head]) => {
+  const H = head[0];
+
+  $('#meta').textContent =
+    `${fmt(H.total_price_rows)} price observations · 8 chains · ${H.first_date} to ${H.last_date} · `
+    + `comparison basket ${fmt(H.comparison_barcodes)} barcodes across 3 chains `
+    + `(${fmt(H.full_basket_barcodes)} across all 4 with trustworthy barcodes)`;
+
+  /* ---------- 1. pairwise over time ---------- */
+  (() => {
+    const W=860,Hh=300,L=52,R=14,T=14,B=46, iw=W-L-R, ih=Hh-T-B;
+    const pairs=[...new Set(pair.map(d=>d.pair))].sort();
+    const col={'Metro / SaveOnFoods':css('--m'),'Metro / Walmart':css('--w'),'SaveOnFoods / Walmart':css('--s')};
+    const ds=pair.map(d=>+new Date(d.date));
+    const x0=Math.min(...ds), x1=Math.max(...ds);
+    const ys=pair.map(d=>d.median_ratio);
+    const y0=Math.min(0.85,Math.min(...ys)), y1=Math.max(1.35,Math.max(...ys));
+    const X=v=>L+(v-x0)/(x1-x0)*iw, Y=v=>T+ih-(v-y0)/(y1-y0)*ih;
+    let s='';
+    for(const g of [0.9,1.0,1.1,1.2,1.3]){
+      s+=`<line class="${g===1?'par':'gl'}" x1="${L}" x2="${W-R}" y1="${Y(g).toFixed(1)}" y2="${Y(g).toFixed(1)}"/>`
+       + `<text class="tick" x="${L-8}" y="${(Y(g)+3).toFixed(1)}" text-anchor="end">${g.toFixed(2)}</text>`;
+    }
+    for(const p of pairs){
+      const pts=pair.filter(d=>d.pair===p).sort((a,b)=>a.date<b.date?-1:1);
+      s+=`<polyline fill="none" stroke="${col[p]||css('--fg')}" stroke-width="1.3" opacity=".9" points="`
+        + pts.map(d=>`${X(+new Date(d.date)).toFixed(1)},${Y(d.median_ratio).toFixed(1)}`).join(' ')+`"/>`;
+    }
+    const yr=[2024,2025,2026].map(y=>+new Date(`${y}-07-01`)).filter(t=>t>=x0&&t<=x1);
+    for(const t of yr) s+=`<text class="tick" x="${X(t).toFixed(1)}" y="${Hh-B+16}" text-anchor="middle">${new Date(t).getFullYear()}</text>`;
+    s+=`<line class="ax" x1="${L}" x2="${W-R}" y1="${T+ih}" y2="${T+ih}"/>`;
+    let lx=L+4;
+    for(const p of pairs){
+      s+=`<rect x="${lx}" y="${Hh-14}" width="16" height="3" fill="${col[p]||css('--fg')}"/>`
+       + `<text class="lbl" x="${lx+21}" y="${Hh-10}">${p.replace('SaveOnFoods','Save-On-Foods')}</text>`;
+      lx+=p.length*6.4+40;
+    }
+    s+=`<text class="lbl" x="${L+4}" y="${T+12}" opacity=".7">↑ first chain dearer</text>`;
+    $('#c1').innerHTML=s;
+    const ns=pair.map(d=>d.n_products);
+    $('#n1').textContent=`n = ${fmt(Math.min(...ns))}–${fmt(Math.max(...ns))} products per day per pair `
+      + `(median ${fmt(ns.slice().sort((a,b)=>a-b)[Math.floor(ns.length/2)])}); `
+      + `${fmt(pair.length)} pair-days, minimum 30 products required for a point. `
+      + `Excludes store brands entirely — see panel 2.`;
+  })();
+
+  /* ---------- 2. blind spot ---------- */
+  (() => {
+    const W=860,rowH=42,T=16,L=118,R=130, iw=W-L-R;
+    const mx=Math.max(...blind.map(d=>d.pct_exposure_store_brand),35);
+    let s='',y=T;
+    for(const d of blind){
+      const seen=100-d.pct_exposure_store_brand;
+      s+=`<text class="lbl" x="${L-10}" y="${y+15}" text-anchor="end">${d.vendor.replace('SaveOnFoods','Save-On-Foods')}</text>`
+       + `<rect x="${L}" y="${y+4}" width="${iw}" height="14" rx="2" fill="${css('--rule')}"/>`
+       + `<rect x="${L}" y="${y+4}" width="${(iw*d.pct_exposure_store_brand/100).toFixed(1)}" height="14" rx="2" fill="${css('--warn')}"/>`
+       + `<text class="lbl" x="${W-R+8}" y="${y+15}">${d.pct_exposure_store_brand}% invisible</text>`
+       + `<text class="tick" x="${L+4}" y="${y+32}">${fmt(d.price_rows)} price observations · ${(seen).toFixed(1)}% of shelf presence is comparable</text>`;
+      y+=rowH;
+    }
+    $('#c2').innerHTML=s;
+    $('#n2').textContent='“Price-weighted shelf presence” = sum of observed prices across listings. '
+      + 'The dataset records no quantities sold, so this is not spend and not market share. '
+      + 'Of 8,448 product listings in the matched basket, exactly 1 is a store brand.';
+  })();
+
+  /* ---------- 3. sale frequency ---------- */
+  (() => {
+    const W=860,T=14,L=118,R=150,rowH=30, iw=W-L-R;
+    const rows=freq.slice().sort((a,b)=>b.median_pct_days_on_sale-a.median_pct_days_on_sale);
+    const mx=Math.max(...rows.map(d=>d.median_pct_days_on_sale),35);
+    let s='',y=T;
+    for(const d of rows){
+      s+=`<text class="lbl" x="${L-10}" y="${y+14}" text-anchor="end">${d.vendor.replace('SaveOnFoods','Save-On-Foods').replace('NoFrills','No Frills').replace('TandT','T&amp;T')}</text>`
+       + `<rect x="${L}" y="${y+3}" width="${Math.max(1,iw*d.median_pct_days_on_sale/mx).toFixed(1)}" height="13" rx="2" fill="${css('--accent')}" opacity=".8"/>`
+       + `<text class="lbl" x="${L+Math.max(1,iw*d.median_pct_days_on_sale/mx)+8}" y="${y+14}">${d.median_pct_days_on_sale}% · n=${fmt(d.n_products)}</text>`;
+      y+=rowH;
+    }
+    $('#c3').innerHTML=s;
+    $('#n3').textContent='Median product, share of its observed days carrying a struck-out price, 2025–26. '
+      + 'Products observed on 90+ days only. Bars are within-chain measures and are NOT ranked against '
+      + 'each other — see the note below.';
+  })();
+
+  /* ---------- 3b. corroboration ---------- */
+  (() => {
+    const ok=corr.filter(d=>d.testable&&d.pct_corroborated!==null&&d.n_flag_rows>0)
+                 .sort((a,b)=>b.pct_corroborated-a.pct_corroborated);
+    if(ok.length){
+      $('#corrHi').textContent=ok[0].pct_corroborated+'%';
+      $('#corrLo').textContent=ok[ok.length-1].pct_corroborated+'%';
+    }
+    let t='<tr><th>Chain</th><th>Struck-out price confirmed by promotional text</th><th>n rows</th></tr>';
+    for(const d of corr.slice().sort((a,b)=>(b.testable?1:0)-(a.testable?1:0)||((b.pct_corroborated??-1)-(a.pct_corroborated??-1)))){
+      const v = (!d.testable||d.pct_corroborated===null||d.n_flag_rows===0)
+        ? '<span style="color:var(--warn)">cannot be checked — no promotional text on any row</span>'
+        : d.pct_corroborated+'%';
+      t+=`<tr><td>${d.vendor.replace('SaveOnFoods','Save-On-Foods').replace('NoFrills','No Frills').replace('TandT','T&amp;T')}</td><td>${v}</td><td class="n">${fmt(d.n_flag_rows)}</td></tr>`;
+    }
+    $('#corrTable').innerHTML=t;
+  })();
+
+  /* ---------- 4. ledger ---------- */
+  (() => {
+    const verdict={
+      'kept':'—',
+      'no product record':'<b style="color:var(--warn)">Biased on time.</b> Removes 26.8% of one chain’s 2024 sale events against 0.4% of its 2025 events — which is why every headline result is scoped to 2025–26.',
+      'ambiguous price':'Distinct in kind, immaterial in effect: 25 of 576,200 sale events, 27 of 5,222 basket barcodes.',
+      'unparseable price':'Too few to test.'
+    };
+    const tot=ledger.reduce((a,d)=>a+d.rows,0);
+    let t='<tr><th>Class</th><th>Rows</th><th>Share</th><th>Bias verdict</th></tr>';
+    for(const d of ledger){
+      t+=`<tr><td>${d.class}</td><td class="n">${fmt(d.rows)}</td><td class="n">${d.pct_of_all}%</td>`
+       + `<td style="font-size:.8rem;color:var(--muted)">${verdict[d.class]||''}</td></tr>`;
+    }
+    $('#ledger').innerHTML=t;
+    $('#n4').textContent=`n = ${fmt(tot)} price observations; the four classes sum to it exactly. `
+      + 'A fifth exclusion — an undeclared filter carried over from earlier work — removed 8,797 sale '
+      + 'events and is documented in the findings.';
+  })();
+}).catch(e => {
+  document.querySelector('.wrap').insertAdjacentHTML('beforeend',
+    `<p style="color:var(--warn)"><b>Could not load the data files.</b> This page reads JSON from
+     <code>dashboard/data/</code>; serve the folder over HTTP rather than opening the file directly.
+     (<code>python -m http.server</code> from the repository root.)</p>`);
+  console.error(e);
+});
+</script>
+</body>
+</html>

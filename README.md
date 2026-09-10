@@ -6,7 +6,7 @@ websites since February 2024.
 
 **The underlying data was sourced from ProjectHammer.org.**
 
-**We are a downstream consumer of a published dataset. This project does not scrape any
+**This is a downstream consumer of a published dataset. It does not scrape any
 grocery vendor.**
 
 ## Scope, stated up front
@@ -15,61 +15,63 @@ The upstream data is the **"in store pickup" price for one neighbourhood in Toro
 Nothing here is a national, provincial, or "Canadian" price. Any number that leaves this
 repo carries that qualifier.
 
+## Start here
+
+**→ [The writeup](docs/writeup.md)** — the argument, for a reader who will never open this
+repo. *The hard part of comparing grocery prices isn't getting the prices.*
+
+**→ [The dashboard](dashboard/index.html)** — four charts, including the comparison that
+could not be made and why. Serve the repo over HTTP (`python -m http.server`) and open
+`dashboard/index.html`.
+
+**→ [The findings](docs/phase-2-findings.md)** — every number, denominator, exclusion and
+withdrawal. Opens with a consolidated record.
+
+**→ [The method note](docs/method-note.md)** — how I know the numbers are trustworthy, and
+four times I caught myself being wrong.
+
+---
+
 ## Current status
 
-**Phase 0 — data reconnaissance. Complete.** Answered questions about the data and
-produced a go/no-go verdict on each proposed analysis. No findings.
+**Phase 0 — data reconnaissance. Complete.** Questions about the data, and a go/no-go
+verdict on each proposed analysis. No findings.
 
 **Phase 1 — representation. Complete.** A computable price and an owned product identity.
-100.000% of price rows in both snapshots resolve to a `unit_price` or an explicit
-`unparsed` verdict (33 unparsed of 71.8M / 72.0M). An owned `product_key` with **0
-collisions** across the union of both snapshots. 40 dbt tests passing on both snapshots,
-23 of 23 demonstrated to fail when they should.
+100.000% of price rows in both snapshots resolve to a unit price or an explicit `unparsed`
+verdict (33 unparsed of 71.8M / 72.0M). An owned product key with **0 collisions** across
+both snapshots. 40 dbt tests passing on both, 23 of 23 demonstrated to fail when they
+should.
 
-**Phase 2 — findings. In progress.** Sections 1 and 2 complete; Sections 3 (cross-vendor
-basket) and 4 (price-freeze secondary) not started.
+**Phase 2 — findings. Complete.** Three results, five withdrawals, a full exclusion ledger
+with a bias verdict on each class.
 
-### What Phase 2 has found, and what it has not
+**Phase 3 — publication. In progress.** Writeup and dashboard drafted; repository
+presentation being finalised.
 
-This section exists because the findings are easy to over-read, and two of them have
-already been narrowed after review.
+### What this project found, and what it did not
 
 **Found, with stated bounds:**
 
-- **Between 3.39% and 21.27%** of 2025–26 sale events advertise a "regular" price not
-  supported by the fortnight before the sale. This is a **bracket, not a point**: the
-  lower bound is constructed to exonerate, the upper to accuse. Most of the gap is
-  attributable to genuine price increases followed by a sale, which is quantified.
-- **One exclusion in the pipeline is biased**, not merely large: orphaned rows remove
-  26.8% of Metro's 2024 sale events against 0.4% of its 2025 events. The D2 headline is
-  therefore scoped to 2025–26 and 2024 is reported separately.
+- **Between 3.4% and 21.3%** of 2025–26 sale events advertise a "regular" price not
+  supported by the fortnight before the sale — a **bracket, not a point**, with most of the
+  gap attributable to ordinary repricing.
+- **On identical national-brand products stocked by both chains on the same day**, Walmart
+  was cheaper than Metro on 100% of 711 observed dates and cheaper than Save-On-Foods on
+  100% of 606 — stable across categories and consistent with the third comparison.
+- **One exclusion in the pipeline is biased**, not merely large, which is why every headline
+  result is scoped to 2025–26.
 
 **Explicitly NOT found:**
 
-- **No retailer has been shown to lie about prices.** Most apparent pre-sale inflation is
-  explained by ordinary repricing.
-- **No cross-vendor ranking of promotional frequency.** That comparison was computed and
-  then **withdrawn**: the sale flag is not semantically equivalent across vendors. An
-  independent promotional signal corroborates it on 99.50% of rows at No Frills and 21.46%
-  at Save-On-Foods, and cannot be tested at all at Metro — and Save-On-Foods and Metro were
-  the two vendors the ranking put first and second.
-- **Nothing national.** One Toronto neighbourhood, pickup price.
-
-Full detail, with every denominator and bias verdict:
-[docs/phase-2-findings.md](docs/phase-2-findings.md).
-
-Documents, in reading order:
-
-- [docs/phase-0-findings.md](docs/phase-0-findings.md) — start with §1 (the headline
-  number), §2 (bad news), §8 (what the data can and cannot support).
-- [docs/phase-1-findings.md](docs/phase-1-findings.md) — start with §5.1 (a defect the
-  test suite found in our own key) and §5.5 (a published figure that turned out stale).
-- [docs/phase-2-findings.md](docs/phase-2-findings.md) — start with §1.2 (the bias audit)
-  and §2.7 (the withdrawal).
-- [docs/upstream-feedback.md](docs/upstream-feedback.md) — ergonomics feedback for the
-  dataset maintainer, written to be sent as-is.
-- [docs/retention-design.md](docs/retention-design.md) — snapshot retention, proposed.
-- [docs/FILES.md](docs/FILES.md) — what every file is and why it exists.
+- **No retailer has been shown to lie about prices.**
+- **No "cheapest supermarket" claim.** The barcode-matched comparison is blind to store
+  brands — about 22.6% of price-weighted shelf presence — which is where the chains compete
+  hardest.
+- **No cross-chain ranking of promotional frequency.** Computed, then **withdrawn**: the
+  sale flag is not semantically equivalent across chains.
+- **No price-freeze compliance rate for any retailer.** Not measurable from this data.
+- **Nothing national.** One Toronto neighbourhood, pickup prices.
 
 ## Layout
 
@@ -170,7 +172,7 @@ is updated deliberately, in its own commit, with a note.
 
 - **A missing day is not an unchanged price.** No forward-filling across gaps without an
   explicit, named, documented rule.
-- **Publication lag is not a data gap.** The date a price was observed and the date we
+- **Publication lag is not a data gap.** The date a price was observed and the date I
   obtained the file containing it are two different fields, and a late upload must never
   be reported as missing scrape data.
 - **Every published number is reproducible.** If a figure appears in a document, a
@@ -201,9 +203,9 @@ Everything authored in this repository — the Python scripts, the SQL models an
 the dbt project, and the documentation — is **MIT licensed**. See [LICENSE](LICENSE). Use
 it, fork it, ship it commercially; keep the copyright notice.
 
-### The data: Project Hammer's, not ours
+### The data: Project Hammer's, not mine
 
-The grocery price data is **not ours and is not licensed by us**. It belongs to
+The grocery price data is **not mine and is not licensed by me**. It belongs to
 [Project Hammer](https://projecthammer.org) and is used here as a downstream consumer.
 
 **It is also not in this repository.** `data/snapshots/` and the DuckDB files are
@@ -218,4 +220,4 @@ comes with a required attribution, used here and in every writeup and dashboard 
 **What this means in practice:** MIT lets you take the code. It does **not** give you any
 right to the data, and it does **not** transfer the attribution obligation away from you —
 if you republish numbers derived from Project Hammer, the attribution requirement is yours
-to carry, not something the MIT licence on our code discharges.
+to carry, not something the MIT licence on this code discharges.

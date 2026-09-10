@@ -1,0 +1,10 @@
+[
+	{"vendor":"NoFrills","testable":true,"pct_corroborated":99.5,"n_flag_rows":1247314},
+	{"vendor":"Loblaws","testable":true,"pct_corroborated":99.06,"n_flag_rows":2012425},
+	{"vendor":"Voila","testable":true,"pct_corroborated":98.2,"n_flag_rows":1947342},
+	{"vendor":"Walmart","testable":true,"pct_corroborated":79.02,"n_flag_rows":530083},
+	{"vendor":"SaveOnFoods","testable":true,"pct_corroborated":21.46,"n_flag_rows":1972080},
+	{"vendor":"TandT","testable":true,"pct_corroborated":0.04,"n_flag_rows":252224},
+	{"vendor":"Galleria","testable":false,"pct_corroborated":null,"n_flag_rows":37753},
+	{"vendor":"Metro","testable":false,"pct_corroborated":null,"n_flag_rows":1739677}
+]

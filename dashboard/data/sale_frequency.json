@@ -1,0 +1,10 @@
+[
+	{"vendor":"Galleria","n_products":9580,"median_pct_days_on_sale":0.0,"pct_products_over_half_the_time":0.44},
+	{"vendor":"Loblaws","n_products":24323,"median_pct_days_on_sale":12.12,"pct_products_over_half_the_time":6.23},
+	{"vendor":"Metro","n_products":14970,"median_pct_days_on_sale":26.44,"pct_products_over_half_the_time":18.28},
+	{"vendor":"NoFrills","n_products":18638,"median_pct_days_on_sale":8.98,"pct_products_over_half_the_time":0.58},
+	{"vendor":"SaveOnFoods","n_products":12389,"median_pct_days_on_sale":32.12,"pct_products_over_half_the_time":21.08},
+	{"vendor":"TandT","n_products":9299,"median_pct_days_on_sale":1.38,"pct_products_over_half_the_time":0.13},
+	{"vendor":"Voila","n_products":18854,"median_pct_days_on_sale":11.41,"pct_products_over_half_the_time":5.56},
+	{"vendor":"Walmart","n_products":9750,"median_pct_days_on_sale":2.62,"pct_products_over_half_the_time":1.76}
+]

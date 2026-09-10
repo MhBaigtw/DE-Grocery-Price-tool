@@ -1,0 +1,6 @@
+[
+	{"class":"kept","rows":70883862,"pct_of_all":98.7112},
+	{"class":"no product record","rows":878559,"pct_of_all":1.2235},
+	{"class":"ambiguous price","rows":46884,"pct_of_all":0.0653},
+	{"class":"unparseable price","rows":28,"pct_of_all":0.0}
+]
