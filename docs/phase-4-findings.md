@@ -472,13 +472,23 @@ may have changed.*
 rather than a promise.** §1.3b: Walmart was absent from the dataset for 49 consecutive days
 in 2025 and 26 more in 2026. No refresh cadence touches this. Therefore:
 
+> **Corrected in §2.** The rule below is right, but the reasoning behind it named the wrong
+> chain. Chain-level absence — a whole chain vanishing for weeks — is Walmart's problem.
+> What the 7-day rule mostly catches is **product-level catalogue rotation**, an individual
+> line not listed this week, and there **Metro** is the worst by a wide margin: 67.42% of
+> its offers comparable against 85.19% and 85.25%. On the extract date no chain was absent
+> at all, so every exclusion the tool currently makes is a product, not a chain. These are
+> two different failure modes and I had conflated them.
+
+
 - Every price carries **its own observed date**, not the refresh date. These are different
   fields, and conflating them would be the publication-lag error from CLAUDE.md repeated
   inside our own product.
 - A chain whose latest observation is **more than 7 days behind the extract's own maximum
   date** is shown as **"no recent price"** — never as absent, never silently dropped from
   the comparison (brief §3.2). A 7-day threshold catches all four multi-day absence episodes
-  observed since 2025 and none of the single days.
+  observed since 2025 and none of the single days. Measured against the shipped extract it
+  excludes 1,256 offers, 651 of them Metro's (§2).
 - The extract's metadata records, per chain, the latest observed date and how many days it is
   behind, so the interface renders this from data rather than from a rule compiled into the
   page.
@@ -671,6 +681,136 @@ products. A missing size is better than a wrong one.
 - `offers[].staleness_*` — per chain, measured or explicitly not measured.
 - `meta.chains[].staleness` — the per-chain curve for the standing disclosure. There is no
   pooled figure to reach for.
+
+---
+
+
+---
+
+# §3 — The interface
+
+*Same build and extract as §2. The page is [`tool/index.html`](../tool/index.html), one
+static file, no framework and no external request. Verified by
+[`scripts/test_tool_render.js`](../scripts/test_tool_render.js), which renders **all 2,921
+products** through the page's own card functions — pulled out of `index.html` rather than
+copied, so the test cannot drift from what ships — and asserts the honesty rules on the
+rendered output.*
+
+## Built unavailable-first, because that is where 39% of it lives
+
+The three result states were written in this order: nothing to compare, then one chain, then
+the comparison. That ordering was the point — a tool whose failure states are an afterthought
+is a bad tool for 1,141 of its 2,921 products.
+
+**State A — nothing recent anywhere (328 products, 11.23%).** Red rule, and the heading is
+the finding, not an apology:
+
+> **Nothing to compare. No chain has a price for this from the last 7 days.**
+> This is not a statement that the product is unavailable, and it is certainly not a
+> statement about which chain is cheaper. It means the data has nothing recent enough to
+> answer with. The last prices I did see are below.
+
+The stale prices still appear, each with its date and its warning. Brief §3.2 forbids
+dropping a chain silently; it does not require pretending the old price never existed.
+
+**State B — exactly one chain (813 products, 27.83%).** Amber rule, and the copy exists to
+kill one specific misreading:
+
+> **Only Save-On-Foods has a price from the last 7 days.**
+> **There is nothing to compare it with.** This does not mean Save-On-Foods is cheapest — it
+> means the other chain has no recent price here, so no comparison exists to win.
+
+A single price with a green tick beside it reads as a verdict. This is the state most likely
+to mislead, and it is 2.5× more common than the state where nothing shows at all.
+
+**State C — two or three chains (1,780 products, 60.93%).** The heading is
+`comparison.claim`, taken verbatim from the extract:
+
+> Cheapest of the 3 chains with a price from the last 7 days: Metro, Save-On-Foods and Walmart.
+
+Cheapest first, each with its date, its basis, its own chain's measured staleness and its
+14-day context. Chains that did not qualify appear below a dashed rule under **"Not compared
+— last seen"**, struck through and greyed, with the reason and the date.
+
+## Staleness renders as a warning, never as an absence
+
+The 1,137 offers past the longest measured horizon get a bordered red block, not a dash:
+
+> ⚠ **178 days old.** How far this price may have moved since has **not been measured** —
+> the longest span I checked is 14 days. Treat it as unknown, not as current.
+
+Everything inside the measured range gets the chain's own figure and the age that goes with
+it — *"Captured on the extract date. Measured: 5.32% of Save-On-Foods prices differ a day
+after capture."* Per chain, always. There is no pooled number in the extract to print, so
+there is none on the page.
+
+The render test asserts both halves: every `staleness_exceeds_measured` offer produces the
+words "not been measured" **and** its age in days, and no offer beyond the horizon carries a
+percentage.
+
+## The landing state, before anyone searches and misses
+
+Shown above the search box, on first load:
+
+- **2,921 products, all national brands.** *Store brands cannot be compared* and are not
+  here at all — President's Choice against Selection is not a comparison this tool can make.
+- **3 chains: Metro, Save-On-Foods, Walmart.** In-store pickup prices for one neighbourhood
+  in Toronto — not national, not provincial, not delivery.
+- **60.9% of them can actually be compared today**, with a four-segment bar breaking that
+  into 464 at three chains, 1,316 at two, 813 at only one, 328 with nothing recent — the
+  last two labelled *nothing to compare*.
+- Prices are from 2026-08-21, refreshed weekly, and **at Save-On-Foods, the chain that moves
+  most, 36.68% of prices change over a week** — the worst chain named rather than an average
+  taken.
+
+A user should be able to see the shape of the thing before searching for something it does
+not have. The empty-search result says the same in miniature rather than a bare "no results".
+
+Underneath everything, fixed to the bottom of the viewport and not behind a link:
+*Toronto pickup prices, one neighbourhood · national brands only, no store brands · data to
+2026-08-21 · no basket, no store ranking · The underlying data was sourced from
+ProjectHammer.org.*
+
+## What the interface deliberately cannot do
+
+**No basket, no total, no store ranking** (brief §3.4). Nothing on the page sums across
+products or counts wins per chain. The word "cheapest" appears only inside a sentence naming
+the chains it applies to and the product it applies to.
+
+**Six weeks of history, on request.** A step chart per chain, drawn from the spells in
+`history.json`, loaded only when asked for so it costs nothing on first paint. Gaps in the
+line are days with no observation, and the caption says so — a flat line would be a
+forward-fill drawn as a fact.
+
+## Two copy defects the render test caught
+
+Both were in the extract, not the page, which is the right place for them to have been:
+
+1. **The claim printed a raw vendor code.** *"Cheapest of the 2 chains …: SaveOnFoods and
+   Walmart."* `SaveOnFoods` is a database key, not a shop name.
+2. **Three chains joined as "A and B and C".**
+
+Both are fixed at source: a `chain_label` macro in the extract, carried into every offer,
+every unavailable entry, `meta.chains`, and `history.json`. **The page no longer keeps its
+own name map** — it reads the label from the data, so there is one mapping rather than two
+that can disagree. The test now fails if any raw vendor code reaches the reader, or if a
+claim joins names with a repeated "and".
+
+## Size, measured over HTTP
+
+| Asset | Raw | Gzipped |
+|---|---|---|
+| `index.html` | 21.1 KB | 7.2 KB |
+| `data/meta.json` | 2.3 KB | 1.1 KB |
+| `data/products.json` | 3,499.0 KB | 180.9 KB |
+| `data/history.json` | 1,764.9 KB | 76.5 KB |
+| **First paint** (history deferred) | | **189.2 KB** |
+| Total if everything is fetched | 5,287.4 KB | 265.7 KB |
+
+All four assets return 200 over HTTP and every JSON parses. Layout is single-column with a
+560px breakpoint; **that is a CSS assertion, not a measurement, and §5.5's phone-width check
+still has to make it a measurement** — along with the parse cost of 3.5 MB of JSON on a
+mid-range phone, which is the one number in this section I do not have.
 
 ---
 

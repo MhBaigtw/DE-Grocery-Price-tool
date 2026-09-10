@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What does this cost at Metro, Save-On-Foods or Walmart?</title>
+<style>
+  :root{
+    --bg:#fbfaf8; --fg:#1b1b1a; --muted:#666; --rule:#e2ded7;
+    --card:#fff; --accent:#1f5f4e; --warn:#8a4b1f; --dim:#9a9a96;
+    --warnbg:#fdf4ec; --stopbg:#fbeeee; --stop:#9a3232;
+    --w:#2f6f9f; --m:#7a4b8f; --s:#b0693a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme=light]){
+      --bg:#16171a; --fg:#e9e7e3; --muted:#a4a29d; --rule:#33353a;
+      --card:#1e2024; --accent:#6fc0a6; --warn:#d59a63; --dim:#75777c;
+      --warnbg:#2a2118; --stopbg:#2c1c1c; --stop:#e08585;
+      --w:#7bb6e0; --m:#c39ad8; --s:#e0a071;
+    }
+  }
+  :root[data-theme=dark]{
+    --bg:#16171a; --fg:#e9e7e3; --muted:#a4a29d; --rule:#33353a;
+    --card:#1e2024; --accent:#6fc0a6; --warn:#d59a63; --dim:#75777c;
+    --warnbg:#2a2118; --stopbg:#2c1c1c; --stop:#e08585;
+    --w:#7bb6e0; --m:#c39ad8; --s:#e0a071;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--fg);
+       font:16px/1.6 ui-serif,Georgia,"Times New Roman",serif;
+       margin:0;padding:0 18px 110px}
+  .wrap{max-width:760px;margin:0 auto}
+  header{padding:44px 0 0}
+  h1{font-size:1.75rem;line-height:1.22;margin:0 0 10px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:1rem;margin:0 0 22px}
+  a{color:var(--accent)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  /* ---- coverage panel: the landing state, shown before any search ---- */
+  .cover{background:var(--card);border:1px solid var(--rule);border-radius:10px;
+         padding:18px 18px 6px;margin:0 0 20px}
+  .cover h2{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;
+            color:var(--muted);margin:0 0 12px;font-family:ui-sans-serif,system-ui,sans-serif}
+  .cov{display:flex;gap:12px;align-items:baseline;margin:0 0 12px;font-size:.93rem}
+  .cov .big{font-size:1.5rem;font-weight:700;font-family:ui-sans-serif,system-ui,sans-serif;
+            line-height:1;min-width:4.6rem}
+  .cov .t{color:var(--muted)}
+  .cov .t b{color:var(--fg);font-weight:600}
+  .cantbar{display:flex;height:12px;border-radius:3px;overflow:hidden;margin:4px 0 8px;
+           border:1px solid var(--rule)}
+  .cantbar i{display:block}
+  .barkey{font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.7}
+  .barkey s{text-decoration:none;display:inline-block;width:9px;height:9px;border-radius:2px;
+            margin:0 5px 0 0;vertical-align:baseline}
+
+  /* ---- search ---- */
+  .searchrow{position:relative;margin:0 0 6px}
+  #q{width:100%;padding:14px 16px;font:1.05rem ui-sans-serif,system-ui,sans-serif;
+     background:var(--card);color:var(--fg);border:1px solid var(--rule);border-radius:9px}
+  #q:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .hint{font-size:.8rem;color:var(--dim);margin:0 0 22px}
+
+  /* ---- result cards ---- */
+  .res{background:var(--card);border:1px solid var(--rule);border-radius:10px;
+       padding:16px 16px 12px;margin:0 0 14px}
+  .res.none{border-left:4px solid var(--stop);background:var(--stopbg)}
+  .res.one {border-left:4px solid var(--warn);background:var(--warnbg)}
+  .pname{font-size:1.06rem;font-weight:600;line-height:1.35;margin:0 0 2px}
+  .pmeta{font-size:.82rem;color:var(--muted);margin:0 0 12px;
+         font-family:ui-sans-serif,system-ui,sans-serif}
+  .claim{font-family:ui-sans-serif,system-ui,sans-serif;font-size:.9rem;font-weight:600;
+         margin:0 0 12px;line-height:1.45}
+  .res.none .claim{color:var(--stop)}
+  .res.one  .claim{color:var(--warn)}
+  .notclaim{font-family:ui-sans-serif,system-ui,sans-serif;font-size:.83rem;
+            color:var(--muted);margin:-6px 0 12px;line-height:1.5}
+
+  .offer{display:grid;grid-template-columns:1fr auto;gap:2px 12px;
+         padding:10px 0;border-top:1px solid var(--rule)}
+  .offer .chain{font-family:ui-sans-serif,system-ui,sans-serif;font-weight:600;font-size:.95rem}
+  .offer .px{font-family:ui-monospace,Menlo,monospace;font-size:1.12rem;font-weight:600;
+             text-align:right;white-space:nowrap}
+  .offer .det{grid-column:1/3;font-size:.8rem;color:var(--muted);line-height:1.6;
+              font-family:ui-sans-serif,system-ui,sans-serif}
+  .offer.out .chain,.offer.out .px{color:var(--dim)}
+  .offer.out .px{font-weight:400;text-decoration:line-through}
+  .best{display:inline-block;font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;
+        background:var(--accent);color:#fff;border-radius:3px;padding:1px 6px;margin-left:7px;
+        vertical-align:2px;font-family:ui-sans-serif,system-ui,sans-serif;font-weight:700}
+  .tag{display:inline-block;font-size:.68rem;border:1px solid var(--rule);border-radius:3px;
+       padding:0 5px;margin-left:6px;color:var(--muted);vertical-align:1px;
+       font-family:ui-sans-serif,system-ui,sans-serif}
+
+  /* ---- the staleness warning: a warning, never a dash ---- */
+  .stale{display:block;margin:5px 0 0;padding:7px 9px;border-radius:5px;
+         background:var(--stopbg);border:1px solid var(--stop);color:var(--stop);
+         font-family:ui-sans-serif,system-ui,sans-serif;font-size:.78rem;line-height:1.5;
+         font-weight:600}
+  .stale b{font-weight:700}
+  .measured{color:var(--muted)}
+
+  .sep{font-family:ui-sans-serif,system-ui,sans-serif;font-size:.7rem;text-transform:uppercase;
+       letter-spacing:.06em;color:var(--muted);margin:14px 0 0;padding:10px 0 0;
+       border-top:1px dashed var(--rule)}
+  .hist{margin:8px 0 0}
+  .hist svg{display:block;width:100%;height:44px;overflow:visible}
+  .histnote{font-size:.74rem;color:var(--dim);font-family:ui-sans-serif,system-ui,sans-serif}
+  .more{font-family:ui-sans-serif,system-ui,sans-serif;font-size:.8rem;color:var(--muted);
+        margin:16px 0 0}
+  button.link{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;
+              font:inherit;text-decoration:underline}
+
+  /* ---- always-visible disclosure strip (brief 3.3) ---- */
+  .strip{position:fixed;left:0;right:0;bottom:0;background:var(--card);
+         border-top:1px solid var(--rule);padding:8px 18px;z-index:9;
+         font-family:ui-sans-serif,system-ui,sans-serif;font-size:.735rem;
+         color:var(--muted);line-height:1.5}
+  .strip .in{max-width:760px;margin:0 auto}
+  .strip b{color:var(--fg)}
+  footer{margin:44px 0 0;padding:20px 0 0;border-top:1px solid var(--rule);
+         color:var(--muted);font-size:.85rem}
+  @media (max-width:560px){
+    h1{font-size:1.4rem} body{font-size:15px;padding-bottom:132px}
+    .cov .big{font-size:1.25rem;min-width:3.9rem}
+    .offer .px{font-size:1rem}
+    .strip{font-size:.7rem}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>What does this cost at Metro, Save-On-Foods or Walmart?</h1>
+  <p class="sub">One product at a time. Same barcode, same day, at whichever of the three
+  chains actually had a price.</p>
+</header>
+
+<!-- LANDING STATE: the shape of the thing, before anyone searches and misses. -->
+<section class="cover" id="cover">
+  <h2>What this covers</h2>
+  <div id="covbody" class="pmeta">Loading…</div>
+</section>
+
+<div class="searchrow">
+  <input id="q" type="search" autocomplete="off" spellcheck="false"
+         placeholder="Search a product or brand — try “ketchup”, “Annie’s”, “oat milk”">
+</div>
+<p class="hint" id="hint">Type at least two characters.</p>
+
+<div id="results"></div>
+
+<footer>
+  <p><b>Why this tool works the way it does</b> — including why it refuses to compare
+  store brands, why it will not add up a basket, and the four times measurement choices
+  moved the answer more than the supermarkets did:
+  <a href="../docs/writeup.md">read the writeup</a> ·
+  <a href="../docs/method-note.md">method note</a> ·
+  <a href="../docs/phase-4-findings.md">how the refresh cadence was measured</a>.</p>
+  <p id="prov" class="mono" style="font-size:.72rem;color:var(--dim)"></p>
+</footer>
+</div>
+
+<div class="strip"><div class="in" id="strip">…</div></div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money = v => "$" + Number(v).toFixed(2);
+// Display names come from the extract (`chain_label`), not from a map kept here. One
+// mapping, in the file that licenses the sentences, so the two cannot drift apart.
+const nice = o => (o && o.chain_label) || (o && o.chain) || o;
+
+let META = null, PRODUCTS = [], HIST = null, HISTPROM = null;
+
+/* ------------------------------------------------------------------ *
+ * Staleness. staleness_exceeds_measured is rendered as a WARNING, never
+ * as an absent field. An offer 200 days old is the least trustworthy
+ * thing in the extract and a dash would read as "fine".
+ * ------------------------------------------------------------------ */
+function staleBlock(o){
+  if (o.staleness_exceeds_measured){
+    return '<span class="stale">⚠ <b>' + o.days_behind + ' days old.</b> '
+      + 'How far this price may have moved since has <b>not been measured</b> — '
+      + 'the longest span I checked is 14 days. Treat it as unknown, not as current.</span>';
+  }
+  if (o.staleness_pct == null) return "";
+  const age = o.days_behind === 0 ? "Captured on the extract date"
+            : o.days_behind === 1 ? "1 day old" : o.days_behind + " days old";
+  return '<span class="measured">' + age + ". Measured: <b>" + o.staleness_pct
+    + "%</b> of " + nice(o) + " prices differ "
+    + (o.staleness_horizon_days === 1 ? "a day" : o.staleness_horizon_days + " days")
+    + " after capture.</span>";
+}
+
+function priorBlock(o){
+  const p = o.prior_14d;
+  if (!p || !p.days_observed) return "";
+  let s = "In the 14 days before: seen on " + p.days_observed + " day"
+        + (p.days_observed === 1 ? "" : "s");
+  if (p.low != null && p.high != null){
+    s += ", " + (Math.abs(p.high - p.low) < 0.005
+      ? "unchanged at " + money(p.low)
+      : money(p.low) + "–" + money(p.high));
+  }
+  s += ", this exact price on " + p.days_at_this_price + " of them.";
+  return s;
+}
+
+function offerRow(o, isBest){
+  const out = !o.comparable;
+  let det = [];
+  const sb = staleBlock(o);
+  const pb = priorBlock(o);
+  if (out && o.not_comparable_reason)
+    det.push("<b>Not compared:</b> " + esc(o.not_comparable_reason) + ".");
+  det.push("Observed " + esc(o.observed_date) + ".");
+  if (pb) det.push(pb);
+  if (o.min_qty > 1) det.push("<b>Requires buying " + o.min_qty + ".</b>");
+  return '<div class="offer' + (out ? " out" : "") + '">'
+    + '<div class="chain">' + esc(nice(o))
+      + (isBest ? '<span class="best">cheapest here</span>' : "")
+      + (o.on_sale ? '<span class="tag">marked on sale</span>' : "")
+      + '<span class="tag">' + esc(o.basis) + "</span></div>"
+    + '<div class="px">' + money(o.price) + "</div>"
+    + '<div class="det">' + det.join(" ") + (sb ? sb : "") + "</div>"
+    + "</div>";
+}
+
+/* ------------------------------------------------------------------ *
+ * The three card states. The two unavailable ones are written first and
+ * are the loudest, because 39% of products land in them.
+ * ------------------------------------------------------------------ */
+function head(p){
+  const bits = [p.brand, p.size].filter(Boolean).map(esc);
+  return '<div class="pname">' + esc(p.name) + "</div>"
+       + '<div class="pmeta">' + (bits.length ? bits.join(" · ") + " · " : "")
+       + '<span class="mono">' + esc(p.gtin14) + "</span></div>";
+}
+
+// STATE A - nothing recent anywhere. 328 products, 11.23%.
+function cardNone(p){
+  return '<div class="res none">' + head(p)
+    + '<div class="claim">Nothing to compare. No chain has a price for this from the last 7 days.</div>'
+    + '<div class="notclaim">This is not a statement that the product is unavailable, and it '
+    + 'is certainly not a statement about which chain is cheaper. It means the data has '
+    + 'nothing recent enough to answer with. The last prices I did see are below.</div>'
+    + p.offers.map(o => offerRow(o, false)).join("")
+    + histSlot(p) + "</div>";
+}
+
+// STATE B - exactly one chain recent. 813 products, 27.83%.
+function cardOne(p){
+  const only = p.offers.filter(o => o.comparable);
+  const rest = p.offers.filter(o => !o.comparable);
+  return '<div class="res one">' + head(p)
+    + '<div class="claim">Only ' + esc(nice(only[0]))
+      + ' has a price from the last 7 days.</div>'
+    + '<div class="notclaim"><b>There is nothing to compare it with.</b> This does not mean '
+    + esc(nice(only[0])) + ' is cheapest — it means the other '
+    + (rest.length === 1 ? "chain has" : "chains have")
+    + ' no recent price here, so no comparison exists to win.</div>'
+    + only.map(o => offerRow(o, false)).join("")
+    + (rest.length ? '<div class="sep">Not compared — last seen</div>'
+        + rest.map(o => offerRow(o, false)).join("") : "")
+    + histSlot(p) + "</div>";
+}
+
+// STATE C - two or three chains recent. 1,780 products, 60.93%.
+function cardCompare(p){
+  const c = p.offers.filter(o => o.comparable).slice().sort((a,b)=>a.price-b.price
+             || a.chain.localeCompare(b.chain));
+  const rest = p.offers.filter(o => !o.comparable);
+  const cheapest = p.comparison.cheapest;
+  const mq = p.comparison.cheapest_requires_min_qty;
+  return '<div class="res">' + head(p)
+    + '<div class="claim">' + esc(p.comparison.claim) + "</div>"
+    + (mq ? '<div class="notclaim">The cheapest unit price here requires buying '
+            + mq + " at once.</div>" : "")
+    + c.map(o => offerRow(o, o.chain === cheapest)).join("")
+    + (rest.length ? '<div class="sep">Not compared — last seen</div>'
+        + rest.map(o => offerRow(o, false)).join("") : "")
+    + histSlot(p) + "</div>";
+}
+
+function histSlot(p){
+  return '<p class="more"><button class="link" data-g="' + esc(p.gtin14)
+       + '">Show the last 6 weeks</button></p><div class="hist" id="h-'
+       + esc(p.gtin14) + '"></div>';
+}
+
+function card(p){
+  const n = p.comparison.n_compared;
+  return n === 0 ? cardNone(p) : n === 1 ? cardOne(p) : cardCompare(p);
+}
+
+/* ---- 6-week history, drawn as steps so gaps stay visible ---- */
+function loadHist(){
+  if (HISTPROM) return HISTPROM;
+  HISTPROM = fetch("data/history.json").then(r => r.json()).then(rows => {
+    HIST = {};
+    for (const r of rows) (HIST[r.gtin14] = HIST[r.gtin14] || []).push(r);
+    return HIST;
+  });
+  return HISTPROM;
+}
+
+function drawHist(gtin){
+  const el = document.getElementById("h-" + gtin);
+  if (!el || el.dataset.done) return;
+  el.dataset.done = "1";
+  el.innerHTML = '<p class="histnote">Loading…</p>';
+  loadHist().then(H => {
+    const series = H[gtin] || [];
+    if (!series.length){ el.innerHTML = '<p class="histnote">No observations in the last 6 weeks.</p>'; return; }
+    const all = series.flatMap(s => s.spells);
+    const lo = Math.min(...all.map(s => s.price)), hi = Math.max(...all.map(s => s.price));
+    const t0 = Math.min(...all.map(s => Date.parse(s.from_date)));
+    const t1 = Math.max(...all.map(s => Date.parse(s.to_date)));
+    const span = Math.max(1, t1 - t0);
+    const COL = {Metro:"var(--m)", SaveOnFoods:"var(--s)", Walmart:"var(--w)"};
+    let out = "";
+    for (const s of series){
+      const segs = s.spells.map(sp => {
+        const x1 = 100*(Date.parse(sp.from_date)-t0)/span, x2 = 100*(Date.parse(sp.to_date)-t0)/span;
+        const y = hi === lo ? 22 : 38 - 32*(sp.price-lo)/(hi-lo);
+        return '<line x1="'+x1+'%" x2="'+Math.max(x2,x1+0.6)+'%" y1="'+y+'" y2="'+y
+             + '" stroke="'+COL[s.chain]+'" stroke-width="'+(sp.on_sale?4:2.4)
+             + '" stroke-linecap="round"/>';
+      }).join("");
+      out += '<p class="histnote" style="margin:6px 0 0"><b style="color:'+COL[s.chain]+'">'
+           + esc(nice(s)) + "</b> — " + s.spells.length + " price"
+           + (s.spells.length===1?"":"s") + ", thick = marked on sale</p>"
+           + '<svg viewBox="0 0 100 44" preserveAspectRatio="none">' + segs + "</svg>";
+    }
+    out += '<p class="histnote">' + money(lo) + " – " + money(hi)
+         + ". Gaps are days with no observation, not days at an unchanged price.</p>";
+    el.innerHTML = out;
+  });
+}
+
+/* ---- search ---- */
+function search(q){
+  const t = q.trim().toLowerCase();
+  const R = $("#results"), H = $("#hint");
+  if (t.length < 2){ R.innerHTML = ""; H.textContent = "Type at least two characters."; return; }
+  const hits = PRODUCTS.filter(p => p._s.includes(t));
+  if (!hits.length){
+    H.textContent = "";
+    R.innerHTML = '<div class="res none"><div class="claim">Nothing matched “'
+      + esc(q) + '”.</div><div class="notclaim">This tool carries '
+      + META.products_shipped.toLocaleString() + ' barcoded national-brand products, not a '
+      + 'whole supermarket. Store brands are absent by design — they share no barcode, so '
+      + 'they cannot be compared across chains at all.</div></div>';
+    return;
+  }
+  hits.sort((a,b) => (a._s.indexOf(t) - b._s.indexOf(t))
+    || b.comparison.n_compared - a.comparison.n_compared
+    || a.name.localeCompare(b.name));
+  const show = hits.slice(0, 25);
+  H.textContent = hits.length + " match" + (hits.length===1?"":"es")
+    + (hits.length > 25 ? " — showing the first 25" : "");
+  R.innerHTML = show.map(card).join("");
+}
+
+/* ---- landing coverage panel (brief 3.3, constraint 3) ---- */
+function renderCover(counts){
+  const total = counts.total;
+  const pct = n => (100*n/total).toFixed(1);
+  const chains = META.chains.map(c => nice(c)).join(", ");
+  const worst = META.chains.map(c => {
+      const s = c.staleness.find(x => x.days === 7);
+      return {chain: nice(c), pct: s ? s.pct_wrong : null};
+    }).filter(x => x.pct != null).sort((a,b) => b.pct - a.pct)[0];
+
+  $("#covbody").innerHTML =
+      '<div class="cov"><span class="big">' + META.products_shipped.toLocaleString()
+    + '</span><span class="t">products, all <b>national brands</b>. '
+    + '<b>Store brands cannot be compared</b> and are not here at all — President’s Choice '
+    + 'against Selection is not a comparison this tool can make, because they share no '
+    + 'barcode and there is nothing to match on.</span></div>'
+    + '<div class="cov"><span class="big">3</span><span class="t">chains: <b>' + esc(chains)
+    + '</b>. <b>In-store pickup prices for one neighbourhood in Toronto</b> — not national, '
+    + 'not provincial, not delivery.</span></div>'
+    + '<div class="cov"><span class="big">' + pct(counts.n2 + counts.n3)
+    + '%</span><span class="t">of them can actually be compared today. '
+    + '<b>A comparison is often not possible</b>, and the tool says so rather than guessing:</span></div>'
+    + '<div class="cantbar">'
+      + '<i style="background:var(--accent);width:' + pct(counts.n3) + '%"></i>'
+      + '<i style="background:var(--accent);opacity:.55;width:' + pct(counts.n2) + '%"></i>'
+      + '<i style="background:var(--warn);width:' + pct(counts.n1) + '%"></i>'
+      + '<i style="background:var(--stop);width:' + pct(counts.n0) + '%"></i>'
+    + "</div>"
+    + '<p class="barkey">'
+      + '<s style="background:var(--accent)"></s>' + counts.n3.toLocaleString() + " ("
+      + pct(counts.n3) + "%) priced at all three &nbsp; "
+      + '<s style="background:var(--accent);opacity:.55"></s>' + counts.n2.toLocaleString()
+      + " (" + pct(counts.n2) + "%) at two<br>"
+      + '<s style="background:var(--warn)"></s>' + counts.n1.toLocaleString() + " ("
+      + pct(counts.n1) + "%) at only one — <b>nothing to compare</b> &nbsp; "
+      + '<s style="background:var(--stop)"></s>' + counts.n0.toLocaleString() + " ("
+      + pct(counts.n0) + "%) nothing recent at all</p>"
+    + '<p class="barkey">Prices are from <b>' + esc(META.extract_date)
+      + "</b> and are refreshed weekly. A price up to 8 days old is normal; at "
+      + esc(worst.chain) + ", the chain that moves most, <b>" + worst.pct
+      + "%</b> of prices change over a week. Every price below carries its own date and its "
+      + "own chain's figure — there is deliberately no single overall number, because "
+      + "averaging them hides the chain you are most likely to be wrong about.</p>";
+
+  $("#strip").innerHTML = "<b>Toronto pickup prices, one neighbourhood · national brands only, "
+    + "no store brands · data to " + esc(META.extract_date) + " · no basket, no store ranking</b> · "
+    + esc(META.attribution);
+
+  $("#prov").textContent = "Extract " + META.extract_date + " · snapshot " + META.snapshot_id
+    + " · build " + META.built_utc + " · basket " + META.basket_barcodes
+    + " barcodes, " + META.products_shipped + " with a price in the last 200 days ("
+    + META.omitted.count + " dormant, omitted)";
+}
+
+/* ---- boot ---- */
+Promise.all([
+  fetch("data/meta.json").then(r => r.json()),
+  fetch("data/products.json").then(r => r.json())
+]).then(([m, p]) => {
+  META = m; PRODUCTS = p;
+  const counts = {total: p.length, n0:0, n1:0, n2:0, n3:0};
+  for (const x of p){
+    x._s = ((x.name||"") + " " + (x.brand||"") + " " + (x.size||"")).toLowerCase();
+    counts["n" + Math.min(3, x.comparison.n_compared)]++;
+  }
+  renderCover(counts);
+  $("#q").addEventListener("input", e => search(e.target.value));
+  $("#results").addEventListener("click", e => {
+    const b = e.target.closest("button.link");
+    if (b) { b.remove(); drawHist(b.dataset.g); }
+  });
+}).catch(err => {
+  $("#covbody").innerHTML = '<span style="color:var(--stop)">Could not load the price data ('
+    + esc(err.message) + "). Nothing is shown rather than something stale.</span>";
+});
+</script>
+</body>
+</html>

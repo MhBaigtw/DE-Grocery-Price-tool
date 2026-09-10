@@ -16,8 +16,12 @@
 --      the two chains that had a recent price" are different claims. Every product carries
 --      a `comparison` object naming exactly which chains were compared and which were not,
 --      with the reason and the date, plus the sentence the interface is licensed to print.
---      Walmart was absent 85 of 598 days since 2025-01-01 (§1.3b), so this is the most
---      likely wrong answer the tool can give, and it is prevented here rather than there.
+--      This is the most likely wrong answer the tool can give, and it is prevented here
+--      rather than there. NOTE, corrected after measuring: the chain this bites is METRO,
+--      not Walmart. Walmart has the worse CHAIN-level absence record (85 days since
+--      2025-01-01, §1.3b), but what the 7-day rule mostly catches is PRODUCT-level
+--      catalogue rotation, and Metro rotates hardest -- 67.42% of its offers are
+--      comparable against 85.19% for Walmart and 85.25% for Save-On-Foods (§2).
 --
 --   3. PER-CHAIN OBSERVED DATE AND PER-CHAIN STALENESS ARE FIRST-CLASS FIELDS. Not derived
 --      client-side. The page cannot compute a comparison this file has not licensed,
@@ -227,6 +231,11 @@ SELECT gtin14,
 FROM (SELECT gtin14, basis, count(*) AS n FROM offer GROUP BY 1,2)
 GROUP BY 1;
 
+-- One place where a vendor code becomes a name a person reads. Kept here rather than in
+-- the page so there is exactly one mapping to keep right.
+CREATE OR REPLACE MACRO chain_label(v) AS
+  CASE v WHEN 'SaveOnFoods' THEN 'Save-On-Foods' ELSE v END;
+
 CREATE OR REPLACE TEMP TABLE offer_flagged AS
 SELECT o.*, mb.basis AS product_basis,
        (o.days_behind <= 7)                                AS is_recent,
@@ -333,8 +342,13 @@ COPY (
                    count := omitted_no_recent_observation,
                    note := 'Barcodes in the comparison basket with no observation at any of the three chains in the last 200 days. They are delisted or dormant, have no price to show, and are not in products.json. Stated here so this count and the published basket size cannot silently disagree.')
           FROM shipped)                                                AS omitted,
+         -- determinism-ok: this list() IS ordered -- `ORDER BY vendor` sits at the close of
+         -- the struct_pack six lines below, and vendor is the GROUP BY key of the derived
+         -- table it reads, so the order is total. Flagged only because adding chain_label
+         -- pushed the ORDER BY past the linter's line-local window.
          (SELECT list(struct_pack(
                    chain := vendor,
+                   chain_label := chain_label(vendor),
                    last_observed := last_d,
                    days_behind := date_diff('day', last_d, (SELECT extract_date FROM params)),
                    products := n_products,
@@ -375,6 +389,7 @@ COPY (
            -- ORDER BY sits further down than the linter's line-local check reaches.
            list(struct_pack(
              chain := f.vendor,
+             chain_label := chain_label(f.vendor),
              price := round(f.px, 2),
              basis := f.basis,
              min_qty := f.min_qty,
@@ -402,7 +417,9 @@ COPY (
            -- from majority_basis, which has exactly one row per gtin.
            any_value(f.product_basis)                                     AS product_basis,
            list(f.vendor ORDER BY f.vendor) FILTER (WHERE f.comparable)    AS compared,
+           list(chain_label(f.vendor) ORDER BY f.vendor) FILTER (WHERE f.comparable) AS compared_labels,
            list(struct_pack(chain := f.vendor,
+                            chain_label := chain_label(f.vendor),
                             last_observed := f.observed_date,
                             days_behind := f.days_behind,
                             reason := f.not_comparable_reason)
@@ -428,9 +445,13 @@ COPY (
                                              THEN o.cheapest_min_qty END,
            claim := CASE
              WHEN o.n_cmp = 0 THEN 'No chain has a price from the last 7 days. Nothing can be compared.'
-             WHEN o.n_cmp = 1 THEN 'Only ' || o.compared[1] || ' has a price from the last 7 days. There is nothing to compare it with.'
+             WHEN o.n_cmp = 1 THEN 'Only ' || o.compared_labels[1]
+                  || ' has a price from the last 7 days. There is nothing to compare it with.'
+             -- "A, B and C" rather than "A and B and C": the last name is split off and the
+             -- rest comma-joined, which reads correctly at both 2 and 3 chains.
              ELSE 'Cheapest of the ' || o.n_cmp || ' chains with a price from the last 7 days: '
-                  || list_aggregate(o.compared, 'string_agg', ' and ') || '.'
+                  || array_to_string(o.compared_labels[1 : o.n_cmp - 1], ', ')
+                  || ' and ' || o.compared_labels[o.n_cmp] || '.'
            END)                                      AS comparison
   FROM off o JOIN name_pick n ON n.gtin14 = o.gtin14
   ORDER BY o.gtin14
@@ -439,7 +460,7 @@ COPY (
 -- history.json -- 42 days of price spells per barcode per chain. Runs of constant price,
 -- not one point per day: gaps stay visible because a spell covers only observed days.
 COPY (
-  SELECT gtin14, vendor AS chain, basis,
+  SELECT gtin14, vendor AS chain, chain_label(vendor) AS chain_label, basis,
          list(struct_pack(from_date := from_date, to_date := to_date,
                           price := round(px, 2), observed_days := observed_days,
                           on_sale := (on_sale = 1))
