@@ -35,7 +35,7 @@ LASTUPDATED_URL = f"{BASE}/hammerdata/hammer-lastupdated.txt"
 # Set REPO_URL to the published repository once the remote exists. Until then the UA
 # carries no contact at all, which is honest -- an unreachable or invented URL would be
 # worse than none.
-REPO_URL = ""  # e.g. "https://github.com/<owner>/<repo>"
+REPO_URL = "https://github.com/MhBaigtw/DE-Grocery-Price-tool"
 UA = ("Mozilla/5.0 (Project Hammer downstream analysis"
       + (f"; +{REPO_URL}" if REPO_URL else "") + ")")
 CHUNK = 1 << 20
