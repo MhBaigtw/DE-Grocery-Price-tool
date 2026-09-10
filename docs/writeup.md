@@ -220,6 +220,51 @@ roughly a quarter of what is actually on the shelf.
 
 ---
 
+## Almost every price change happens on a Thursday
+
+This one needs no caveats about definitions, no bracket, and no argument. It is the
+cleanest thing in the data.
+
+I looked at every pair of consecutive days on which the same product was seen at the same
+chain — 56,176,157 of them — and asked which weekday the price changes landed on. If prices
+moved at random, each weekday would carry about a seventh of them: 14.3%.
+
+| Chain | Busiest weekday | Share of that chain's price changes | Quietest weekday |
+|---|---|---|---|
+| Voila | Thursday | **92.6%** | 0.1% |
+| Metro | Thursday | **92.5%** | 0.4% |
+| Save-On-Foods | Thursday | **89.4%** | 0.2% |
+| Loblaws | Thursday | **86.5%** | 0.6% |
+| No Frills | Thursday | **85.4%** | 1.5% |
+| Walmart | Thursday | **63.1%** | 2.4% |
+| Galleria | Friday | 46.7% | 4.8% |
+| T&T | Friday | 44.9% | 4.9% |
+
+Six of the eight chains move their prices on Thursday and almost nowhere else. The two
+Asian-grocery chains run a Friday cycle instead, less tightly. Put the other way round: on
+a Thursday, **22.2% of the Metro products I can see change price. On a Sunday, 0.1%.**
+
+It is not a one-year fluke. Splitting the data by year, every chain keeps the same busiest
+weekday in 2024, 2025 and 2026, and two of them have got *sharper* — T&T went from 32% to
+76%, No Frills from 81% to 92%. Nothing has drifted.
+
+**The honest version of this claim is slightly narrower than the exciting one.** I am
+measuring the day a change *appeared in the dataset*, not the moment a supermarket altered a
+shelf price. The dataset is built by a scraper that visits each site on a schedule, so a
+change made on Wednesday evening would surface as a Thursday observation. What the data
+supports is "prices in this dataset move on Thursdays" — which, for anyone building on the
+dataset, is the version that actually matters.
+
+And it does matter, for a practical reason. It means a price you looked up on a Wednesday is
+about as trustworthy as one you looked up on a Monday, and one you look up on a Thursday is
+the single most likely to be wrong. Any tool built on this data is at its worst on exactly
+one day of the week — which is worth knowing, and is knowable only because the pattern is
+this stark.
+
+→ [`R1_refresh_cadence.sql`](../analysis/phase4/R1_refresh_cadence.sql) · [findings §1.1](phase-4-findings.md)
+
+---
+
 ## One more thing the data said, which I did not expect
 
 Galleria — a Korean grocery chain — barely overlaps the others. Only **11.1%** of its
@@ -263,6 +308,7 @@ Every figure traces to a committed query:
 | 3.4%–21.3% bracket | [`Q2a_presale_inflation.sql`](../analysis/phase2/Q2a_presale_inflation.sql) |
 | Freeze-rate sensitivity | [`Q4_d1_bounded.sql`](../analysis/phase2/Q4_d1_bounded.sql) |
 | Store-brand blind spot, Galleria | [`Q3b_basket_blindspot.sql`](../analysis/phase2/Q3b_basket_blindspot.sql) |
+| The Thursday cycle | [`R1_refresh_cadence.sql`](../analysis/phase4/R1_refresh_cadence.sql) |
 | Walmart comparison, stability, consistency | [`Q3c_pairwise_stability.sql`](../analysis/phase2/Q3c_pairwise_stability.sql) |
 | What was excluded and whether it was biased | [`Q1_exclusion_ledger.sql`](../analysis/phase2/Q1_exclusion_ledger.sql), [`Q1b_bias_controls.sql`](../analysis/phase2/Q1b_bias_controls.sql) |
 

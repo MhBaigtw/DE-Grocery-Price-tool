@@ -1,4 +1,6 @@
-# Phase 4 §1 — Refresh cadence, measured
+# Phase 4 — Findings
+
+# §1 — Refresh cadence, measured
 
 The brief says: *do not pick a schedule, derive it.* This document is the derivation. It
 builds nothing, and it recommends one thing, at the end, from numbers that exist first.
@@ -527,5 +529,149 @@ a cookieless, privacy-respecting counter and nothing more.
    controls: R1's k-day staleness measure (understated 6.5×, §1.3c), and an R3 statement that
    crashed identically on both runs and compared byte-identical — caught by `verify_twice.py`,
    which asserts completion before it compares bytes. Second incident of that class.
+
+
+---
+---
+
+# §2 — The data extract
+
+*Computed under build `2026-08-28T17:48:35Z` — models
+`d1f90ee`/`f6d7345`/`6d01e90`/`01ff1a1`/`b584c32`/`b2f47b3`/`bfc7be8`, snapshot
+`20260822T134045Z`, extract date 2026-08-21. Verified twice with `scripts/verify_twice.py`,
+byte-identical, and the check includes an md5 of each written JSON file so the files are
+covered and not just the printed results.*
+
+Query: [E1_tool_extract.sql](../analysis/phase4/E1_tool_extract.sql). Output:
+[`tool/data/`](../tool/data/).
+
+## The design rule this section was built on
+
+An interface can only be as honest as the data it is handed. Each of the four constraints is
+therefore enforced in the extract, not left to the page to remember:
+
+| Constraint | How the extract enforces it |
+|---|---|
+| No pooled staleness | No pooled figure is *computed anywhere in the file*. `meta.json` carries a per-chain curve and nothing else, so the page has no pooled number to display |
+| Absence is a property of the comparison | Every product carries a `comparison` object naming the chains compared, the chains excluded with reason and date, and the sentence the interface is licensed to print. "Cheapest" unqualified is not one of the available sentences |
+| Per-chain date and staleness are first-class | `observed_date`, `days_behind`, `is_recent`, `staleness_pct`, `staleness_horizon_days` and `staleness_exceeds_measured` are stored per offer. The page is not given the parts to compute a comparison the extract has not licensed |
+| Basis never crosses | Every offer carries `price_basis`; only offers on the product's majority basis are marked `comparable`, and the rest carry the reason |
+
+## What shipped
+
+| | |
+|---|---|
+| Comparison basket | **3,190** barcodes |
+| **Products in the extract** | **2,921** |
+| Omitted, no observation in 200 days | **269** — delisted or dormant, no price to show |
+| Offers (barcode × chain) | 6,093 |
+| History spells, 42-day window | 13,260 |
+| Rows excluded before the extract | 197 ambiguous, of 1,105,033 in scope. 0 orphan, 0 unparseable, 0 non-positive |
+
+**The 269 are disclosed in `meta.json`, not dropped quietly.** The dashboard already had to
+fix one silent contradiction between two basket counts (3,190 against 3,477); shipping 2,921
+products under a published figure of 3,190 would have been the same mistake with different
+numbers.
+
+## 2.1–2.4 against the brief
+
+**2.1 — per barcode per chain: price, basis, min quantity, date observed, on-sale flag.**
+Present, plus the freshness and staleness fields constraint 3 requires. Excluded counts are
+in `meta.json`.
+
+**2.2 — short recent price history.** 42 days, six flyer cycles, from the 8–10 day median
+hold in §1.2. Exported as **runs of constant price rather than one point per day**: the same
+information at a fraction of the size, and gaps stay visible because a spell covers only the
+days actually observed (honesty rule 1). The "is this actually a sale" signal from Phase 2
+appears per offer as `prior_14d`: days observed, low, high, and **days already spent at this
+exact price**. It is a count of days, never a verdict — the findings forbid "retailer X
+inflates prices before sales", and a per-product day-count does not say that.
+
+**2.3 — size it.** It ships as static JSON with no backend, comfortably:
+
+| File | Raw | Gzipped |
+|---|---|---|
+| `products.json` | 3.24 MB | **178.6 KB** |
+| `history.json` | 1.60 MB | **75.1 KB** |
+| `meta.json` | 2.0 KB | 1.0 KB |
+| **Total** | 4.84 MB | **254.7 KB** |
+
+**No history depth had to be cut.** History is a separate file, so §3 can defer loading it
+until a product is opened and the first paint costs 179 KB. The one cost worth naming is
+parse time: 3.24 MB of JSON is real work on a mid-range phone, and §5.5's phone-width check
+should measure it rather than assume it.
+
+**2.4 — basis never crosses.** Enforced, and currently binding on nothing: **all 6,093
+offers are `each`**, so `excluded_basis_mismatch` is 0 at every chain. The rule stays,
+because a per-weight price appearing later would otherwise be compared silently, but I would
+rather record that it is presently vacuous than let the zero read as a passed test.
+
+## The result that matters most, and it is not a good one
+
+**The tool can offer a real comparison for 61% of what it carries.**
+
+| Chains with a price from the last 7 days | Products | Share |
+|---|---|---|
+| 3 | 464 | 15.88% |
+| 2 | 1,316 | 45.05% |
+| **1 — nothing to compare** | **813** | **27.83%** |
+| **0 — nothing to show** | **328** | **11.23%** |
+
+1,780 of 2,921 products (60.93%) have two or more chains with a recent price. Against the
+published basket of 3,190 it is 55.80%. **For nearly two products in five, the honest answer
+is "I cannot compare this"** — and that is what the extract makes the page say, rather than
+letting it compare whatever it happens to have.
+
+This is the entire reason constraint 2 exists. Without it the tool would compare one chain
+against a price from May and call the winner.
+
+### The chain most often missing is Metro, not Walmart
+
+I expected Walmart, and said so. Walmart has by far the worst chain-level absence record —
+85 missing days since 2025-01-01 including a 49-day run (§1.3b). At **product** level it is
+not the problem:
+
+| Chain | Offers | Comparable | Excluded: no recent price | Share comparable |
+|---|---|---|---|---|
+| **Metro** | 1,998 | 1,347 | **651** | **67.42%** |
+| Walmart | 1,864 | 1,588 | 276 | 85.19% |
+| Save-On-Foods | 2,231 | 1,902 | 329 | 85.25% |
+
+These are different failure modes and I had conflated them. Chain-level absence is the whole
+chain vanishing from the extract for weeks. What the 7-day rule mostly catches is
+**product-level rotation** — an individual line not listed this week — and Metro rotates its
+listed catalogue harder than the other two. On the extract date no chain was absent at all;
+every one of these 1,256 exclusions is a product, not a chain.
+
+The constraint is right and the reasoning behind it was right. The chain I named was wrong.
+
+## A defect the first run shipped, caught before it went anywhere
+
+The first build handed **every offer a staleness figure**, including offers 200 days old, by
+mapping any age above 14 days onto the 14-day measurement. That is presenting an unmeasured
+quantity as a measured one — 14 days is simply the longest horizon §1.3e measured, and how
+wrong a 200-day-old price is has never been computed.
+
+**1,137 of 6,093 offers (18.66%) were in that state.** They now carry
+`staleness_pct: null`, `staleness_horizon_days: null` and
+`staleness_exceeds_measured: true`, and §3 must render that as "older than 14 days — how
+far it may have moved has not been measured", never as a number.
+
+A second, smaller one: the `size` field was `units_raw`, which at some chains is the product
+name with the size glued to the end — `"marvel spidey and his amazing friends170g"`. It now
+comes from the parsed quantity and is **null where the parse failed**, which is 114 of 2,921
+products. A missing size is better than a wrong one.
+
+## What §2 hands to §3
+
+- `comparison.claim` — the sentence the interface prints. Three forms only: nothing to
+  compare, only one chain has a recent price, or cheapest of the *n* named chains.
+- `comparison.unavailable` — every excluded chain with its last observed date, its age and
+  its reason. Brief §3.2 requires these to be shown, not dropped.
+- `offers[].staleness_*` — per chain, measured or explicitly not measured.
+- `meta.chains[].staleness` — the per-chain curve for the standing disclosure. There is no
+  pooled figure to reach for.
+
+---
 
 *The underlying data was sourced from ProjectHammer.org.*

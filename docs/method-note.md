@@ -5,7 +5,8 @@ else had written it.*
 
 The writeup argues that measurement choices moved the answer more than the supermarkets
 did. That argument is only worth anything if my own measurements are sound. This note is
-the evidence, including **four times I caught myself being wrong**.
+the evidence, including **four times I caught myself being wrong** — one of which then
+happened a second time.
 
 Every check below is a committed script that can be run against the repository.
 
@@ -70,7 +71,7 @@ carry a written justification a reviewer can check.
 
 *[findings §1.3](phase-2-findings.md)*
 
-### 3. Two runs that crashed identically and passed a byte-comparison
+### 3. Two runs that crashed identically and passed a byte-comparison — twice
 
 My reproducibility check was `diff run1 run2`. That check has a hole: **two runs that fail
 the same way produce identical output and compare as agreement.**
@@ -84,7 +85,19 @@ compares bytes.
 The test for that checker includes a probe engineered to crash identically on both runs,
 asserting the checker still refuses. A plain `diff` passes that probe.
 
-*[findings §2.8](phase-2-findings.md)*
+**It happened again.** Measuring refresh cadence, a query with `GROUP BY 1,2,3` — where
+position 3 was an aggregate — failed on both runs with the same binder error and produced
+byte-identical output for the second time. `verify_twice.py` refused it again, for the same
+reason.
+
+**Two occurrences means this is not a rare accident.** A deterministic bug fails
+deterministically; that is what "deterministic" means. Any comparison that treats matching
+output as agreement will call a reproducible crash a reproducible result, and **a plain
+`diff` would have shipped both of these**. The order of the assertions is the whole
+mechanism: exit status first, failure markers second, row counts third, bytes last. Compare
+bytes first and the check is worse than nothing, because it produces a pass.
+
+*[findings §2.8](phase-2-findings.md); the repeat in [Phase 4 §1](phase-4-findings.md), "What §1 changed about the plan"*
 
 ### 4. A published number whose origin can no longer be established
 
