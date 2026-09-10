@@ -115,9 +115,20 @@ for (const need of ["national brands", "Toronto", "pickup", "cannot be compared"
                     "not possible", meta.extract_date]) {
   if (!cover.includes(need)) bad("cover", "landing state omits: " + need);
 }
-if (!nodes["#strip"].innerHTML.includes(meta.attribution)) bad("strip", "attribution missing");
-for (const need of ["no basket", "no store ranking", "national brands only"])
-  if (!nodes["#strip"].innerHTML.includes(need)) bad("strip", "omits: " + need);
+// The always-visible strip is STATIC HTML, not something the script writes. That is the
+// point: the licence's attribution and the scope disclosures must not depend on a script
+// having run. So they are asserted against the page source, which is a stronger check than
+// asserting against whatever the script happened to render.
+const strip = (html.match(/<div class="strip">[\s\S]*?<\/div><\/div>/) || [""])[0];
+if (!strip) bad("strip", "no always-visible disclosure strip in the page source");
+for (const need of ["ProjectHammer.org", "no basket", "no store ranking",
+                    "national brands only", "Toronto"])
+  if (!strip.includes(need)) bad("strip", "static strip omits: " + need);
+// And the landing panel must state the scope before any data arrives, for the same reason.
+const coverStatic = (html.match(/<div id="covbody"[\s\S]*?<\/div>/) || [""])[0];
+for (const need of ["national-brand", "Store brands cannot be compared", "Toronto",
+                    "not always possible"])
+  if (!coverStatic.includes(need)) bad("cover", "static landing state omits: " + need);
 
 console.log("products rendered : " + checked);
 console.log("  3 chains        : " + counts[3]);

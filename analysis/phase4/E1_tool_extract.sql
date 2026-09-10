@@ -180,12 +180,22 @@ GROUP BY 1,2,3,4;
 -- One name per barcode. The same GTIN carries different names at different chains, so the
 -- choice must be deterministic: the (name, brand, size) tuple appearing on the most price
 -- rows, ties broken lexicographically.
+-- At some chains the brand field holds the price or promotion text instead of a brand --
+-- "You save$0.53", "$8.98 current price $8.98". The phone-width check found it on screen
+-- under a product name. Such values become an empty brand, never a displayed one. The
+-- patterns are anchored on a currency amount or the promo phrases so that real brands
+-- which merely contain "save" (LIFESAVERS) are kept.
+CREATE OR REPLACE MACRO clean_brand(b) AS
+  CASE WHEN b IS NULL OR trim(b) = '' THEN ''
+       WHEN regexp_matches(lower(b), '[$][0-9]|you save|current price') THEN ''
+       ELSE trim(b) END;
+
 CREATE OR REPLACE TEMP TABLE name_pick AS
 SELECT gtin14, product_name, brand_raw, units_raw
 FROM (
   SELECT m.gtin14,
          coalesce(nullif(trim(sp.product_name), ''), '(no name)') AS product_name,
-         coalesce(nullif(trim(sp.brand_raw), ''), '')             AS brand_raw,
+         clean_brand(sp.brand_raw)                                AS brand_raw,
          -- Size comes from the PARSED quantity, not `units_raw`. The raw string is often
          -- the product name with the size glued to the end -- "marvel spidey and his
          -- amazing friends170g" -- and printing that would be worse than printing nothing.
@@ -202,7 +212,7 @@ FROM (
          -- unique within a gtin because the tuple is the GROUP BY key, so no tie survives.
          row_number() OVER (PARTITION BY m.gtin14
                             ORDER BY count(*) DESC, coalesce(nullif(trim(sp.product_name),''),'(no name)'),
-                                     coalesce(nullif(trim(sp.brand_raw),''),''),
+                                     clean_brand(sp.brand_raw),
                                      CASE WHEN sp.unit_parse_confidence IN ('exact','derived') AND sp.unit_qty IS NOT NULL
                                           THEN CASE WHEN coalesce(sp.pack_count, 1) > 1
                                                     THEN CAST(CAST(sp.pack_count AS INTEGER) AS VARCHAR) || ' x '

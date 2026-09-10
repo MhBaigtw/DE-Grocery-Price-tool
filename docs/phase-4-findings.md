@@ -814,4 +814,201 @@ mid-range phone, which is the one number in this section I do not have.
 
 ---
 
+---
+
+# §4 — Refresh automation
+
+## The constraint that decided the shape: it does not fit a hosted runner
+
+Brief §4.1 reads as one scheduled job doing everything. It cannot be one job, and the reason
+is arithmetic rather than preference:
+
+| Working set for a full rebuild | |
+|---|---|
+| Snapshot archives | 1.45 GB |
+| Extracted upstream SQLite | ~5 GB |
+| Built `hammer.duckdb` | 3.19 GB |
+| **Total** | **~10 GB, transiently more** |
+| Free disk on a GitHub-hosted runner | **~14 GB** |
+
+That is not a margin worth betting a weekly job on, and it does not include the ~40 minutes
+the extract alone takes. So the pipeline is **split by weight, not by concern**:
+
+- **The heavy half — [`scripts/refresh.py`](../scripts/refresh.py)** — runs where the data
+  already lives: locally, or on a self-hosted runner. Fetch, gate, rebuild, check,
+  regenerate, gate again. It produces a **~5 MB extract** and stops. It never deploys.
+- **The light half — [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)** —
+  validates that committed extract and ships it. 5 MB fits anywhere.
+
+This also happens to be the right answer for the bandwidth argument in §1.4: the archive is
+pulled once a week from the machine that keeps the mirror, not by a cloud runner that
+discards it.
+
+## Every step is a gate
+
+`refresh.py` runs thirteen steps and any one of them stops the run. Nothing half-built is
+left where a deploy could find it.
+
+| Step | What it refuses |
+|---|---|
+| decision | Refreshing when upstream has published nothing new |
+| fetch | (never overwrites an existing snapshot — brief §4.4, the archive keeps accruing) |
+| **schema gate** | **An upstream column that moved or changed type — brief §4.2** |
+| build models | — |
+| layering | `product_id` leaking below staging |
+| determinism | A construct that could return a different answer on the same data |
+| model parity | The two build paths disagreeing about what a model means |
+| reproducible | Materialised data that no longer matches its own definition |
+| dbt tests | 40 contract violations |
+| extract ×2 | An extract that does not reproduce, files included |
+| **extract gate** | **A thin or dishonest extract — brief §4.3** |
+| render gate | A page that betrays what the extract enforces |
+| manifest | A file tree that has drifted from `docs/FILES.md` |
+
+The schema gate is the one the brief singles out, and it is a gate in the literal sense: a
+mismatch raises, the run stops, and the previous extract stays live. The announced
+`raw.product_id` type change will land as a stopped refresh and an alert, not as a silently
+cast column.
+
+### The deploy gate checks shape, not remembered values
+
+[`check_extract.py`](../scripts/check_extract.py) is the last thing between a rebuilt
+extract and a live site. It deliberately does **not** assert "3,190 barcodes" — a refresh
+legitimately changes every count, and a gate that fails weekly for the right data is a gate
+someone switches off. What it asserts is that the promises still hold:
+
+- no pooled staleness figure exists anywhere in `meta.json`
+- every chain carries its own curve, ascending — **staleness that falls as data ages is
+  refused**, because that is the exact shape of the defect withdrawn from R1 in §1.3c
+- no offer past the measured horizon carries a figure
+- no product names a cheapest chain with fewer than two compared
+- every chain is either compared or listed as unavailable *with a reason and a date*
+- no raw vendor code reaches a reader
+- floors: ≥1,500 products, ≥40% comparable, extract no older than 21 days
+
+[`test_check_extract.py`](../scripts/test_check_extract.py) breaks each of those in turn and
+asserts the gate refuses: **13 of 13 cases**, including one that must *not* fail — the real
+extract — and one that fails on vintage alone, where nothing is malformed and the pipeline
+has simply stopped.
+
+## Two bugs a dry run cannot catch
+
+`refresh.py --dry-run` printed thirteen plausible commands, two of which would have failed:
+`check_model_parity.py` takes **no arguments** and was being handed `--db`;
+`run_dbt_tests.py` takes `--target`, not `--db`. A dry run prints commands without
+validating them, so both would have surfaced at 05:00 on a Friday.
+
+`--verify-steps` now resolves every command and asks each script's own parser whether it
+accepts the flags this pipeline passes it, without running any of the work. It reports
+**13 ok**. This is the same lesson as `fetch_snapshot.py --help` starting a 1.4 GB download
+in Phase 2: the way to find out whether a documented step works is to run it, and where you
+cannot run it, to check it mechanically rather than read it.
+
+## Alerting, per §4.5
+
+[`.github/workflows/probe.yml`](../.github/workflows/probe.yml), daily at 05:00 UTC — after
+the observed publication window of 20:20–21:48 ET, with about three hours of margin in EDT
+and two in EST. It fetches `hammer-lastupdated.txt`, a few hundred bytes, and never the
+archive.
+
+It **opens or updates a GitHub issue** rather than merely going red. A workflow that quietly
+fails is the exact failure mode the brief names — *"a silent refresh failure means the site
+serves stale prices with a fresh-looking date"* — and a red tick in a tab nobody opens is
+close enough to silent. The issue is reopened and commented rather than duplicated, so the
+alert has one home, and it carries the command to run.
+
+Two conditions, deliberately distinct: **a refresh is due** (upstream has newer data) and
+**the served extract is past its limit** (nobody has run one for three weeks). The second
+also fails the workflow.
+
+---
+
+# §5 — Deployment
+
+## What is built
+
+| Brief | State |
+|---|---|
+| 5.1 Static host, no backend | **Done.** GitHub Pages, JSON + client-side JS, no server |
+| 5.2 Owner's own domain, its own path | **Blocked on a domain.** `deploy.yml` copies `tool/CNAME` if it exists; none does. Without one the site serves from `github.io`, and nothing pretends otherwise |
+| 5.3 Deploy from CI, failed check leaves previous deploy | **Done.** `deploy` depends on `gate`; a failed gate means no deploy at all |
+| 5.4 Stands alone for an external visitor | **Done.** The landing state names coverage, chains, geography and the store-brand limit before any search |
+| 5.5 Verify the deployed site over HTTP | **Script done, run against a local server. Never run against a real deploy** |
+| 5.6 Repo links tool, tool links writeup | **Done.** Both directions |
+
+## The live-site check, and why it is not the same as the others
+
+Every other check in this project runs against the working tree.
+[`verify_deploy.py`](../scripts/verify_deploy.py) runs against the **live URL**, because a
+deploy that "succeeded" while serving a stale extract, 404ing a data file, or showing a date
+that disagrees with the data behind it would pass all of them and still be broken for every
+visitor.
+
+It asserts every asset returns 200 and is non-empty, every JSON parses, the extract's own
+date is what the page will show, the extract is not older than the refresh interval allows,
+the required disclosures are present, and **the page loads no external script, stylesheet,
+frame or image** — the brief's no-tracker non-goal, enforced rather than promised.
+
+Run against a local server it passes, with one warning: *live extract is 20 days old*. That
+warning is correct and is the system working. The snapshot is from 2026-08-21 and nothing has
+been fetched since; **at 21 days the gate stops warning and starts refusing**, which is
+one day away.
+
+### It found a real defect
+
+The attribution and the scope disclosures were being written by JavaScript from `meta.json`.
+They rendered correctly in a browser and were **absent from the served HTML**. The licence
+requires attribution and brief §3.3 requires "always visible, not behind a link" — neither
+of which should depend on a script having run.
+
+Both are now **static HTML**; the script fills in the date and nothing else. There is a
+`<noscript>` block stating the scope and pointing at the raw JSON. The render test was
+changed to assert against the page *source* rather than against whatever the script
+rendered, which is a stronger check than the one it replaced.
+
+## Phone width, measured rather than asserted
+
+Rendered in headless Chrome inside a **true 380px viewport** (an iframe, because a desktop
+Chrome window will not go narrower than about 500px and a plain `--window-size=380` lays the
+page out wider than it captures, which produced a false clipping result on the first try).
+Three states captured: the landing page, a search with comparable, partial and one-chain
+results, and a nothing-to-compare product with two warnings past the measured range.
+
+**The layout holds at 380px.** No horizontal scroll; every card, claim, warning and the fixed
+disclosure strip fits. The amber one-chain state and the red warnings stay legible. A `?q=`
+deep link was added so a real result state could be rendered, and it lets a lookup be shared
+as a URL.
+
+**It found two defects the render test could not have**, because both were about what a
+person sees rather than which fields exist:
+
+1. **Promotional text in the brand field.** *Annie's Moana Mac & Cheese* displayed under the
+   brand **"You save$0.53"**. At some chains the brand field carries the price or promotion
+   instead. Seven shipped products were affected (a looser pattern flagged nine; two were
+   the real brands LIFESAVERS and LIFE SAVERS). Fixed at source with a `clean_brand` macro
+   that turns price and promo text into an empty brand, and the deploy gate now refuses it,
+   with a test case that a real brand containing "save" is *not* refused.
+2. **A missing space** between the 14-day context and the staleness sentence:
+   *"this exact price on 1 of them.Captured on the extract date."*
+
+The garbled characters visible in one check (`McCain�`) were a Windows console artefact when
+printing trademark symbols. The shipped extract contains no U+FFFD characters. The source
+does: **232 of 187,028 product rows** carry one in the name, and none of those reach the tool.
+
+## What is not done, and what it needs
+
+- **GitHub Pages is not enabled.** It needs Settings → Pages → Source: *GitHub Actions*.
+  That is a repository setting, not something a workflow can turn on for itself.
+- **The workflows have never run.** They parse, their jobs and triggers resolve, and every
+  script they call has been run by hand — but a workflow that has not executed is a workflow
+  that has not been tested, and I am not going to describe it as working.
+- **No custom domain** (5.2). The mechanism is there and the domain is not.
+- **Parse time on a real phone is unmeasured.** Phone *width* is now measured (below); the cost
+  of parsing 3.5 MB of JSON on a mid-range phone is not, and a desktop headless browser
+  cannot stand in for it.
+- **Nothing has been pushed.** The deploy workflow triggers on push to `main`, so pushing is
+  what starts all of this.
+
+---
+
 *The underlying data was sourced from ProjectHammer.org.*

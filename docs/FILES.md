@@ -207,6 +207,36 @@ Read these in order to understand the project from scratch:
 **Depends on:** `hammer.duckdb` with the Phase 1 models built; `int_upc_match` for the basket definition in R3/R4/R5.
 **Notes:** Two of these carry corrections that are left visible on purpose. **R1 result 5 is withdrawn in place** — it divided by consecutive-observation pairs with a gap of at most k days, which on a near-daily dataset is ~97% one-day pairs, so it re-measured the one-day rate k times and understated 7-day staleness by 6.5×; R3 replaces it with a forward-looking measure and says so in its header. **R3 statement 6 carries a note about crashing identically on both runs** with byte-identical output, which `diff` would have called agreement — the second incident of that class, and the reason `verify_twice.py` asserts successful completion before it compares bytes. R5 rebuilds the 3,190-barcode basket independently rather than importing it, so the findings and the dashboard extract cannot silently drift apart; it exists because the tool's own basket turned out ~1 pp more volatile than the wider reliable set, and the narrower, worse number is the one the interface has to print.
 
+### scripts/check_extract.py
+**Purpose:** The deploy gate. The last thing between a rebuilt extract and a live site; exit 1 means nothing deploys and the previous site stays live.
+**Breaks if removed:** The Section 2 constraints are enforced when the extract is built, and the render test enforces them on a laptop, but nothing enforces them at deploy time. A thin, stale or dishonest extract would ship under a fresh date.
+**Depends on:** `tool/data/*.json`.
+**Notes:** Checks **shape and floors, not remembered values**, because a refresh legitimately changes every count and a gate that fails weekly for correct data is a gate someone switches off. Refuses a pooled staleness figure, a staleness curve that falls as data ages (the shape of the withdrawn R1 defect), a figure on an unmeasured age, a cheapest verdict with fewer than two chains, a chain dropped without a reason, a raw vendor code, promotional text in the brand field, and an extract older than 21 days.
+
+### scripts/test_check_extract.py
+**Purpose:** Proves `check_extract.py` refuses what it must: each case breaks one promise in the real extract and asserts the gate says no, and names why.
+**Breaks if removed:** The deploy gate becomes an untested assertion, which on this project means an unverified one.
+**Depends on:** `scripts/check_extract.py`, `tool/data/`.
+**Notes:** Includes two cases that must **not** fail: the real extract, and a real brand that merely contains "save" (LIFESAVERS). A check too blunt to pass real data gets disabled, so false positives are tested as seriously as misses.
+
+### scripts/refresh.py
+**Purpose:** The weekly refresh (brief section 4): probe upstream, fetch, gate on schema, rebuild, run every standing check, rebuild the extract twice, gate it. It never deploys.
+**Breaks if removed:** The cadence derived in findings section 1.4 has nothing to run it, and a refresh becomes a sequence of remembered manual steps.
+**Depends on:** every pipeline script it calls; `node` for the render gate.
+**Notes:** Runs **locally or on a self-hosted runner, not on hosted CI**. The working set is about 10 GB against about 14 GB of runner disk. `--verify-steps` exists because a dry run printed two commands with wrong flags (`check_model_parity.py` takes no arguments, `run_dbt_tests.py` takes `--target`) and a dry run cannot catch that; it asks each script's own parser instead.
+
+### scripts/verify_deploy.py
+**Purpose:** Verifies the **live** site over HTTP: assets load, JSON parses, the extract is within its age limit, the required disclosures are in the served HTML, and no external script, style, frame or image is loaded.
+**Breaks if removed:** Every other check runs against the working tree, so a deploy serving a stale or broken extract would pass all of them and still be wrong for every visitor.
+**Depends on:** a reachable deployed URL.
+**Notes:** Its first run found the attribution and scope disclosures existed only after JavaScript ran and were absent from the served HTML; they are now static. The external-resource check is how the no-trackers non-goal is enforced rather than promised.
+
+### .github/workflows/
+**Purpose:** `deploy.yml` gates and deploys the committed extract to GitHub Pages, then verifies the live site; `probe.yml` checks upstream daily and opens or updates an issue when a refresh is due or the served extract is past its limit.
+**Breaks if removed:** Deployment becomes manual, and a stopped refresh becomes silent, which is the failure brief 4.5 names.
+**Depends on:** `scripts/check_extract.py`, `scripts/test_tool_render.js`, `scripts/test_check_extract.py`, `scripts/verify_deploy.py`, `scripts/refresh.py --probe-only`; GitHub Pages enabled with source "GitHub Actions".
+**Notes:** A **directory entry**. CI deliberately does only the light half: the full rebuild does not fit a hosted runner. **Neither workflow has run yet**; both parse and every script they call has been run by hand, which is not the same as the workflow having executed.
+
 ### scripts/test_tool_render.js
 **Purpose:** Renders every product in the extract through the tool's own card functions and asserts the honesty rules hold on the rendered **output**, not just on the input data.
 **Breaks if removed:** The Section 2 constraints are enforced in the extract, but the interface can still betray them at render time — printing a bare "cheapest", showing a 200-day-old price with no warning, dropping a chain that has no recent price, or leaking a raw vendor code. Those are properties of the output and only an output check catches them.

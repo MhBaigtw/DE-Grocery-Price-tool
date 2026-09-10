@@ -20,6 +20,11 @@ repo carries that qualifier.
 **→ [The writeup](docs/writeup.md)** — the argument, for a reader who will never open this
 repo. *The hard part of comparing grocery prices isn't getting the prices.*
 
+**→ [The price tool](https://mhbaigtw.github.io/DE-Grocery-Price-tool/)** — what one
+product costs at Metro, Save-On-Foods and Walmart, for the 2,921 barcodes where that
+question can be answered. It refuses to answer for the 39% where it cannot, and says which
+chains it actually compared. Locally: serve the repo over HTTP and open `tool/index.html`.
+
 **→ [The dashboard](dashboard/index.html)** — four charts, including the comparison that
 could not be made and why. Serve the repo over HTTP (`python -m http.server`) and open
 `dashboard/index.html`.
@@ -46,8 +51,13 @@ should.
 **Phase 2 — findings. Complete.** Three results, five withdrawals, a full exclusion ledger
 with a bias verdict on each class.
 
-**Phase 3 — publication. In progress.** Writeup and dashboard drafted; repository
-presentation being finalised.
+**Phase 3 — publication. Complete.** Writeup, method note and dashboard.
+
+**Phase 4 — the price tool. In progress.** Refresh cadence measured rather than assumed
+(Thursday is the flyer day at six of eight chains, and a daily refresh beats a
+correctly-timed weekly one by under 2 percentage points). Static extract and interface
+built; refresh automation and deployment in progress. See
+[the Phase 4 findings](docs/phase-4-findings.md).
 
 ### What this project found, and what it did not
 

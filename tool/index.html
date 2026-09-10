@@ -139,7 +139,8 @@
 <!-- LANDING STATE: the shape of the thing, before anyone searches and misses. -->
 <section class="cover" id="cover">
   <h2>What this covers</h2>
-  <div id="covbody" class="pmeta">Loading…</div>
+  <div id="covbody" class="pmeta">Barcoded <b>national-brand</b> products at <b>Metro, Save-On-Foods and Walmart</b>. <b>Store brands cannot be compared</b> and are not included. <b>In-store pickup prices for one neighbourhood in Toronto</b> — not national, not provincial. A comparison is <b>not always possible</b>: where fewer than two chains have a recent price, this tool says so instead of guessing. <span id="covload">Loading the current figures…</span></div>
+  <noscript><p class="pmeta" style="color:var(--stop)"><b>This page needs JavaScript to look up prices.</b> The scope above still applies, and the data is available as plain JSON in <code>data/</code>.</p></noscript>
 </section>
 
 <div class="searchrow">
@@ -154,14 +155,15 @@
   <p><b>Why this tool works the way it does</b> — including why it refuses to compare
   store brands, why it will not add up a basket, and the four times measurement choices
   moved the answer more than the supermarkets did:
-  <a href="../docs/writeup.md">read the writeup</a> ·
-  <a href="../docs/method-note.md">method note</a> ·
-  <a href="../docs/phase-4-findings.md">how the refresh cadence was measured</a>.</p>
+  <a href="https://github.com/MhBaigtw/DE-Grocery-Price-tool/blob/main/docs/writeup.md">read the writeup</a> ·
+  <a href="https://github.com/MhBaigtw/DE-Grocery-Price-tool/blob/main/docs/method-note.md">method note</a> ·
+  <a href="https://github.com/MhBaigtw/DE-Grocery-Price-tool/blob/main/docs/phase-4-findings.md">how the refresh cadence was measured</a>.</p>
+  <p>The data behind this page, the queries that build it and the checks that gate it are all in <a href="https://github.com/MhBaigtw/DE-Grocery-Price-tool">the repository</a>. <a href="dashboard/">The dashboard</a> covers what the wider dataset can and cannot tell you.</p>
   <p id="prov" class="mono" style="font-size:.72rem;color:var(--dim)"></p>
 </footer>
 </div>
 
-<div class="strip"><div class="in" id="strip">…</div></div>
+<div class="strip"><div class="in" id="strip"><b>Toronto pickup prices, one neighbourhood · national brands only, no store brands · data to <span id="stripdate">the date shown on each price</span> · no basket, no store ranking</b> · The underlying data was sourced from ProjectHammer.org</div></div>
 
 <script>
 "use strict";
@@ -225,7 +227,7 @@ function offerRow(o, isBest){
       + (o.on_sale ? '<span class="tag">marked on sale</span>' : "")
       + '<span class="tag">' + esc(o.basis) + "</span></div>"
     + '<div class="px">' + money(o.price) + "</div>"
-    + '<div class="det">' + det.join(" ") + (sb ? sb : "") + "</div>"
+    + '<div class="det">' + det.join(" ") + (sb ? " " + sb : "") + "</div>"
     + "</div>";
 }
 
@@ -409,9 +411,10 @@ function renderCover(counts){
       + "own chain's figure — there is deliberately no single overall number, because "
       + "averaging them hides the chain you are most likely to be wrong about.</p>";
 
-  $("#strip").innerHTML = "<b>Toronto pickup prices, one neighbourhood · national brands only, "
-    + "no store brands · data to " + esc(META.extract_date) + " · no basket, no store ranking</b> · "
-    + esc(META.attribution);
+  // Only the date is filled in. The scope and the attribution are static HTML above, so
+  // they survive a script that never runs.
+  const sd = document.getElementById("stripdate");
+  if (sd) sd.textContent = META.extract_date;
 
   $("#prov").textContent = "Extract " + META.extract_date + " · snapshot " + META.snapshot_id
     + " · build " + META.built_utc + " · basket " + META.basket_barcodes
@@ -432,6 +435,10 @@ Promise.all([
   }
   renderCover(counts);
   $("#q").addEventListener("input", e => search(e.target.value));
+  // ?q= deep link: a lookup can be shared as a URL, and a headless browser can render a
+  // real result state for the phone-width check rather than only the landing state.
+  const q0 = new URLSearchParams(location.search).get("q");
+  if (q0) { $("#q").value = q0; search(q0); }
   $("#results").addEventListener("click", e => {
     const b = e.target.closest("button.link");
     if (b) { b.remove(); drawHist(b.dataset.g); }
