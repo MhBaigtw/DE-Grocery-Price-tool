@@ -1,11 +1,11 @@
-# Method note — how we know the numbers are trustworthy
+# Method note — how I know the numbers are trustworthy
 
-*Companion to [the writeup](writeup.md). This is the part we would read first if someone
+*Companion to [the writeup](writeup.md). This is the part I would read first if someone
 else had written it.*
 
 The writeup argues that measurement choices moved the answer more than the supermarkets
-did. That argument is only worth anything if our own measurements are sound. This note is
-the evidence, including **four times we caught ourselves being wrong**.
+did. That argument is only worth anything if my own measurements are sound. This note is
+the evidence, including **four times I caught myself being wrong**.
 
 Every check below is a committed script that can be run against the repository.
 
@@ -29,32 +29,32 @@ it complains.
 
 ---
 
-## Four times we caught ourselves
+## Four times I caught myself
 
 These are in the repository in full. They are here because a reader deciding whether to
 believe the writeup should see the failure rate, not just the controls.
 
 ### 1. A pooled comparison overturned by controlling for one variable — three separate times
 
-Orphaned price rows looked **1.70× richer in sale rows** than the rows we kept. That would
+Orphaned price rows looked **1.70× richer in sale rows** than the rows I kept. That would
 have been a real bias in the sale analysis.
 
 It was a composition artefact. 72.6% of those rows are Metro's, and Metro runs more
 promotions than average. Recomputed *within* each chain the enrichment is **1.22×**, and
 the direction is not even consistent — four chains enriched, three depleted, one neutral.
 
-**The same confound caught us twice more** in the same audit, on multibuy share and on
+**The same confound caught me twice more** in the same audit, on multibuy share and on
 brand mix. An apparent 11× multibuy enrichment was entirely Metro; within Metro it is
 1.77×.
 
-This is the exact error an earlier phase had already made once, on a different question.
-Knowing about it did not prevent it — running the control did.
+It is the same error I had already made once before, on a different question. Knowing
+about it did not prevent it — running the control did.
 
 *[findings §1.2, §1.4](phase-2-findings.md)*
 
 ### 2. A published figure that changed between runs of the same query
 
-A number in the Phase 1 findings moved by **614** across three runs — same data, same
+One published figure moved by **614** across three runs — same data, same
 build, same query. The cause was `any_value()` over a group that was not unique: it picks
 an arbitrary row, and "arbitrary" is not "stable".
 
@@ -62,7 +62,7 @@ Fixing it exposed a second instance immediately. The fix partitioned by `(produc
 which is *also* not unique on this dataset — one product can appear many times in a single
 day's scrape with conflicting prices — so rows migrated between categories between runs.
 
-That was the third instance of one defect class, so we stopped fixing instances and wrote
+That was the third instance of one defect class, so I stopped fixing instances and wrote
 [`check_determinism.py`](../scripts/check_determinism.py), which flags the pattern
 repository-wide. It found **44** constructs. 16 were made deterministic for
 free — **one of those was a real latent defect** nobody had noticed — and the other 28 now
@@ -72,7 +72,7 @@ carry a written justification a reviewer can check.
 
 ### 3. Two runs that crashed identically and passed a byte-comparison
 
-Our reproducibility check was `diff run1 run2`. That check has a hole: **two runs that fail
+My reproducibility check was `diff run1 run2`. That check has a hole: **two runs that fail
 the same way produce identical output and compare as agreement.**
 
 This is not hypothetical. During the basket analysis, a query failed on both runs with the
@@ -88,10 +88,9 @@ asserting the checker still refuses. A plain `diff` passes that probe.
 
 ### 4. A published number whose origin can no longer be established
 
-One figure in the Phase 1 findings — a row count of 105,540 — matches no state we can
-reconstruct. Not the current value, not the value under any committed version of the code.
+One published figure — a row count of 105,540 — matches no state I can reconstruct. Not the current value, not the value under any committed version of the code.
 
-We could not explain it, and we did not invent an explanation. It is recorded as
+I could not explain it, and I did not invent an explanation. It is recorded as
 **provenance lost, permanently**, so nobody reopens the search. In response, every findings
 section now carries the build fingerprint it was computed under, which makes the next such
 discrepancy a lookup instead of an investigation.
@@ -99,11 +98,11 @@ discrepancy a lookup instead of an investigation.
 **That rule fixes the problem forward, not backward.** Numbers published before it existed
 have no such record and never will.
 
-*[findings §5.8 of Phase 1](phase-1-findings.md)*
+*[earlier findings §5.8](phase-1-findings.md)*
 
 ---
 
-## What we excluded, and whether it was biased
+## What I excluded, and whether it was biased
 
 Excluding rows is unavoidable. Excluding them *without checking whether they resemble what
 remains* is how an exclusion becomes a finding. Of 71,809,333 price observations:
@@ -119,11 +118,10 @@ The time bias is why **every headline result in the writeup is scoped to 2025–
 2024 reported separately. The exclusion was not merely large; it was concentrated in one
 chain in one year, which is the kind that moves a trend line.
 
-We also found a **fourth exclusion nobody had declared** — a filter inherited from an
-earlier phase whose original justification had disappeared. It removed 8,797 sale events,
-eight times more than the documented filter beside it, and was biased on every axis we
-tested. It was also worth 0.19% of the final sample. Both halves are true and we report
-both.
+I also found a **fourth exclusion nobody had declared** — a filter carried over from earlier
+work whose original justification had disappeared. It removed 8,797 sale events, eight
+times more than the documented filter beside it, and was biased on every axis I tested. It
+was also worth 0.19% of the final sample. Both halves are true and I report both.
 
 *[findings §1.1, §1.5](phase-2-findings.md)*
 
@@ -131,12 +129,12 @@ both.
 
 ## What this note does not claim
 
-- **Not that the analysis is error-free.** Four errors are described above and those are
-  the ones we found.
+- **Not that the analysis is error-free.** Four errors are described above, and those are
+  the ones I found.
 - **Not that the dataset is flawed.** It is unusually good. Every defect in the writeup is
-  ours or is a documented upstream quirk the maintainer is actively working through.
+  mine, or is a documented upstream quirk the maintainer is actively working through.
 - **Not that the controls are complete.** They cover the failure modes that have actually
-  bitten us. Nothing here rules out one that has not yet.
+  bitten me. Nothing here rules out one that has not yet.
 
 ---
 

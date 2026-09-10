@@ -2,60 +2,55 @@
 
 *How four measurement choices moved the answer more than the supermarkets did — and the one comparison that survived.*
 
-**Data:** the [Project Hammer](https://projecthammer.org) public dataset — 71.8 million
-price observations from eight Canadian grocery chains, February 2024 to **23 August 2026**.
-The underlying data was sourced from ProjectHammer.org.
-
-**Scope, before anything else:** these are *in-store pickup prices for one Toronto
-neighbourhood*. Nothing here is a national, provincial or "Canadian" price. Every number
-below is one click from the SQL that produced it.
-
-**Vintage matters here.** Our newest snapshot is 23 August 2026, and the dataset's
-maintainer is actively fixing the defects this piece describes. Several findings describe a
-moment in time, not a permanent state.
+<sub>71.8M price observations, 8 Canadian chains, Feb 2024 – 23 Aug 2026. In-store pickup, one Toronto neighbourhood. Data: [Project Hammer](https://projecthammer.org). Full provenance at the end.</sub>
 
 ---
 
-## The question everyone asks
-
-Which supermarket is cheaper?
+## Which supermarket is cheaper?
 
 It sounds like a data problem. Get the prices, put them side by side, add them up. The
 prices exist — 71.8 million of them, published openly, updated daily.
 
-We spent three phases on that question. **The prices were never the hard part.** What kept
-changing the answer was our own choices about how to measure — and they changed it by more
+I spent a long time on that question. **The prices were never the hard part.** What kept
+changing the answer was my own choices about how to measure — and they changed it by more
 than the supermarkets differed from each other.
 
 ---
 
 ## Four times a choice moved the answer more than the retailers did
 
-### 1. How you define "on sale" reverses which chain looks most promotional
+### 1. How you define "on sale" scrambles which chain looks most promotional
 
 There are two reasonable ways to tell whether a product is on sale. Either the retailer
 publishes a struck-out "was" price, or its listing carries promotional text — `SALE`,
 `Rollback`, `2 for $7`.
 
-Rank the eight chains by how often their products are on sale, and the two definitions
-disagree:
+Rank all eight chains by how often their products are on sale, and the two definitions
+barely agree at all:
 
-| Chain | Rank by struck-out price | Rank by promotional text |
-|---|---|---|
-| Save-On-Foods | **1st** (32.4% of rows) | **5th** (8.6%) |
-| Loblaws | 4th (17.8%) | **1st** (24.1%) |
+| Chain | By struck-out price | Rank | By promotional text | Rank |
+|---|---|---|---|---|
+| Save-On-Foods | 32.4% | **1** | 8.6% | **5** |
+| Metro | 29.0% | 2 | 0.0% | 7= |
+| Voila | 19.1% | 3 | 19.4% | 2 |
+| Loblaws | 17.8% | **4** | 24.1% | **1** |
+| No Frills | 14.1% | 5 | 14.1% | 4 |
+| Walmart | 12.2% | 6 | 17.1% | 3 |
+| T&T | 6.2% | 7 | 0.9% | 6 |
+| Galleria | 0.8% | 8 | 0.0% | 7= |
 
-*(Two rows from an eight-chain ranking — the two that move furthest. The full table is in
-the findings.)*
+**Rank correlation between the two orderings: 0.196** — statistically indistinguishable
+from no relationship. The chain that looks most promotional under one definition is fifth
+under the other; the one that looks fourth is first.
 
 The two mechanisms agree almost perfectly at some chains and barely at all at others. Where
 a product has a struck-out price, promotional text confirms it on **99.5%** of rows at No
 Frills — and **21.5%** at Save-On-Foods. At Metro the check is impossible: the promotional
 text field is empty on all 6,003,385 of its rows.
 
-So "which chain promotes most?" has no stable answer. **We withdrew that comparison rather
-than pick a definition and present the ranking it produced.** We are not showing you the
-reversal because one ordering is right — we are showing it because neither is.
+So "which chain promotes most?" has no stable answer. **I withdrew that comparison rather
+than pick a definition and publish the ranking it produced.** I am not showing the reversal
+because one ordering is right — I am showing it because neither is.
 
 *Not a claim about any retailer's behaviour. A claim about the word "sale".*
 → [`Q2d_flag_semantics.sql`](../analysis/phase2/Q2d_flag_semantics.sql) · [findings §2.7](phase-2-findings.md)
@@ -65,7 +60,7 @@ reversal because one ordering is right — we are showing it because neither is.
 When a retailer strikes out a regular price, was that price actually being charged?
 
 To answer it you need "the price before the sale" — and that is not one number. Take the
-same 228,608 sale events and the same fortnight of prior prices:
+same **228,608 sale events** and the same fortnight of prior prices:
 
 | "The price before the sale" means… | Share of sales where the struck-out price is higher |
 |---|---|
@@ -77,7 +72,7 @@ same 228,608 sale events and the same fortnight of prior prices:
 **Between 3.4% and 21.3%.** Same events, same data, sixfold range.
 
 The bounds are built to fail in opposite directions and neither is "the truth". The low
-bound clears a retailer if it charged the higher price on even one of fourteen days. The
+bound clears a retailer that charged the higher price on even one of fourteen days. The
 high bound flags a retailer that genuinely raised its price and then ran a sale — ordinary
 retail, not deception.
 
@@ -85,15 +80,25 @@ And that turns out to be most of the gap: **at the five largest chains, 77% to 9
 flagged sales are explained by the retailer having actually charged that price during the
 window.** A price rise followed by a discount is not a fabricated "regular" price.
 
-**We found no evidence that any retailer lies about its regular prices.** The honest
+**I found no evidence that any retailer lies about its regular prices.** The honest
 statement is the bracket, and the bracket is mostly ordinary repricing.
+
+> **Where 228,608 comes from.** It is a deliberately narrow slice of the 575,036 sale
+> events in the data. Requiring fourteen consecutive days of prior prices leaves 279,962;
+> requiring the struck-out price to carry a usable *number* rather than just a flag leaves
+> 275,779; restricting to the stronger of two product-identity methods leaves 275,240; and
+> restricting to 2025–26 — because an earlier data gap makes 2024 unreliable for one chain
+> — leaves **228,608**. A different figure, 279,596, appears in the detailed findings: that
+> counts events with a usable *current* price and does not require the struck-out price to
+> be a number at all. Narrower cohort, different question.
 
 → [`Q2a_presale_inflation.sql`](../analysis/phase2/Q2a_presale_inflation.sql) · [findings §2A, §2.6](phase-2-findings.md)
 
 ### 3. How you build the sample moves a price-freeze rate by up to 13 points
 
-Several chains announced price freezes. Testing one means picking which products count —
-and the obvious choice is products listed continuously through the freeze window.
+Metro publicly committed to a price freeze from 1 November to 5 February. Testing it means
+picking which products count — and the obvious choice is products listed continuously
+through the window.
 
 That choice is not neutral. Compare the "share of products whose price never changed"
 computed on continuously-listed products against all products in the window:
@@ -108,8 +113,8 @@ The gap swings from −0.7 to 13.3 points **and changes direction by chain**, so
 correction to apply. A number that moves that far on a sample-construction choice is not a
 compliance rate.
 
-**We publish no price-freeze compliance figure for any retailer, and this piece does not
-say whether any chain honoured its freeze.** We could not measure it, so we did not.
+**I publish no price-freeze compliance figure for Metro or anyone else, and this piece does
+not say whether any chain honoured a freeze.** I could not measure it, so I did not.
 
 *(A separate problem: "price never changed" isn't freeze compliance anyway. A price that
 **fell** hasn't violated a freeze.)*
@@ -126,8 +131,10 @@ Great Value is Walmart's. A store brand therefore has no barcode shared with a c
 so it can never appear in a barcode-matched comparison — not because of a data gap, but by
 construction.
 
-Our matched basket contains **8,448 products. Exactly one of them is a store brand.** The
-catalogue contains 16,106.
+My matched basket covers **3,477 distinct barcodes, which is 8,448 product listings** —
+each barcode is stocked by two to four chains, and each chain's listing counts once.
+**Exactly one of those 8,448 listings is a store brand.** The catalogue contains 16,106
+store-brand products.
 
 How much that removes:
 
@@ -141,7 +148,7 @@ How much that removes:
 dataset records no quantities sold, so it is not spend and not market share — it is how much
 of the observed shelf, weighted by price, sits in store brands.*
 
-**So every barcode-matched grocery comparison — including ours — is blind to roughly a
+**So every barcode-matched grocery comparison — including mine — is blind to roughly a
 quarter of the shelf, and it is the quarter where the chains compete hardest on price.**
 Store brands are the retailer's own margin lever; that is the point of them.
 
@@ -154,7 +161,7 @@ at two chains.
 
 ## What survived
 
-One comparison came through every check we could think to run.
+One comparison came through every check I could think to run.
 
 > **On identical national-brand products stocked by both stores on the same day, Walmart
 > was cheaper than Metro on 100% of 711 observed dates, and cheaper than Save-On-Foods on
@@ -167,27 +174,27 @@ products. Stocked by both. Same day.*
 It survived the things that broke everything else:
 
 - **Not one date in 711 goes the other way.** Not an average that hides variation.
-- **Holds in every category** — all eight for the Walmart comparisons.
-- **Transitive.** Recomputed on only those products all three chains stocked on the same
-  day, no figure moves more than 0.5%, and chaining Metro→Save-On-Foods→Walmart lands
-  within **0.6%** of the direct Metro→Walmart measure. Comparisons like this are not
-  guaranteed to be consistent with each other. This one is.
+- **Holds in every category** — all eight, for both Walmart comparisons.
+- **The three comparisons are consistent with each other.** Recomputed on only the products
+  all three chains stocked on the same day, no figure moves more than 0.5%, and chaining
+  Metro→Save-On-Foods→Walmart lands within **0.6%** of the direct Metro→Walmart measure.
+  Comparisons built this way are not guaranteed to agree. These do.
 
 ### Why this is not "so none of it means anything"
 
-That reading is available and it is wrong, so let us close it directly.
+That reading is available and it is wrong, so let me close it directly.
 
 **A result that survives its own measurement choices is a different kind of object from one
-that doesn't.** The promotion ranking reversed when we changed the definition of a sale.
-The pre-sale figure moved sixfold when we changed the comparison price. The freeze rate
-moved 13 points when we changed the sample. **The Walmart comparison did none of that** —
-we varied the statistic, the basket, the dates and the categories, and it held.
+that hasn't been tested.** The promotion ranking scrambled when I changed the definition of
+a sale. The pre-sale figure moved sixfold when I changed the comparison price. The freeze
+rate moved 13 points when I changed the sample. **The Walmart comparison did none of that**
+— I varied the statistic, the basket, the dates and the categories, and it held.
 
-The difference between those two categories of result is the whole point, and it is only
-visible if you go looking. **Most published grocery price comparisons never run that check
-at all** — they pick one definition, compute one number, and publish it. A number produced
-that way is not wrong on purpose; it is simply untested, and there is no way for a reader to
-tell it apart from one that has been.
+The difference between those two kinds of result is the whole point, and it is only visible
+if you go looking. **Most published grocery price comparisons never run that check at all**
+— they pick one definition, compute one number, and publish it. A number produced that way
+is not wrong on purpose; it is simply untested, and a reader has no way to tell it apart
+from one that has been tried and held.
 
 So the conclusion is not "nothing is knowable". It is narrower and more useful: **some
 grocery price claims are robust and some are artefacts of how they were computed, and you
@@ -213,16 +220,16 @@ roughly a quarter of what is actually on the shelf.
 
 ---
 
-## One more thing the data said, which we did not expect
+## One more thing the data said, which I did not expect
 
 Galleria — a Korean grocery chain — barely overlaps the others. Only **11.1%** of its
-barcoded products are carried by any other reliable-tier chain, against 41.7% to 54.0% for
-the rest.
+barcoded products are carried by any other chain whose barcodes I could trust, against
+41.7% to 54.0% for the rest.
 
-We assumed we had a matching bug and went looking for it. There isn't one: Galleria has the
-**second-best barcode coverage of the four chains we could match on**, better than Metro's.
-Its catalogue is simply different, which for a specialist grocer is exactly what you would
-expect.
+I assumed I had a matching bug and went looking for it. There isn't one. Of the four chains
+whose barcodes come straight from the retailer rather than being guessed by text-matching,
+**Galleria has the second-best barcode coverage** — better than Metro's. Its catalogue is
+simply different, which for a specialist grocer is exactly what you would expect.
 
 **A "which supermarket is cheapest" comparison cannot include it in any meaningful way** —
 and that is a fact about Canadian grocery retail, not a defect in the data.
@@ -236,7 +243,7 @@ and that is a fact about Canadian grocery retail, not a defect in the data.
 - **A product identity that isn't the barcode.** Comparing a store brand against a national
   brand means matching on what a product *is* — size, category, contents — not on a code
   that store brands cannot share. That is a different and harder problem, with its own
-  accuracy question, and we did not attempt it.
+  accuracy question, and I did not attempt it.
 - **A shared definition of "on sale."** Until the field means the same thing at every
   chain, cross-retailer promotion comparisons are not defined. One published sentence from
   each retailer would fix it.
@@ -252,22 +259,37 @@ Every figure traces to a committed query:
 
 | Claim | Query |
 |---|---|
-| Sale-definition reversal | [`Q2d_flag_semantics.sql`](../analysis/phase2/Q2d_flag_semantics.sql) |
+| Sale-definition scramble | [`Q2d_flag_semantics.sql`](../analysis/phase2/Q2d_flag_semantics.sql) |
 | 3.4%–21.3% bracket | [`Q2a_presale_inflation.sql`](../analysis/phase2/Q2a_presale_inflation.sql) |
 | Freeze-rate sensitivity | [`Q4_d1_bounded.sql`](../analysis/phase2/Q4_d1_bounded.sql) |
 | Store-brand blind spot, Galleria | [`Q3b_basket_blindspot.sql`](../analysis/phase2/Q3b_basket_blindspot.sql) |
-| Walmart comparison, stability, transitivity | [`Q3c_pairwise_stability.sql`](../analysis/phase2/Q3c_pairwise_stability.sql) |
+| Walmart comparison, stability, consistency | [`Q3c_pairwise_stability.sql`](../analysis/phase2/Q3c_pairwise_stability.sql) |
 | What was excluded and whether it was biased | [`Q1_exclusion_ledger.sql`](../analysis/phase2/Q1_exclusion_ledger.sql), [`Q1b_bias_controls.sql`](../analysis/phase2/Q1b_bias_controls.sql) |
 
 Full results, with every denominator and every withdrawal:
 **[docs/phase-2-findings.md](phase-2-findings.md)**.
 
-**How we know the numbers are trustworthy — and the mistakes we caught in our own work:**
-**[docs/method-note.md](method-note.md)**. It is short, and it is the part we would read
+**How I know the numbers are trustworthy — and the mistakes I caught in my own work:**
+**[docs/method-note.md](method-note.md)**. It is short, and it is the part I would read
 first if someone else had written this.
 
 ---
 
-*The underlying data was sourced from ProjectHammer.org. Prices are in-store pickup for one
-Toronto neighbourhood, February 2024 to 23 August 2026. Analysis code is MIT licensed; the
-dataset is not ours and is not redistributed here.*
+## Data, scope and licence
+
+**The data.** The [Project Hammer](https://projecthammer.org) public dataset: 71.8 million
+price observations from eight Canadian grocery chains, February 2024 to 23 August 2026.
+**The underlying data was sourced from ProjectHammer.org.**
+
+**The scope.** These are *in-store pickup prices for one neighbourhood in Toronto*. Nothing
+here is a national, provincial or "Canadian" price. The comparison basket also excludes the
+expensive end of the catalogue — its 95th-percentile price is $13.99 against $20.04 for the
+catalogue as a whole — so it describes ordinary mid-market groceries and nothing above that.
+
+**The vintage.** My newest snapshot is 23 August 2026. The dataset's maintainer is actively
+fixing several of the defects described here, so parts of this piece describe a moment in
+time rather than a permanent state. Anything he fixed after that date is invisible to me.
+
+**The licence.** The analysis code and documentation are MIT licensed. The dataset is not
+mine, is not redistributed in this repository, and carries its own attribution requirement,
+which is the line above.
