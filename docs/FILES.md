@@ -237,6 +237,18 @@ Read these in order to understand the project from scratch:
 **Depends on:** the standard library only.
 **Notes:** The lesson generalises: verifying against a server that behaves differently from the deployment is not verification. `verify_deploy.py` now fails a deploy whose large files come back uncompressed, so this failure is caught on the live site rather than only avoided locally.
 
+### netlify.toml
+**Purpose:** The deployment configuration: build command, publish directory, per-context rules, cache headers and a content-security policy.
+**Breaks if removed:** Netlify falls back to publishing the repository root, which would put `hammer*.duckdb` paths, the briefs and every internal document on a public CDN, and would skip the extract gate entirely.
+**Depends on:** `scripts/netlify_build.sh`.
+**Notes:** The build is **a gate, not a copy** — a refused extract exits non-zero and the previous deploy stays live. Deploy previews and branch deploys are configured to fail, so only `main` can publish; the build script refuses non-production contexts as a backstop to the UI setting. `/data/*` is served with a short `max-age` because a visitor holding yesterday's `products.json` would see prices the page's own date field contradicts. The CSP is the difference between "no trackers were added" and "none can be added by accident", which matters while the brief's ads non-goal is deferred rather than declined.
+
+### scripts/netlify_build.sh
+**Purpose:** The Netlify build: refuse non-production contexts, run the extract and render gates, then assemble `_site` from `tool/` and `dashboard/`.
+**Breaks if removed:** The deploy loses its gate and becomes a file copy, which is how a thin or dishonest extract reaches a CDN.
+**Depends on:** `scripts/check_extract.py`, `scripts/test_tool_render.js`, Python 3 and Node on the builder.
+**Notes:** Clears the publish directory **before** the gates, so a refusal cannot leave a publishable `_site` behind. Picks a Python interpreter that actually **runs** rather than one merely on `PATH` — Windows ships a `python3` stub that prints an advert and exits 0, which made the gate appear to pass while executing nothing. Both refusal paths are demonstrated: a `deploy-preview` context and a missing `products.json` each exit 1 and leave no publish directory.
+
 ### scripts/verify_deploy.py
 **Purpose:** Verifies the **live** site over HTTP: assets load, JSON parses, the extract is within its age limit, the required disclosures are in the served HTML, and no external script, style, frame or image is loaded.
 **Breaks if removed:** Every other check runs against the working tree, so a deploy serving a stale or broken extract would pass all of them and still be wrong for every visitor.
@@ -244,10 +256,10 @@ Read these in order to understand the project from scratch:
 **Notes:** Its first run found the attribution and scope disclosures existed only after JavaScript ran and were absent from the served HTML; they are now static. The external-resource check is how the no-trackers non-goal is enforced rather than promised. It also **fails a deploy whose large JSON comes back uncompressed** — byte-identical on disk either way, invisible to every other check, and the difference between a 3.3 s and a 40 s phone load.
 
 ### .github/workflows/
-**Purpose:** `deploy.yml` gates and deploys the committed extract to GitHub Pages, then verifies the live site; `probe.yml` checks upstream daily and opens or updates an issue when a refresh is due or the served extract is past its limit.
-**Breaks if removed:** Deployment becomes manual, and a stopped refresh becomes silent, which is the failure brief 4.5 names.
-**Depends on:** `scripts/check_extract.py`, `scripts/test_tool_render.js`, `scripts/test_check_extract.py`, `scripts/verify_deploy.py`, `scripts/refresh.py --probe-only`; GitHub Pages enabled with source "GitHub Actions".
-**Notes:** A **directory entry**. CI deliberately does only the light half: the full rebuild does not fit a hosted runner. **Neither workflow has run yet**; both parse and every script they call has been run by hand, which is not the same as the workflow having executed.
+**Purpose:** `probe.yml` — checks upstream daily and opens or updates an issue when a refresh is due or the served extract is past its limit.
+**Breaks if removed:** A stopped refresh becomes silent, which is the failure brief 4.5 names by name: the site serves stale prices under a fresh-looking date.
+**Depends on:** `scripts/refresh.py --probe-only`, `scripts/check_extract.py`.
+**Notes:** A **directory entry**, now holding one workflow. `deploy.yml` was removed when the deploy target moved to Netlify — two deploy paths for one site is a way to publish something nobody reviewed. **Deployment now happens in the Netlify build** (`netlify.toml`, `scripts/netlify_build.sh`); the probe deliberately does not deploy. The probe alerts by **opening or updating an issue** rather than going quietly red, because a red tick in a tab nobody opens is close enough to silent. **It has never executed.**
 
 ### scripts/test_tool_render.js
 **Purpose:** Renders every product in the extract through the tool's own card functions and asserts the honesty rules hold on the rendered **output**, not just on the input data.

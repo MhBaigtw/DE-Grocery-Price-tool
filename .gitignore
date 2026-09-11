@@ -34,3 +34,7 @@ dbt/dbt_packages/
 # Kept out of git for the same reason as the snapshots: regenerable, and noisy in history.
 logs/
 dbt/.user.yml
+
+# Netlify build output. Assembled by scripts/netlify_build.sh from tool/ and dashboard/;
+# nothing in it is authored.
+_site/

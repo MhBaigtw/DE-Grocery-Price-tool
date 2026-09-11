@@ -20,11 +20,13 @@ repo carries that qualifier.
 **→ [The writeup](docs/writeup.md)** — the argument, for a reader who will never open this
 repo. *The hard part of comparing grocery prices isn't getting the prices.*
 
-**→ [The price tool](https://mhbaigtw.github.io/DE-Grocery-Price-tool/)** — what one
+**→ [The price tool](tool/index.html)** — what one
 product costs at Metro, Save-On-Foods and Walmart, for the 6,090 barcodes where that
 question can be answered. It refuses to answer for the 35% where it cannot, and says which
 chains it actually compared. Its basket is deliberately wider than the analysis basket of
-3,477 — see [findings §7](docs/phase-4-findings.md) for why the two differ. Locally: serve the repo over HTTP and open `tool/index.html`.
+3,477 — see [findings §7](docs/phase-4-findings.md) for why the two differ. Deployed from
+Netlify; the public URL goes here once it is live. Locally: serve the repo over HTTP and open
+`tool/index.html`. Locally: serve the repo over HTTP and open `tool/index.html`.
 
 **→ [The dashboard](dashboard/index.html)** — four charts, including the comparison that
 could not be made and why. Serve the repo over HTTP (`python -m http.server`) and open

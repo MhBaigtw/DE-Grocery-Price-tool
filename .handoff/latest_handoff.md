@@ -1,4 +1,4 @@
-# Handoff — 2026-09-12 01:20, Claude Opus 5
+# Handoff — 2026-09-12 02:05, Claude Opus 5
 
 > Rewritten in full at the end of every completed section, at the same time as the
 > commit. Never written in a hurry at the end of a session — a note written while
@@ -50,19 +50,26 @@ was clean when written.
 
 ## Immediate next steps
 
-1. **Step 3, the push.** Commands were shown to the owner and are awaiting a go. Repo is
-   public, remote configured, `REPO_URL` set.
+1. **Deploy target moved to Netlify** (owner's decision, 2026-09-12). `main` is pushed and
+   `origin/main` matches. The owner connects the repo in the Netlify UI; the build command
+   and publish directory are already in `netlify.toml`. **Nothing is deployed yet.**
 2. Step 4 is **done and passed** — findings §8. 3.31 s to interactive on a mid-range phone
    profile; no history depth cut, none needed.
 3. Step 5: custom domain — the owner supplies the hostname for `tool/CNAME`, then check the
    tool and the writeup are both reachable from the domain's landing page.
-4. GitHub Pages still needs enabling by hand: Settings → Pages → Source: *GitHub Actions*.
+4. Once the site is live the owner supplies the URL; run
+   `python scripts/verify_deploy.py <url>` and report, **compression result included** — that
+   check is the one that decides 3.3 s versus 40 s on a phone.
+5. **GitHub Pages is not being used.** `deploy.yml` was removed so there is only one deploy
+   path. Do not re-add it.
 
 ## Open questions and blockers
 
 **Blocked on the project owner:**
 
-- **The push**, **enabling GitHub Pages**, and **the custom domain hostname**.
+- **Connecting the repo in the Netlify UI**, then the live URL.
+- **The custom domain hostname** — the owner wants it working on the `netlify.app`
+  subdomain first, so **do not add a CNAME or configure a domain yet.**
 
 
 **Decided by the owner, recorded so it is not relitigated:** the maintainer's own listing of
@@ -97,8 +104,10 @@ separate and unchanged.
   **40 s uncompressed**. `verify_deploy.py` fails the deploy if the live host serves the large
   JSON uncompressed, so this is checked rather than assumed — but it has never run against a
   real deploy.
-- **Neither GitHub Actions workflow has ever executed.** Both parse, and every script they
-  call has been run by hand. That is not the same as the workflow having run.
+- **The Netlify build has never run on Netlify.** `scripts/netlify_build.sh` has been run
+  locally and both its refusal paths demonstrated, but a local bash run is not a builder.
+- **`probe.yml` has never executed** either. It parses, and the script it calls has been run
+  by hand.
 - **Every local verification before 2026-09-12 used `python -m http.server`, which does not
   compress.** Use `scripts/serve_gzip.py` for anything performance-related; the plain server
   overstated transfer cost by 12x once already.
