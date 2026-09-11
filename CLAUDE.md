@@ -270,3 +270,33 @@ can be studied later, file by file, by someone who did not write it.
 
 No Kafka. This is a daily batch dataset; streaming infrastructure here would be
 decoration.
+
+## Context and handoff
+
+A session ends whether or not the work is finished. What survives is the repository; what is
+lost is everything that lived only in the session. These rules exist so the loss is bounded.
+
+1. **Rewrite `.handoff/latest_handoff.md` in full at the end of every completed section, at
+   the same time as the commit.** In full, from `.handoff/context_template.md` — not edited
+   in place, not appended to. **Never write it under context pressure.** A note written as
+   context runs out is written by the version of the session least able to judge what
+   matters, and it is the note the next agent will trust most.
+
+2. **Commit at the end of every completed section, before reporting.** Uncommitted work is
+   the only thing a lost session actually destroys — the reasoning is recoverable from the
+   docs, the diff is not.
+
+3. **The handoff note records where work stopped. It never records what is true.** Ground
+   truth is `CLAUDE.md`, the findings docs, the briefs and git history. **Never duplicate a
+   standing rule into the handoff note**: two sources will drift, and the drifted copy is
+   the one that gets read. A note that restates a rule is worse than one that omits it,
+   because it looks authoritative while being stale.
+
+4. **If you notice you are running low on context, say so plainly in your reply, update the
+   handoff note, and stop.** Do not attempt to estimate a percentage — a made-up number is
+   an invented number like any other (honesty rule 9), and the useful signal is that you
+   noticed, not how far along you think you are. Stopping early with a good note costs one
+   session. Continuing until context runs out costs the note as well.
+
+`docs/RESUME.md` is the procedure for the agent arriving without context; `AGENTS.md` points
+non-Claude agents at it. Neither restates the rules above — they point here.

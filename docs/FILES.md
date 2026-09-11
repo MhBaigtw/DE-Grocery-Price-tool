@@ -249,6 +249,24 @@ Read these in order to understand the project from scratch:
 **Depends on:** `analysis/phase4/E1_tool_extract.sql`, `hammer.duckdb` with the Phase 1 models built.
 **Notes:** A **directory entry** — one hand-written HTML file and three generated JSON files. The JSON is never hand-edited, so a figure cannot drift from the analysis. The interface is built **unavailable-first**: the "nothing to compare" and "only one chain" states were written before the comparison state, because 1,141 of 2,921 products land in them, and the one-chain state carries copy whose only job is to stop a lone price reading as a verdict. `staleness_exceeds_measured` renders as a **bordered warning naming the age**, never a dash. The extract is where the tool's honesty is enforced rather than the interface: there is **no pooled staleness figure anywhere in it** (pooling understates Save-On-Foods by over 9 pp), every product carries a `comparison` object naming exactly which chains were compared and which were not with dates and reasons, and per-chain observed date and staleness are stored fields rather than something the page derives. Staleness beyond 14 days is **null with an explicit flag**, not the 14-day figure stretched to fit — 1,137 of 6,093 offers are in that state. 254.7 KB gzipped in total, so history did not have to be shortened.
 
+### docs/RESUME.md
+**Purpose:** The orientation procedure for anyone picking the project up without prior context — a new session, a different agent, or a human returning after a break. What to read, in what order, what to verify, what to report, and when to stop.
+**Breaks if removed:** Every future session starts by reconstructing the project from whatever it happens to read first, which is how a summary quietly becomes the source of truth instead of the repository.
+**Depends on:** `CLAUDE.md`, `docs/FILES.md`, `docs/phase-2-findings.md`, `.handoff/latest_handoff.md`, the phase briefs.
+**Notes:** Its load-bearing line is that the **repository wins over any document**, including the handoff note and anything another model said. Step 2 is a list of checks to run rather than trust, and Step 3 requires reporting **anything that contradicts the handoff note** — the contradiction is the point, not the summary.
+
+### AGENTS.md
+**Purpose:** Entry point for non-Claude agents (Codex reads it by convention). Points at `docs/RESUME.md`, then the handoff note, then requires a state report before any work.
+**Breaks if removed:** An agent that does not read `CLAUDE.md` by convention starts work with no rules and no orientation.
+**Depends on:** `docs/RESUME.md`, `CLAUDE.md`, `.handoff/latest_handoff.md`.
+**Notes:** Deliberately **does not restate CLAUDE.md's rules** — it names three that arriving agents break most often (counts as counts, volunteer bad news, never work around a wrong instruction) and points at `CLAUDE.md` for the rules themselves. A second copy of a rule drifts from the first, and the copy is always the one someone reads.
+
+### .handoff/
+**Purpose:** The session-handoff mechanism. `context_template.md` is the shape of the note, `latest_handoff.md` is the current one, `invoke_codex.sh` hands the project to Codex with the checks that matter run first.
+**Breaks if removed:** Work in progress at the end of a session has to be reconstructed from the diff, and the distinction between "blocked on a person" and "not started" is lost — the next agent conflates them.
+**Depends on:** `docs/RESUME.md`; `CLAUDE.md`, "Context and handoff", which is the rule the directory implements.
+**Notes:** A **directory entry**. The note records **where work stopped, never what is true** — ground truth is `CLAUDE.md`, the findings docs and git history — and it carries an "anything the next agent should distrust" section, which is the reason it is worth reading. `invoke_codex.sh` refuses to run without a note, and warns and asks for confirmation when the tree is dirty or the note is older than the last commit: uncommitted work and a stale note are the two things a handoff actually loses, and neither is visible to the agent picking up.
+
 ### docs/phase-4-brief.md
 **Purpose:** The Phase 4 assignment — a public per-product price lookup across Metro, Save-On-Foods and Walmart, built on the one comparison the findings support.
 **Breaks if removed:** The scope discipline loses its source. The brief is what forbids a basket, a store ranking and a store-brand comparison, and what requires the four disclosures to sit on the screen rather than behind a link.
