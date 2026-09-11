@@ -225,11 +225,23 @@ Read these in order to understand the project from scratch:
 **Depends on:** every pipeline script it calls; `node` for the render gate.
 **Notes:** Runs **locally or on a self-hosted runner, not on hosted CI**. The working set is about 10 GB against about 14 GB of runner disk. `--verify-steps` exists because a dry run printed two commands with wrong flags (`check_model_parity.py` takes no arguments, `run_dbt_tests.py` takes `--target`) and a dry run cannot catch that; it asks each script's own parser instead.
 
+### scripts/measure_phone.js
+**Purpose:** Measures the tool on a mid-range phone profile — first contentful paint, time to interactive, search cost and the first history click — by driving Chrome over the DevTools protocol.
+**Breaks if removed:** Phone performance reverts to an impression. Width was already measured and says nothing about whether a ~7.5 MB payload is usable on a phone CPU.
+**Depends on:** Chrome, Node 22+ (uses the built-in `WebSocket`), a served copy of the site.
+**Notes:** Throttling is applied by the browser (CPU 4×, Slow 4G, cold cache), not approximated. "Interactive" is the moment the coverage panel populates — after `products.json` is parsed and search will answer — rather than first paint, because that is when the tool becomes usable. Installs its probe with `Page.addScriptToEvaluateOnNewDocument`, so the shipped page is not modified to be measurable.
+
+### scripts/serve_gzip.py
+**Purpose:** Serves the repo over HTTP **with gzip**, so local verification matches what a static host actually does.
+**Breaks if removed:** Local measurement silently diverges from deployment. `python -m http.server` sends everything uncompressed, which made `products.json` a 7.6 MB transfer and put time-to-interactive at 40 s instead of 3.3 s — a 12× error in a number that was about to be reported.
+**Depends on:** the standard library only.
+**Notes:** The lesson generalises: verifying against a server that behaves differently from the deployment is not verification. `verify_deploy.py` now fails a deploy whose large files come back uncompressed, so this failure is caught on the live site rather than only avoided locally.
+
 ### scripts/verify_deploy.py
 **Purpose:** Verifies the **live** site over HTTP: assets load, JSON parses, the extract is within its age limit, the required disclosures are in the served HTML, and no external script, style, frame or image is loaded.
 **Breaks if removed:** Every other check runs against the working tree, so a deploy serving a stale or broken extract would pass all of them and still be wrong for every visitor.
 **Depends on:** a reachable deployed URL.
-**Notes:** Its first run found the attribution and scope disclosures existed only after JavaScript ran and were absent from the served HTML; they are now static. The external-resource check is how the no-trackers non-goal is enforced rather than promised.
+**Notes:** Its first run found the attribution and scope disclosures existed only after JavaScript ran and were absent from the served HTML; they are now static. The external-resource check is how the no-trackers non-goal is enforced rather than promised. It also **fails a deploy whose large JSON comes back uncompressed** — byte-identical on disk either way, invisible to every other check, and the difference between a 3.3 s and a 40 s phone load.
 
 ### .github/workflows/
 **Purpose:** `deploy.yml` gates and deploys the committed extract to GitHub Pages, then verifies the live site; `probe.yml` checks upstream daily and opens or updates an issue when a refresh is due or the served extract is past its limit.

@@ -101,6 +101,30 @@ def main() -> int:
         else:
             print(f"  products {len(products):,}")
 
+    # COMPRESSION. products.json is ~7.5 MB of JSON and ~360 KB gzipped. Measured on a
+    # mid-range phone profile (CPU 4x, Slow 4G) the tool is usable in 3.3 s compressed and
+    # 40 s uncompressed -- a 12x difference that is invisible in every other check, because
+    # the file is byte-identical either way. If the host ever stops compressing, the tool is
+    # broken for phone users and nothing else here would notice.
+    big = [n for n in ("data/products.json", "data/history.json") if n in data]
+    for name in big:
+        req = urllib.request.Request(base + name,
+                                     headers={"User-Agent": UA, "Accept-Encoding": "gzip, br"})
+        try:
+            with urllib.request.urlopen(req, timeout=45) as r:
+                enc = (r.headers.get("Content-Encoding") or "").lower()
+                clen = r.headers.get("Content-Length")
+        except Exception as e:                                 # noqa: BLE001
+            FAILS.append(f"{name}: compression probe failed: {e}")
+            continue
+        if enc in ("gzip", "br", "deflate", "zstd"):
+            print(f"  {name} served {enc}" + (f", {int(clen)/1024:.0f} KB" if clen else ""))
+        else:
+            FAILS.append(
+                f"{name} is served UNCOMPRESSED (Content-Encoding: {enc or 'none'}). "
+                "It is ~7.5 MB raw against ~360 KB gzipped; on a mid-range phone that is "
+                "40 s to usable instead of 3.3 s. Enable compression on the host.")
+
     # Disclosures that must be in the served HTML itself, not fetched or behind a link.
     for needle, label in (("Toronto", "Toronto scope"),
                           ("ProjectHammer.org", "attribution"),

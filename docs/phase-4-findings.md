@@ -1215,4 +1215,82 @@ shrink — which makes a low floor less dangerous but also less useful as a trip
 
 ---
 
+---
+
+# §8 — Phone performance, measured
+
+*Measured 2026-09-12 with [`scripts/measure_phone.js`](../scripts/measure_phone.js), driving
+Chrome over the DevTools protocol — the same machinery DevTools' own device mode uses, so
+the throttling is applied by the browser rather than approximated.*
+
+**Profile:** 380 × 780 CSS px, deviceScaleFactor 2, mobile viewport; **CPU throttled 4×**,
+the multiplier Lighthouse uses to stand in for a mid-tier phone; **Slow 4G** (1.6 Mbit/s
+down, 150 ms RTT); **cold cache**, disabled per request. Three runs, medians reported.
+
+"Interactive" is defined as the moment the coverage panel is populated — which happens only
+after `products.json` has been parsed and the search box will actually answer. That is the
+first moment the tool is *usable*, not the first moment something is on screen.
+
+## The numbers
+
+| | Median of 3 |
+|---|---|
+| First contentful paint | **1.17 s** |
+| Largest contentful paint | 1.17 s |
+| **Interactive (usable)** | **3.31 s** |
+| Search keystroke | **53 ms** |
+| First history click | 1.57 s |
+
+Where the 3.31 s goes:
+
+| | |
+|---|---|
+| `products.json` over the wire | 360 KB (7.46 MB decoded) |
+| Download window | 0.51 s → 2.61 s |
+| After download: parse, index, first render | **0.70 s** |
+
+**This is not poor, and it is network-bound rather than CPU-bound.** Two thirds of the time
+is transfer; the phone's CPU handles 7.46 MB of JSON in 0.70 s. Halving the payload would
+save roughly 0.9 s. Per brief 2.3, **no history depth has been cut**, because nothing
+requires cutting.
+
+## The first number I measured was wrong by 12×
+
+The first run reported **40 seconds to interactive** and I nearly reported it. The
+breakdown is what gave it away: `products.json` showed as a **7,642 KB transfer** against a
+344 KB gzipped file. `python -m http.server`, which every local verification in this project
+has used, **does not compress**. I was measuring a configuration no visitor would meet.
+
+[`scripts/serve_gzip.py`](../scripts/serve_gzip.py) now serves the repo the way a static host
+does, and the re-measurement gave 3.31 s.
+
+**The gap is now a deploy check, not a lesson.** The two cases are byte-identical on disk and
+every other check in this repository passes in both, so an uncompressed host would be
+invisible — and would make the tool unusable on a phone. `verify_deploy.py` now requests the
+two large files with `Accept-Encoding` and **fails the deploy if they come back
+uncompressed**, naming the 3.3 s / 40 s consequence. Demonstrated both ways against the two
+local servers.
+
+**This measurement assumes the host compresses.** GitHub Pages does; the check confirms it
+against the live URL rather than trusting it.
+
+## Does history need to load on first paint?
+
+**It already doesn't.** Boot fetches `meta.json` and `products.json` only;
+`history.json` is fetched on the first click of "Show the last 6 weeks" and cached for the
+session. First paint is unaffected by it.
+
+The remaining question is whether the first click should pull the whole file:
+
+| Option | First click | Files | Verdict |
+|---|---|---|---|
+| **One deferred file (current)** | 1.57 s, 195 KB gzipped, then free for the session | 1 | **Keep** |
+| One file per product | ~0.3 s | **6,090** | Rejected — 6,090 files for 1.2 s, and every one is a repo object and a CI artifact |
+| Sharded by barcode prefix | ~0.3 s | ~256 | Deferred — real but not worth it at 1.57 s |
+
+Revisit if `history.json` passes roughly 500 KB gzipped or the first click passes ~3 s.
+Recorded here so the next person inherits the numbers rather than the conclusion.
+
+---
+
 *The underlying data was sourced from ProjectHammer.org.*

@@ -1,4 +1,4 @@
-# Handoff — 2026-09-12 00:35, Claude Opus 5
+# Handoff — 2026-09-12 01:20, Claude Opus 5
 
 > Rewritten in full at the end of every completed section, at the same time as the
 > commit. Never written in a hurry at the end of a session — a note written while
@@ -43,13 +43,17 @@ was clean when written.
   `.handoff/invoke_codex.sh` end to end.
 - Relaxed `is_reliable_only` for the tool's basket on the owner's decision, with the
   guarantee it rests on asserted in SQL and demonstrated to fail. Findings §7.
+- Set the deploy gate floors to 4,000 products / 50% comparable, with the build and date
+  they were calibrated against recorded beside them in the code.
+- Measured phone performance (findings §8) and added a compression check to
+  `verify_deploy.py`.
 
 ## Immediate next steps
 
 1. **Step 3, the push.** Commands were shown to the owner and are awaiting a go. Repo is
    public, remote configured, `REPO_URL` set.
-2. Step 4: phone parse time for the JSON on a mid-range device profile, **after** the first
-   deploy. Phone *width* is already measured and holds at 380px.
+2. Step 4 is **done and passed** — findings §8. 3.31 s to interactive on a mid-range phone
+   profile; no history depth cut, none needed.
 3. Step 5: custom domain — the owner supplies the hostname for `tool/CNAME`, then check the
    tool and the writeup are both reachable from the domain's landing page.
 4. GitHub Pages still needs enabling by hand: Settings → Pages → Source: *GitHub Actions*.
@@ -59,10 +63,6 @@ was clean when written.
 **Blocked on the project owner:**
 
 - **The push**, **enabling GitHub Pages**, and **the custom domain hostname**.
-- **Whether to reset `check_extract.py`'s floors.** They are 1,500 products and 40%
-  comparable, set against a build of 2,921/60.93%. The population is now 6,090/65.30%, so the
-  product floor is a quarter of it. Findings §7 recommends 4,000 and 50% and explains why.
-  **Recommended, not applied** — the owner has not ruled on it.
 
 
 **Decided by the owner, recorded so it is not relitigated:** the maintainer's own listing of
@@ -93,11 +93,15 @@ separate and unchanged.
   2026-08-21 strict-filter extract** — 2,921 products, 60.93% comparable. §6 and §7 carry the
   current figures: **6,090 products, 65.30% comparable**. Both older sections are correct for
   the build they are stamped to and stale as a description of what the tool ships.
-- **First paint doubled** with the relaxation, 189.2 KB → 353.5 KB gzipped, and the JSON the
-  browser parses went 3.5 MB → 7.46 MB. Step 4's phone parse measurement now matters more.
+- **The phone measurement assumes the host compresses.** 3.31 s to interactive gzipped;
+  **40 s uncompressed**. `verify_deploy.py` fails the deploy if the live host serves the large
+  JSON uncompressed, so this is checked rather than assumed — but it has never run against a
+  real deploy.
 - **Neither GitHub Actions workflow has ever executed.** Both parse, and every script they
   call has been run by hand. That is not the same as the workflow having run.
-- **Phone parse time is unmeasured.** Only width has been measured.
+- **Every local verification before 2026-09-12 used `python -m http.server`, which does not
+  compress.** Use `scripts/serve_gzip.py` for anything performance-related; the plain server
+  overstated transfer cost by 12x once already.
 - **`.handoff/invoke_codex.sh`'s interactive "yes" path has never been exercised.** Every
   guard was tested and each exits 1, and the codex invocation was proven reachable with the
   real binary — but always by way of a non-interactive abort or a TTY error, never by a

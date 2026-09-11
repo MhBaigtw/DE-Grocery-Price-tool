@@ -196,12 +196,24 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dir", default="tool/data", help="directory holding the extract")
-    ap.add_argument("--min-products", type=int, default=1500,
-                    help="floor on products shipped; below this the extract is too thin "
-                         "to deploy under a fresh date (default 1500, against 2,921 today)")
-    ap.add_argument("--min-comparable-pct", type=float, default=40.0,
-                    help="floor on the share of products with 2+ recent chains "
-                         "(default 40, against 60.9%% today)")
+    # FLOORS: CALIBRATED 2026-09-12 against the build of snapshot 20260911T200435Z
+    # (extract date 2026-09-10, relaxed basket): 6,090 products shipped, 65.30% comparable.
+    # They sit at roughly two thirds of that population, which is enough headroom to survive
+    # one chain missing from a refresh and tight enough to catch a collapse.
+    #
+    # A floor outlives its population. These replaced 1,500 / 40%, calibrated against a
+    # 2,921-product build, and by the time they were reset the product floor had drifted to a
+    # QUARTER of the live population -- it would have passed an extract that had lost three
+    # quarters of its contents. If the shipped population moves far from 6,090 / 65.30%,
+    # these are stale too: recalibrate them deliberately and update this note, rather than
+    # lowering whichever one is failing.
+    ap.add_argument("--min-products", type=int, default=4000,
+                    help="floor on products shipped; below this the extract is too thin to "
+                         "deploy under a fresh date (default 4000, calibrated 2026-09-12 "
+                         "against 6,090)")
+    ap.add_argument("--min-comparable-pct", type=float, default=50.0,
+                    help="floor on the share of products with 2+ recent chains (default 50, "
+                         "calibrated 2026-09-12 against 65.30%%)")
     ap.add_argument("--max-extract-age-days", type=int, default=21,
                     help="hard limit on extract vintage (default 21 = three missed weeks)")
     ap.add_argument("--warn-extract-age-days", type=int, default=10)
