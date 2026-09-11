@@ -133,6 +133,16 @@ construction.
 
 My matched basket covers **3,477 distinct barcodes, which is 8,448 product listings** —
 each barcode is stocked by two to four chains, and each chain's listing counts once.
+
+> **A note on a second number you may see.** The [price tool](../tool/index.html) built on
+> this work covers **more** barcodes than the 3,477 here, and the two are not in conflict.
+> The analysis applied a deliberately strict rule: it dropped any barcode that was *also*
+> carried by a chain whose barcodes are fuzzy-matched rather than supplied by the retailer,
+> because those chains take part in the analysis and a bad match there would corrupt a
+> result. The tool never reads a price from those chains — only Metro, Save-On-Foods and
+> Walmart, whose barcodes come from the retailers — so the rule guards a route the tool does
+> not have, and applying it there would discard good data for nothing. **Every figure in
+> this piece is computed under the strict rule and is unchanged.**
 **Exactly one of those 8,448 listings is a store brand.** The catalogue contains 16,106
 store-brand products.
 

@@ -34,6 +34,27 @@
 -- The staleness curve is RECOMPUTED here rather than copied from the findings, so meta.json
 -- cannot drift away from the build that produced it.
 --
+-- THE BASKET IS DELIBERATELY LOOSER THAN THE ANALYSIS BASKET. Phase 2 and Phase 3 used
+-- `is_reliable_only`, which drops any barcode a FUZZY-TIER vendor (Loblaws, No Frills, T&T,
+-- Voila) also carries. This file does not, and the divergence is intentional:
+--
+--   * The filter guards a path this tool does not have. It reads prices from Metro,
+--     Save-On-Foods and Walmart only, all reliable tier, so a bad fuzzy match at Loblaws
+--     cannot reach a price the tool displays -- that vendor's rows are never read.
+--   * It ratchets downward by construction. Fuzzy vendors accumulate barcode sightings as
+--     the dataset grows and never release one, so the reliable-only set can only shrink:
+--     5,222 to 3,599 in twenty days (findings §6). That is not a viable basis for something
+--     that refreshes weekly.
+--
+-- Phase 2's published figures are unchanged and were computed under the strict filter.
+-- 5,222 and 3,477 stand exactly as published; nothing here recomputes them. The two baskets
+-- differ on purpose and the difference is stated in meta.json, the findings and the
+-- interface, so a reader who notices the numbers disagree finds the reason.
+--
+-- THE GUARANTEE THE RELAXATION RESTS ON is asserted below, in SQL, not in this comment:
+-- no fuzzy-tier vendor's price can enter the extract. If that ever stops being true the
+-- build fails rather than shipping.
+--
 -- EXCLUSIONS, per the standing rules: ambiguous prices (honesty rule 3), rows with no
 -- product record (honesty rule 6), unparseable prices. Counted into meta.json (brief 2.1).
 SET threads = 2;
@@ -49,8 +70,7 @@ SELECT m.gtin14, m.vendor, s.observed_date AS d, s.price_basis AS basis,
        min(s.unit_price) AS px
 FROM stg_price s
 JOIN int_upc_match m ON m.product_key = s.product_key
-WHERE m.is_reliable_only
-  AND m.vendor IN ('Metro','SaveOnFoods','Walmart')
+WHERE m.vendor IN ('Metro','SaveOnFoods','Walmart')
   AND s.parse_confidence <> 'ambiguous' AND s.offer_type <> 'unparsed'
   AND s.unit_price IS NOT NULL AND s.unit_price > 0
   AND s.observed_date >= DATE '2024-06-11'
@@ -96,8 +116,7 @@ SELECT m.gtin14, m.vendor, s.observed_date AS d, s.price_basis AS basis,
        max(CASE WHEN s.old_offer_type <> 'blank' THEN 1 ELSE 0 END) AS on_sale
 FROM stg_price s
 JOIN int_upc_match m ON m.product_key = s.product_key
-WHERE m.is_reliable_only
-  AND m.vendor IN ('Metro','SaveOnFoods','Walmart')
+WHERE m.vendor IN ('Metro','SaveOnFoods','Walmart')
   AND m.gtin14 IN (SELECT gtin14 FROM g90)
   AND s.parse_confidence <> 'ambiguous' AND s.offer_type <> 'unparsed'
   AND s.unit_price IS NOT NULL AND s.unit_price > 0
@@ -223,7 +242,7 @@ FROM (
   FROM stg_price s
   JOIN int_upc_match m ON m.product_key = s.product_key
   JOIN stg_product sp  ON sp.product_key = s.product_key
-  WHERE m.is_reliable_only AND m.vendor IN ('Metro','SaveOnFoods','Walmart')
+  WHERE m.vendor IN ('Metro','SaveOnFoods','Walmart')
     AND m.gtin14 IN (SELECT gtin14 FROM g90)
     AND s.observed_date >= DATE '2025-01-01'
   GROUP BY 1,2,3,4)
@@ -270,6 +289,42 @@ LEFT JOIN stale st ON st.vendor = o.vendor
                      WHEN o.days_behind <= 7 THEN 7
                      ELSE 14 END;
 
+-- ============================ THE GUARANTEE, IN CODE =============================
+-- `is_reliable_only` was relaxed for this basket (see the header). The relaxation is only
+-- safe because no fuzzy-tier vendor's price can reach the extract. That is asserted here
+-- rather than argued in a comment: if either condition fails, error() aborts the statement,
+-- verify_twice.py sees the failure marker, and the build does not ship.
+--
+-- It is written to fail on the two ways the guarantee could actually break:
+--   1. an offer appearing from a vendor outside the three the tool reads;
+--   2. one of those three ceasing to be reliable tier -- if upstream reclassified Walmart's
+--      barcodes as fuzzy, or our own matching did, this build must stop rather than quietly
+--      start displaying fuzzy-matched prices.
+CREATE OR REPLACE TEMP TABLE guarantee AS
+SELECT
+  (SELECT count(*) FROM offer_flagged
+    WHERE vendor NOT IN ('Metro','SaveOnFoods','Walmart'))                AS offers_from_other_vendors,
+  (SELECT count(*) FROM int_upc_match
+    WHERE vendor IN ('Metro','SaveOnFoods','Walmart')
+      AND vendor_upc_tier NOT IN ('vendor_upc','matched_upc'))            AS tool_chain_rows_not_reliable_tier,
+  (SELECT count(DISTINCT vendor_upc_tier) FROM int_upc_match
+    WHERE vendor IN ('Metro','SaveOnFoods','Walmart'))                    AS distinct_tiers_seen;
+
+SELECT CASE
+  WHEN (SELECT offers_from_other_vendors FROM guarantee) > 0
+    THEN error('GUARANTEE VIOLATED: the extract carries offers from a vendor outside '
+               || 'Metro/SaveOnFoods/Walmart. The relaxed basket is only safe because the '
+               || 'tool reads reliable-tier chains only. Do not ship this build.')
+  WHEN (SELECT tool_chain_rows_not_reliable_tier FROM guarantee) > 0
+    THEN error('GUARANTEE VIOLATED: one of Metro/SaveOnFoods/Walmart is no longer '
+               || 'reliable tier (vendor_upc or matched_upc). is_reliable_only was relaxed '
+               || 'on the basis that all three are reliable tier. Re-examine the relaxation '
+               || 'before shipping; do not simply widen the allowed tiers.')
+  ELSE 'OK - no fuzzy-tier vendor price can reach this extract'
+END                                                     AS fuzzy_tier_guarantee,
+     (SELECT offers_from_other_vendors FROM guarantee)  AS offers_from_other_vendors,
+     (SELECT tool_chain_rows_not_reliable_tier FROM guarantee) AS rows_not_reliable_tier;
+
 -- ============================ ASSERTIONS AND ACCOUNTING ==========================
 
 -- 1. Shape of the extract. `basket_equals_phase3_figure` compares against the 3,190
@@ -296,7 +351,7 @@ SELECT count(*)                                                        AS rows_i
 FROM stg_price s
 LEFT JOIN int_upc_match m ON m.product_key = s.product_key
 WHERE s.observed_date >= (SELECT extract_date FROM params) - 200
-  AND m.is_reliable_only AND m.vendor IN ('Metro','SaveOnFoods','Walmart');
+  AND m.vendor IN ('Metro','SaveOnFoods','Walmart');
 
 -- 3. How the comparison verdict actually lands. This is the number constraint 2 exists for:
 --    how often the tool can say "cheapest" without qualification, and how often it cannot.
@@ -340,7 +395,7 @@ SELECT count(*)                                                          AS rows
 FROM stg_price s
 LEFT JOIN int_upc_match m ON m.product_key = s.product_key
 WHERE s.observed_date >= (SELECT extract_date FROM params) - 200
-  AND m.is_reliable_only AND m.vendor IN ('Metro','SaveOnFoods','Walmart');
+  AND m.vendor IN ('Metro','SaveOnFoods','Walmart');
 
 -- meta.json -- build provenance, extract vintage, per-chain freshness, per-chain staleness
 -- curve, exclusion counts, scope and attribution. NO POOLED STALENESS FIGURE EXISTS HERE.
@@ -388,6 +443,13 @@ COPY (
            products := 'National brands only. Store brands share no barcode and cannot be compared.',
            chains := 'Metro, Save-On-Foods and Walmart. Galleria is excluded because its catalogue barely overlaps the others.',
            comparison := 'Per product only. This tool produces no basket, no total, and no cheapest-store verdict.',
+           basket := 'This tool covers more barcodes than the published analysis did. The '
+                  || 'analysis used a stricter rule that dropped any barcode also carried by '
+                  || 'a chain whose barcodes are fuzzy-matched; this tool does not need that '
+                  || 'rule, because it only ever reads prices from Metro, Save-On-Foods and '
+                  || 'Walmart, whose barcodes come from the retailers themselves. The '
+                  || 'analysis figures were computed under the stricter rule and are '
+                  || 'unchanged.',
            staleness := 'Reported per chain. There is deliberately no pooled figure: pooling understates the chain you are most likely to be wrong about.'
          )                                                             AS scope,
          'The underlying data was sourced from ProjectHammer.org'       AS attribution

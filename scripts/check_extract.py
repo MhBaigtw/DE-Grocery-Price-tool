@@ -21,6 +21,12 @@ VENDOR_CODES = ("SaveOnFoods",)          # keys that must never reach a reader
 # A brand field carrying a price or a promotion. Anchored on a currency amount or the promo
 # phrases, so a real brand that merely contains "save" (LIFESAVERS) is not refused.
 PROMO_BRAND = re.compile("[$][0-9]|you save|current price")
+
+# The three chains the tool reads, all reliable tier. This is the guarantee the relaxed
+# basket rests on: Phase 4 dropped `is_reliable_only` because a fuzzy-tier vendor's price
+# can never reach the extract, and that is only true while the extract contains these three
+# and nothing else. E1 asserts it in SQL at build time; this asserts it on what shipped.
+ALLOWED_CHAINS = {"Metro", "SaveOnFoods", "Walmart"}
 FAILS: list[str] = []
 WARNS: list[str] = []
 
@@ -72,6 +78,10 @@ def check_meta(meta: dict, args) -> None:
             bad(f"chain {c['chain']!r} staleness falls as data ages: {pcts}")
         if c["chain"] in VENDOR_CODES and c["chain_label"] == c["chain"]:
             bad(f"chain {c['chain']!r} has no display label")
+        if c["chain"] not in ALLOWED_CHAINS:
+            bad(f"meta.json lists chain {c['chain']!r}, which is not one of the three "
+                f"reliable-tier chains {sorted(ALLOWED_CHAINS)}. The relaxed basket is only "
+                "safe while the extract reads these and nothing else.")
 
     # 3. The attribution the licence requires.
     if "ProjectHammer.org" not in meta["attribution"]:
@@ -161,6 +171,9 @@ def check_products(products: list, meta: dict, args) -> None:
                 bad(f"{g}/{o['chain']}: non-positive price {o['price']}")
             if o["chain"] in VENDOR_CODES and o["chain_label"] == o["chain"]:
                 bad(f"{g}/{o['chain']}: offer has no display label")
+            if o["chain"] not in ALLOWED_CHAINS:
+                bad(f"{g}: offer from {o['chain']!r}, outside the three reliable-tier "
+                    "chains. A fuzzy-tier price may have reached the extract; do not deploy.")
             # The §2 defect: an unmeasured age must never carry a measured figure.
             if o["staleness_exceeds_measured"] and o["staleness_pct"] is not None:
                 bad(f"{g}/{o['chain']}: {o['days_behind']}d old but carries a staleness figure")

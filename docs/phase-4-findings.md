@@ -1107,4 +1107,112 @@ the file whose purpose is recording where the data came from.
 
 ---
 
+---
+
+# §7 — Relaxing `is_reliable_only` for the tool's basket
+
+*Decision by the project owner, 2026-09-12. Rebuilt on the same snapshot
+`20260911T200435Z`, extract date 2026-09-10, verified twice, byte-identical.*
+
+## What changed, and what deliberately did not
+
+`is_reliable_only` drops any barcode that a **fuzzy-tier** vendor (Loblaws, No Frills, T&T,
+Voila) also carries. It is **removed from the tool's basket only**.
+
+**Phase 2's analysis is untouched.** 5,222 and 3,477 stand exactly as published, computed
+under the strict filter. Nothing was recomputed. The two baskets differ on purpose.
+
+**Why it was right to relax it here.** The filter guards against fuzzy-tier barcode
+contamination reaching a result. The tool reads prices from Metro, Save-On-Foods and Walmart
+only — all reliable tier — so a bad Loblaws match cannot reach a price it displays; that
+vendor's rows are never read. It guards a path the tool does not have. And it **ratchets
+downward by construction** (§6): fuzzy vendors accumulate barcode sightings as the dataset
+grows and never release one, so the set can only shrink. It is not a viable basis for
+something that refreshes weekly.
+
+## The result
+
+| | Strict, 2026-08-21 | Strict, 2026-09-10 | **Relaxed, 2026-09-10** |
+|---|---|---|---|
+| Basket | 3,190 | 1,908 | **6,475** |
+| Products shipped | 2,921 | 1,627 | **6,090** |
+| All three chains | 464 (15.88%) | 130 (7.99%) | **1,427 (23.43%)** |
+| Two chains | 1,316 (45.05%) | 628 (38.60%) | **2,550 (41.87%)** |
+| One chain — nothing to compare | 813 (27.83%) | 603 (37.06%) | **1,643 (26.98%)** |
+| Nothing recent | 328 (11.23%) | 266 (16.35%) | **470 (7.72%)** |
+| **Comparable (2–3)** | **60.93%** | **46.59%** | **65.30%** |
+
+Comparability is now **higher than the original strict build** — 65.30% against 60.93% — and
+the count of products answerable at all three chains has roughly tripled. The erosion is not
+merely halted; the population the filter had been quietly removing was mostly good data.
+
+## The guarantee, asserted in code
+
+The relaxation is safe only while no fuzzy-tier vendor's price can enter the extract. That is
+asserted in `E1_tool_extract.sql`, not argued in a comment. It fails the build on either way
+the guarantee could break:
+
+1. an offer from a vendor outside Metro / Save-On-Foods / Walmart;
+2. one of those three ceasing to be reliable tier — if upstream or our own matching ever
+   reclassified Walmart's barcodes as fuzzy, the build stops rather than quietly beginning to
+   display fuzzy-matched prices.
+
+On this build: `OK - no fuzzy-tier vendor price can reach this extract`, with 0 offers from
+other vendors and 0 rows off reliable tier. The shipped extract contains exactly three
+chains.
+
+**Demonstrated to fail.** A probe with the violation forced true aborts the statement
+(`Invalid Input Error: GUARANTEE VIOLATED…`), `run_query.py` exits 1, and `verify_twice.py`
+refuses both runs on the failure marker. `check_extract.py` asserts the same allowlist on the
+shipped JSON, and `test_check_extract.py` gained a case that puts a Loblaws offer in the
+extract and requires the gate to refuse it — **16 of 16** cases now behave correctly.
+
+## Where the divergence is stated
+
+A reader who meets both numbers must find the reason, not a contradiction. It is stated in
+four places, each aimed at a different reader:
+
+| Where | For |
+|---|---|
+| `meta.json` → `scope.basket` | The extract states it; the interface renders it from data |
+| The tool's coverage panel, before any search | Someone using the tool |
+| `docs/writeup.md`, beside the 3,477 | Someone reading the argument |
+| This section and `README.md` | Someone reading the repository |
+
+The render test now **fails if the landing state omits it**, so it cannot quietly disappear
+from the interface.
+
+## Size, and one consequence worth watching
+
+| File | Raw | Gzipped |
+|---|---|---|
+| `products.json` | 7.46 MB | 344.3 KB |
+| `history.json` | 4.31 MB | 173.5 KB |
+| **First paint** (history deferred) | | **353.5 KB** |
+
+First paint roughly doubled, 189.2 KB → 353.5 KB gzipped, and the JSON the browser must
+parse went 3.5 MB → 7.46 MB. It still ships as static JSON with no backend, so brief 2.3 is
+met and no history depth has been cut. **But the parse cost on a mid-range phone was already
+the one number this phase does not have, and the relaxation doubled it.** That measurement
+(step 4, after the first deploy) now matters more than it did, and if it comes back poor the
+answer per brief 2.3 is to cut history depth before cutting products.
+
+## The deploy gate's floors are now far too loose
+
+`check_extract.py` floors are **1,500 products and 40% comparable**, set against a build of
+2,921 and 60.93%. Against 6,090 and 65.30% the product floor is a quarter of the population:
+it would pass an extract that had lost three quarters of its contents.
+
+Recommended, **not applied** — resetting floors is the owner's call:
+
+| Floor | Now | Recommended | Reasoning |
+|---|---|---|---|
+| Products | 1,500 | **4,000** | ~66% of current. Survives a chain missing from one refresh; catches a collapse |
+| Comparable | 40% | **50%** | ~15 pp of headroom below current, which is roughly what losing Walmart for a refresh would cost |
+
+The erosion mechanism is gone, so the basket should now grow with the data rather than
+shrink — which makes a low floor less dangerous but also less useful as a tripwire.
+
+---
+
 *The underlying data was sourced from ProjectHammer.org.*

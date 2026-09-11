@@ -125,6 +125,13 @@ def real_brand_containing_save(meta, prods):
     return meta, prods
 
 
+def fuzzy_tier_chain(meta, prods):
+    # The guarantee the relaxed basket rests on: only reliable-tier chains in the extract.
+    prods[0]["offers"][0]["chain"] = "Loblaws"
+    prods[0]["offers"][0]["chain_label"] = "Loblaws"
+    return meta, prods
+
+
 CASES = [
     ("a pooled staleness figure is refused",            pooled,                  "pooled"),
     ("an unmeasured age carrying a figure is refused",  unmeasured_figure,       "carries a staleness figure"),
@@ -138,6 +145,7 @@ CASES = [
     ("missing scope statements are refused",            scope_gone,              "scope does not state"),
     ("an excluded chain with no reason is refused",     excluded_without_reason, "no reason given"),
     ("promotional text in the brand field is refused",  promo_brand,             "promotional text"),
+    ("a fuzzy-tier chain in the extract is refused",    fuzzy_tier_chain,        "reliable-tier"),
 ]
 
 

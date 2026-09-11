@@ -112,7 +112,7 @@ sandbox.renderCover({total: products.length, n0: counts[0], n1: counts[1],
                      n2: counts[2], n3: counts[3]});
 const cover = nodes["#covbody"].innerHTML;
 for (const need of ["national brands", "Toronto", "pickup", "cannot be compared",
-                    "not possible", meta.extract_date]) {
+                    "not possible", "stricter rule", meta.extract_date]) {
   if (!cover.includes(need)) bad("cover", "landing state omits: " + need);
 }
 // The always-visible strip is STATIC HTML, not something the script writes. That is the

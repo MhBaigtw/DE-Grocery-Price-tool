@@ -409,7 +409,12 @@ function renderCover(counts){
       + esc(worst.chain) + ", the chain that moves most, <b>" + worst.pct
       + "%</b> of prices change over a week. Every price below carries its own date and its "
       + "own chain's figure — there is deliberately no single overall number, because "
-      + "averaging them hides the chain you are most likely to be wrong about.</p>";
+      + "averaging them hides the chain you are most likely to be wrong about.</p>"
+    // The basket divergence, rendered from meta.scope so the extract states it rather than
+    // the page asserting it. A reader who notices this tool covers more barcodes than the
+    // writeup describes must find the reason here, not a contradiction.
+    + (META.scope && META.scope.basket
+        ? '<p class="barkey">' + esc(META.scope.basket) + "</p>" : "");
 
   // Only the date is filled in. The scope and the attribution are static HTML above, so
   // they survive a script that never runs.
