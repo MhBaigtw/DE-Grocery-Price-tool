@@ -1,4 +1,4 @@
-# Handoff — 2026-09-11 23:15, Claude Opus 5
+# Handoff — 2026-09-11 23:45, Claude Opus 5
 
 > Rewritten in full at the end of every completed section, at the same time as the
 > commit. Never written in a hurry at the end of a session — a note written while
@@ -15,100 +15,88 @@ below as verified state — verify them.
 
 ## Current phase and section
 
-Phase 4 (the price-lookup tool). **Sections 1 to 5 are built and committed.** The brief is
-`docs/phase-4-brief.md`; the results are in `docs/phase-4-findings.md`.
+Phase 4 (the price-lookup tool). Sections 1 to 5 built and committed; brief
+`docs/phase-4-brief.md`, results `docs/phase-4-findings.md`.
 
-Work is now **past the brief**, on a refresh-and-deploy sequence the project owner gave
-directly in five numbered steps: refresh, report the new extract, push, measure phone parse
-time after the first deploy, then a custom domain. **Step 1 was in progress when this note
-was written** — see "Anything the next agent should distrust".
+Work is past the brief, on a refresh-and-deploy sequence the project owner gave directly.
+**Steps 1 and 2 are done: the first real refresh has completed and is committed.** Step 3
+(the push) is next and is gated on the owner's go.
 
 ## Last commit
 
-`ac28c3f  Phase 4 Sections 4 and 5: refresh automation, deploy pipeline, phone-width check`
+See `git log -1`. The refresh commit contains the rebuilt `tool/data/`, the two pipeline
+fixes that preceded it, findings §6, and this note. The tree was clean when written.
 
-**The tree was NOT clean when this was written.** Uncommitted, deliberately:
-
-- `analysis/phase4/E1_tool_extract.sql` — two fixes made just before the refresh run.
-  `snapshot_id` now reads from the `_snapshot_provenance` table instead of the hardcoded
-  literal `'20260822T134045Z'` (the literal would have made the refreshed `meta.json` state
-  the wrong snapshot — a false provenance claim in a shipped file). The informational
-  `basket_matches_published` field was renamed `basket_equals_phase3_figure`.
-- `scripts/refresh.py` — `run()` now prints every step's output, not only a failing step's,
-  so the schema gate result is readable in the log.
-
-Both are complete and were exercised; they are held back only so they land in the same
-commit as the refreshed extract they produce. **Do not discard them.**
-
-`main` is **3 commits ahead of `origin/main`** (`58a6580`, `e01b67e`, `ac28c3f`).
+`main` is ahead of `origin/main`. **Nothing has been pushed and nothing is deployed.**
 
 ## What the last session completed
 
-- Phase 4 Sections 2 to 5: the static extract, the interface, the refresh pipeline and the
-  deploy workflows. See `docs/phase-4-findings.md` and the three commits above.
-- The Thursday cadence result was added to `docs/writeup.md` as a standalone finding, and
-  the second identical-crash incident to `docs/method-note.md`.
-- Started the first real refresh onto new upstream data (details below).
+- First real refresh onto snapshot `20260911T200435Z` (upstream published 2026-09-10).
+  Every gate passed, extract built twice and agreed, 1,474 s. See `docs/phase-4-findings.md`
+  §6 and `logs/refresh-20260911T200433Z.log`.
+- Built the handoff system (`docs/RESUME.md`, `AGENTS.md`, `.handoff/`, and the "Context and
+  handoff" section of `CLAUDE.md`).
+- Installed the Codex CLI (`@openai/codex`, `codex-cli 0.154.0`) and verified
+  `.handoff/invoke_codex.sh` end to end.
 
 ## Immediate next steps
 
-1. **Finish and report step 2 of the owner's sequence**: the refreshed extract's product
-   count, the comparability breakdown, and how the 60.93% comparable figure moved. The
-   owner asked to be told *before anything deploys* if comparability shifted materially.
-2. Then **step 3, the push** — `main` is 3 ahead. `REPO_URL` in `scripts/fetch_snapshot.py`
-   is already set (commit `7cc1136`); the owner's message carried an unfilled
-   `[your GitHub URL]` placeholder, so that part of the instruction is already satisfied.
-3. Then step 4 (phone parse time for the JSON, on a mid-range device profile, after the
-   first deploy) and step 5 (custom domain CNAME, plus checking the tool and the writeup
-   are both reachable from the domain's landing page).
-
-Commit the two held-back files together with the refreshed `tool/data/`.
+1. **The owner must decide the `is_reliable_only` question** — see "Open questions". It
+   governs whether the tool's coverage keeps eroding, and it has a deadline.
+2. **Step 3, the push.** Commands were shown to the owner and are awaiting a go. Repo is
+   public, remote configured, `REPO_URL` set.
+3. Step 4: phone parse time for the JSON on a mid-range device profile, **after** the first
+   deploy. Phone *width* is already measured and holds at 380px.
+4. Step 5: custom domain — the owner supplies the hostname for `tool/CNAME`, then check the
+   tool and the writeup are both reachable from the domain's landing page.
+5. GitHub Pages still needs enabling by hand: Settings → Pages → Source: *GitHub Actions*.
 
 ## Open questions and blockers
 
-**Blocked on the project owner** (not "not started"):
+**Blocked on the project owner:**
 
-- **The push.** Explicitly gated: confirm before pushing.
-- **GitHub Pages is not enabled.** Needs Settings → Pages → Source: *GitHub Actions*. A
-  workflow cannot enable it for itself.
-- **The custom domain hostname** for `tool/CNAME`. The owner is serving this from their own
-  site and will supply the hostname.
-- **Go-ahead before deploying**, per the owner's "stop between steps".
+- **`is_reliable_only` is degenerative and needs a decision.** It excludes any barcode a
+  fuzzy-tier vendor (Loblaws, No Frills, T&T, Voila) also carries. Those vendors accumulate
+  barcode sightings as the dataset grows, and a barcode once attached never detaches, so the
+  set can only shrink: 5,222 → 3,599 in twenty days, taking the tool's basket from 3,190 to
+  1,908 and comparability from 60.93% to 46.59%. Findings §6 has the full numbers and the
+  argument that the filter may be unnecessary for this tool, since it compares three
+  reliable-tier chains and never reads a fuzzy vendor's price. **Relaxing it would put the
+  tool's basket out of agreement with the 3,190 and 3,477 published in Phase 3**, so it is a
+  decision, not an edit. Do not change it unilaterally.
+- **The push**, **enabling GitHub Pages**, and **the custom domain hostname**.
 
 **Decided by the owner, recorded so it is not relitigated:** the maintainer's own listing of
-downstream projects is out of scope — this project publishes independently and tells him
-afterwards. Nothing about the maintainer's site goes in the repo or the interface. The
-required attribution is separate and unchanged.
+downstream projects is out of scope — publish independently, tell him afterwards. Nothing
+about the maintainer's site goes in the repo or the interface. The required attribution is
+separate and unchanged.
 
 ## Known constraints
 
-- **`hammer.duckdb` no longer holds the snapshot the published numbers were computed on.**
-  Before the refresh it was renamed to `hammer-20260822T134045Z.duckdb`, because
-  `scripts/load_snapshot.py` deletes the target database before loading. Every figure in
-  `docs/phase-2-findings.md` and `docs/phase-3-*` is stamped to snapshot `20260822T134045Z`
-  and must be reproduced against that file, not against the current `hammer.duckdb`.
-  `hammer2.duckdb` is unchanged and still holds snapshot `20260824T132829Z`.
+- **`hammer.duckdb` now holds snapshot `20260911T200435Z`, not the snapshot the Phase 2 and
+  Phase 3 numbers were computed on.** That build is preserved as
+  `hammer-20260822T134045Z.duckdb` — it was renamed rather than overwritten because
+  `scripts/load_snapshot.py` deletes the target database before loading. Reproduce any
+  published Phase 2/3 figure against that file. `hammer2.duckdb` still holds
+  `20260824T132829Z`.
+- **`check_extract.py`'s floors were set against the old, larger build** (1,500 products,
+  40% comparable). The current extract clears them at 1,627 and 46.59%. At the observed rate
+  of erosion the next refresh or two will trip the product floor and refuse to deploy. That
+  is correct behaviour, and it is the deadline on the question above.
 - The full rebuild does not fit a hosted CI runner (~10 GB working set). `scripts/refresh.py`
   runs locally; CI only validates and deploys the committed extract.
 
 ## Anything the next agent should distrust
 
-- **A refresh was running when this note was written and may not have finished.** Snapshot
-  `20260911T200435Z`, upstream published 2026-09-10. The log is the file named in
-  `logs/refresh.current`. Confirmed so far: fetch, load, and **the schema gate passed —
-  `OK - schema matches: 2 tables, 15 columns`, so the announced `raw.product_id`
-  string-to-number change has NOT landed**. Model build, the standing checks, the dbt
-  contracts and the extract had not completed. **Check whether that run finished, and with
-  what exit code, before trusting anything under `tool/data/`.**
-- **Everything in `tool/data/` is from the 2026-08-21 extract until that run completes**,
-  and the run rewrites those files in place. If it failed partway, verify them with
-  `python scripts/check_extract.py` rather than assuming.
-- **The Section 2 and 3 numbers in `docs/phase-4-findings.md` describe the old extract**:
-  2,921 products, 60.93% comparable, 1,137 offers past the measured horizon. A refresh onto
-  newer data moves all of them. They are correct for the build they are stamped to and stale
-  as a description of what the tool now ships.
-- **Neither GitHub Actions workflow has ever executed.** Both parse and every script they
+- **The Section 2 and 3 numbers in `docs/phase-4-findings.md` describe the superseded
+  2026-08-21 extract** — 2,921 products, 60.93% comparable, 1,137 offers past the measured
+  horizon. They are correct for the build they are stamped to and stale as a description of
+  what the tool now ships. §6 carries the current figures. The same applies to the 2,921 and
+  60.9% quoted in `README.md`.
+- **Neither GitHub Actions workflow has ever executed.** Both parse, and every script they
   call has been run by hand. That is not the same as the workflow having run.
-- **Phone parse time is unmeasured.** Phone *width* was measured at a true 380px viewport
-  and holds; the cost of parsing ~3.5 MB of JSON on a mid-range phone is step 4 and has no
-  number yet.
+- **Phone parse time is unmeasured.** Only width has been measured.
+- **`.handoff/invoke_codex.sh`'s interactive "yes" path has never been exercised.** Every
+  guard was tested and each exits 1, and the codex invocation was proven reachable with the
+  real binary — but always by way of a non-interactive abort or a TTY error, never by a
+  human confirming and a session actually starting.

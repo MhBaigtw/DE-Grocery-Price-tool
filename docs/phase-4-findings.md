@@ -1011,4 +1011,100 @@ does: **232 of 187,028 product rows** carry one in the name, and none of those r
 
 ---
 
+---
+
+# §6 — The first real refresh, and what it exposed
+
+*Snapshot `20260911T200435Z`, upstream published 2026-09-10, built
+`2026-09-11T20:20:27Z`. Ran in 1,474 s. Every gate passed; the extract was built twice and
+agreed. Log: `logs/refresh-20260911T200433Z.log`.*
+
+## The schema gate: the announced break has not landed
+
+```
+schema file : config/expected_schema.json (version 1)
+OK - schema matches: 2 tables, 15 columns.
+```
+
+`raw.product_id` is recorded in the contract as `VARCHAR` at position 6, and the gate reports
+no type mismatch. **The string-to-number change has not shipped.** The gate did not stop the
+run, and it did not stop it because the schema is genuinely unchanged — nothing was worked
+around and `config/expected_schema.json` is untouched.
+
+## The data grew. The basket shrank by 40%.
+
+| | 2026-08-21 build | 2026-09-10 build |
+|---|---|---|
+| Price rows | 71,809,333 | 73,741,443 |
+| Distinct dates | 887 | 907 |
+| Earliest date | 2024-02-28 | 2024-02-28 |
+| Product rows | 187,028 | 187,685 |
+| **Comparison basket** | **3,190** | **1,908** |
+| **Products shipped** | **2,921** | **1,627** |
+| **Comparable (2–3 chains)** | **60.93%** | **46.59%** |
+
+Comparability fell **14.34 pp**. Nothing about the price data explains it — the history is
+longer, the start date is the same, and there are more products, not fewer.
+
+## The cause: a filter that erodes as the dataset grows
+
+| | Old | New |
+|---|---|---|
+| GTINs carried by the three chains | 33,682 | 33,796 |
+| …also carried by a **fuzzy-tier** vendor | 5,430 | **8,045** |
+| …**`is_reliable_only`** | 5,222 | **3,599** |
+| Share with a fuzzy vendor attached | 16.12% | **23.80%** |
+
+`is_reliable_only` excludes a barcode when **any** fuzzy-tier vendor — Loblaws, No Frills,
+T&T, Voila — also carries it. Those vendors' barcodes are fuzzy-matched with a known error
+rate (CLAUDE.md, known contamination), and the filter was a conservative purity rule for a
+one-shot analysis.
+
+**As a basis for a refreshing tool it is degenerative.** Every additional day gives the fuzzy
+vendors another chance to attach to a barcode, and a barcode once attached never detaches.
+The reliable-only set can therefore only shrink. It lost 31% in twenty days.
+
+**And for this tool the exclusion is arguably unnecessary.** The tool compares Metro,
+Save-On-Foods and Walmart only, all reliable-tier. A bad fuzzy match at Loblaws does not
+corrupt Metro's barcode or Metro's price — that vendor's rows are never read. The filter is
+doing work for a cross-vendor comparison that includes fuzzy vendors, which this tool is not.
+
+**This is not a change I am making unilaterally.** Relaxing it would raise the tool's basket
+well above 3,190 and make it disagree with the 3,190 and 3,477 published in Phase 3, and the
+reasoning behind honesty rule 2 deserves a decision rather than an edit. It is recorded here
+and in the handoff note as an open question for the project owner.
+
+## The deploy gate passed, and it is closer to refusing than it looks
+
+`check_extract.py` accepted the extract: 1,627 products against a floor of 1,500, and 46.59%
+comparable against a floor of 40%. Both floors were set against the old build, where the
+margins were 2,921 and 60.93%.
+
+**At the observed rate of erosion the next refresh or two will trip the product floor.** That
+is the gate behaving correctly — it is designed to refuse a thin extract — but it means the
+filter question has a deadline attached, and the tool will stop deploying rather than
+silently shipping less.
+
+## Everything else held
+
+| | |
+|---|---|
+| Per-chain last observed | Metro, Save-On-Foods, Walmart all 2026-09-10 |
+| 7-day staleness | Metro 26.95%, Save-On-Foods 34.20%, Walmart 8.65% |
+| Offers | 3,175, of which 836 are past the measured horizon |
+| Provenance | `meta.json` reports `20260911T200435Z`, read from `_snapshot_provenance` |
+
+The staleness curve barely moved (Save-On-Foods 36.68% → 34.20%, Metro 28.39% → 26.95%),
+which is the reassuring part: **the price behaviour the refresh schedule was derived from in
+§1 is stable.** What moved was the population, not the prices.
+
+### One fix this run proved was needed
+
+`meta.json` now reports `20260911T200435Z`. The literal `'20260822T134045Z'` was removed from
+the extract hours before this run; had it not been, the first refreshed extract would have
+shipped a **false statement about its own provenance** — not a stale number, a wrong one, in
+the file whose purpose is recording where the data came from.
+
+---
+
 *The underlying data was sourced from ProjectHammer.org.*

@@ -272,8 +272,10 @@ LEFT JOIN stale st ON st.vendor = o.vendor
 
 -- ============================ ASSERTIONS AND ACCOUNTING ==========================
 
--- 1. The basket is the one the dashboard and the findings use. If this is not 3,190 the
---    extract has drifted from the published figures and must not ship.
+-- 1. Shape of the extract. `basket_equals_phase3_figure` compares against the 3,190
+--    published in Phase 3; it is INFORMATIONAL, not a gate. A refresh onto newer upstream
+--    data legitimately moves it, and the deploy gate checks floors rather than remembered
+--    counts for exactly that reason.
 SELECT (SELECT count(*) FROM g90)                       AS tool_basket_barcodes,
        (SELECT extract_date FROM params)                AS extract_date,
        (SELECT count(*) FROM offer_flagged)             AS offers,
@@ -282,7 +284,7 @@ SELECT (SELECT count(*) FROM g90)                       AS tool_basket_barcodes,
        (SELECT count(DISTINCT gtin14) FROM offer_flagged) AS products_shipped,
        (SELECT count(*) FROM g90)
          - (SELECT count(DISTINCT gtin14) FROM offer_flagged) AS omitted_no_recent_observation,
-       ((SELECT count(*) FROM g90) = 3190)              AS basket_matches_published;
+       ((SELECT count(*) FROM g90) = 3190)              AS basket_equals_phase3_figure;
 
 -- 2. Exclusion accounting for the extract (brief 2.1, honesty rule 7). Counted over the
 --    same chains and the same window the extract reads.
@@ -345,7 +347,10 @@ WHERE s.observed_date >= (SELECT extract_date FROM params) - 200
 COPY (
   SELECT (SELECT v FROM _build_stamp WHERE k = 'built_utc')            AS built_utc,
          (SELECT extract_date FROM params)                             AS extract_date,
-         '20260822T134045Z'                                            AS snapshot_id,
+         -- Read from the DB, never hardcoded. A literal here would have made meta.json
+         -- state the wrong snapshot the first time the tool was refreshed, which is a
+         -- provenance lie in a shipped file rather than a stale number.
+         (SELECT v FROM _snapshot_provenance WHERE k = 'snapshot_id')  AS snapshot_id,
          (SELECT basket_barcodes FROM shipped)                         AS basket_barcodes,
          (SELECT products_shipped FROM shipped)                        AS products_shipped,
          (SELECT struct_pack(

@@ -49,8 +49,12 @@ def run(step: str, cmd: list[str], dry: bool, cwd: pathlib.Path = ROOT) -> str:
         return ""
     p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
     tail = "\n".join((p.stdout + p.stderr).strip().splitlines()[-14:])
+    # Print every step output, not only a failing one. A gate that passes silently is a
+    # gate whose result nobody can see, and the schema check in particular is something a
+    # reader of the log needs to read rather than infer from the absence of an error.
+    for line in tail.splitlines():
+        print("                   | " + line, flush=True)
     if p.returncode != 0:
-        print(tail)
         raise Stop(f"{step} failed (exit {p.returncode})")
     return tail
 
