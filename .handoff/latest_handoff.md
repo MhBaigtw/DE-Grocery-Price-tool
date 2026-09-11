@@ -1,4 +1,4 @@
-# Handoff — 2026-09-12 02:05, Claude Opus 5
+# Handoff — 2026-09-12 02:30, Claude Opus 5
 
 > Rewritten in full at the end of every completed section, at the same time as the
 > commit. Never written in a hurry at the end of a session — a note written while
@@ -15,103 +15,92 @@ below as verified state — verify them.
 
 ## Current phase and section
 
-Phase 4 (the price-lookup tool). Sections 1 to 5 built and committed; brief
-`docs/phase-4-brief.md`, results `docs/phase-4-findings.md`.
+Phase 4 (the price-lookup tool). Sections 1 to 5 built; brief `docs/phase-4-brief.md`,
+results `docs/phase-4-findings.md` (§1–§8).
 
-Work is past the brief, on a refresh-and-deploy sequence the project owner gave directly.
-**Steps 1 and 2 are done and `is_reliable_only` has been relaxed per the owner's decision
-of 2026-09-12** (findings §7). Step 3 (the push) is next and is gated on the owner's go,
-after they have seen the relaxed numbers.
+The tool is **deployed and live on Netlify** at **https://de-grocery-project.netlify.app**,
+with continuous deployment from `main` verified end to end. The only open item in the
+owner's deploy sequence is the custom domain.
 
 ## Last commit
 
-See `git log -1`. The most recent commit relaxes `is_reliable_only` for the tool's basket,
-rebuilds `tool/data/` under it, adds the guarantee assertion, and documents the divergence in
-four places (findings §7, the writeup, the README, the tool's own coverage panel). The tree
-was clean when written.
-
-`main` is ahead of `origin/main`. **Nothing has been pushed and nothing is deployed.**
+See `git log -1`. This note is committed with it. The tree was clean when written, and
+`main` matched `origin/main`.
 
 ## What the last session completed
 
-- First real refresh onto snapshot `20260911T200435Z` (upstream published 2026-09-10).
-  Every gate passed, extract built twice and agreed, 1,474 s. See `docs/phase-4-findings.md`
-  §6 and `logs/refresh-20260911T200433Z.log`.
-- Built the handoff system (`docs/RESUME.md`, `AGENTS.md`, `.handoff/`, and the "Context and
-  handoff" section of `CLAUDE.md`).
-- Installed the Codex CLI (`@openai/codex`, `codex-cli 0.154.0`) and verified
-  `.handoff/invoke_codex.sh` end to end.
-- Relaxed `is_reliable_only` for the tool's basket on the owner's decision, with the
-  guarantee it rests on asserted in SQL and demonstrated to fail. Findings §7.
-- Set the deploy gate floors to 4,000 products / 50% comparable, with the build and date
-  they were calibrated against recorded beside them in the code.
-- Measured phone performance (findings §8) and added a compression check to
-  `verify_deploy.py`.
+- Deploy target moved from GitHub Pages to Netlify (owner's decision). `deploy.yml` removed so
+  there is one deploy path; `netlify.toml` and `scripts/netlify_build.sh` added.
+- Netlify site `de-grocery-project` (site id `36972e0e-7430-455a-998a-a966c9a0a6a9`) created
+  and linked by the owner running `netlify init` in a real terminal.
+- **Continuous deployment proven with a real push**, not inferred: commit `2232900` triggered a
+  build on Netlify's builder (it has a `build_id`), reached `ready` in production, and is the
+  published deploy.
+- `scripts/verify_deploy.py` passed against the live URL, including the compression check —
+  Netlify serves the large JSON **brotli**, `products.json` 312 KB over the wire.
+- Phone profile measured against the live CDN: FCP 1.35 s, interactive 3.99 s, search
+  keystroke 68 ms, first history click 1.96 s.
 
 ## Immediate next steps
 
-1. **Deploy target moved to Netlify** (owner's decision, 2026-09-12). `main` is pushed and
-   `origin/main` matches. The owner connects the repo in the Netlify UI; the build command
-   and publish directory are already in `netlify.toml`. **Nothing is deployed yet.**
-2. Step 4 is **done and passed** — findings §8. 3.31 s to interactive on a mid-range phone
-   profile; no history depth cut, none needed.
-3. Step 5: custom domain — the owner supplies the hostname for `tool/CNAME`, then check the
-   tool and the writeup are both reachable from the domain's landing page.
-4. Once the site is live the owner supplies the URL; run
-   `python scripts/verify_deploy.py <url>` and report, **compression result included** — that
-   check is the one that decides 3.3 s versus 40 s on a phone.
-5. **GitHub Pages is not being used.** `deploy.yml` was removed so there is only one deploy
-   path. Do not re-add it.
+1. **Custom domain.** The owner will supply a hostname once satisfied with the
+   `netlify.app` subdomain. **Do not configure a domain or CNAME before that.** On Netlify the
+   domain is set in the UI (Domain management), not with a `CNAME` file — the build script
+   deletes any `CNAME` from `_site` for exactly that reason. After it is set, re-run
+   `verify_deploy.py` against the custom hostname, and check that the tool and the writeup
+   are both reachable from the domain's landing page (owner's requirement: someone arriving
+   from a resume or a post must find both without a deep link).
+2. Then tell the dataset maintainer the project is published. The owner's decision is to
+   publish independently and tell him afterwards.
 
 ## Open questions and blockers
 
 **Blocked on the project owner:**
 
-- **Connecting the repo in the Netlify UI**, then the live URL.
-- **The custom domain hostname** — the owner wants it working on the `netlify.app`
-  subdomain first, so **do not add a CNAME or configure a domain yet.**
+- **The custom domain hostname.**
 
+**Decided by the owner, recorded so it is not relitigated:**
 
-**Decided by the owner, recorded so it is not relitigated:** the maintainer's own listing of
-downstream projects is out of scope — publish independently, tell him afterwards. Nothing
-about the maintainer's site goes in the repo or the interface. The required attribution is
-separate and unchanged.
+- The maintainer's own listing of downstream projects is out of scope — publish
+  independently, tell him afterwards. Nothing about the maintainer's site goes in the repo or
+  the interface. The required attribution is separate and unchanged.
+- Deploy target is Netlify, not GitHub Pages.
+- `is_reliable_only` is relaxed for the tool's basket only (findings §7).
 
 ## Known constraints
 
-- **`hammer.duckdb` now holds snapshot `20260911T200435Z`, not the snapshot the Phase 2 and
+- **`hammer.duckdb` holds snapshot `20260911T200435Z`, not the snapshot the Phase 2 and
   Phase 3 numbers were computed on.** That build is preserved as
-  `hammer-20260822T134045Z.duckdb` — it was renamed rather than overwritten because
-  `scripts/load_snapshot.py` deletes the target database before loading. Reproduce any
-  published Phase 2/3 figure against that file. `hammer2.duckdb` still holds
-  `20260824T132829Z`.
-- **`is_reliable_only` is relaxed for the tool's basket only** (owner's decision,
-  2026-09-12; findings §7). Phase 2's published figures are unchanged and were computed under
-  the strict filter — **do not recompute them**. The relaxation rests on a guarantee asserted
-  in `E1_tool_extract.sql`: no fuzzy-tier vendor's price can reach the extract. If that
-  assertion ever fires, do not widen the allowed tiers to make it pass — re-examine the
-  relaxation.
-- The full rebuild does not fit a hosted CI runner (~10 GB working set). `scripts/refresh.py`
-  runs locally; CI only validates and deploys the committed extract.
+  `hammer-20260822T134045Z.duckdb` (renamed, because `scripts/load_snapshot.py` deletes the
+  target database before loading). Reproduce any published Phase 2/3 figure against that file.
+- **`is_reliable_only` is relaxed for the tool's basket only.** Phase 2's published figures
+  were computed under the strict filter and are unchanged — do not recompute them. The
+  relaxation rests on a guarantee asserted in `E1_tool_extract.sql`: no fuzzy-tier vendor's
+  price can reach the extract. If that assertion fires, do not widen the allowed tiers to
+  make it pass; re-examine the relaxation.
+- **Deploy gate floors** are 4,000 products and 50% comparable, calibrated 2026-09-12 against
+  a 6,090 / 65.30% population; the calibration is recorded beside them in
+  `scripts/check_extract.py`.
+- **Netlify's site settings show an empty publish directory.** `netlify.toml` supplies
+  `_site` and takes precedence, and the push-triggered build demonstrably used it. If the toml
+  is ever removed, the site will publish the repository root.
+- The full data rebuild does not fit a CI runner (~10 GB working set). `scripts/refresh.py`
+  runs locally and commits the extract; the push then deploys it through Netlify's gated build.
 
 ## Anything the next agent should distrust
 
+- **The gates running on Netlify's builder are inferred, not read from a log.** The build API
+  returned no log lines. The evidence is indirect but strong: the build command is
+  `bash scripts/netlify_build.sh`, which runs `check_extract.py` under `set -euo pipefail`
+  before it assembles anything, and the published deploy serves `/dashboard/` — a path that
+  exists only because that script assembled `_site`. A build log read from the Netlify UI
+  would make it direct.
+- **The refusal path has never run on Netlify.** Both refusals (a non-production context and
+  a failing extract) were demonstrated locally and from a fresh clone, never on the builder.
+- **`probe.yml` has never executed.** It parses, and the script it calls has been run by hand.
 - **The Section 2 and 3 numbers in `docs/phase-4-findings.md` describe the superseded
-  2026-08-21 strict-filter extract** — 2,921 products, 60.93% comparable. §6 and §7 carry the
-  current figures: **6,090 products, 65.30% comparable**. Both older sections are correct for
-  the build they are stamped to and stale as a description of what the tool ships.
-- **The phone measurement assumes the host compresses.** 3.31 s to interactive gzipped;
-  **40 s uncompressed**. `verify_deploy.py` fails the deploy if the live host serves the large
-  JSON uncompressed, so this is checked rather than assumed — but it has never run against a
-  real deploy.
-- **The Netlify build has never run on Netlify.** `scripts/netlify_build.sh` has been run
-  locally and both its refusal paths demonstrated, but a local bash run is not a builder.
-- **`probe.yml` has never executed** either. It parses, and the script it calls has been run
-  by hand.
-- **Every local verification before 2026-09-12 used `python -m http.server`, which does not
-  compress.** Use `scripts/serve_gzip.py` for anything performance-related; the plain server
-  overstated transfer cost by 12x once already.
-- **`.handoff/invoke_codex.sh`'s interactive "yes" path has never been exercised.** Every
-  guard was tested and each exits 1, and the codex invocation was proven reachable with the
-  real binary — but always by way of a non-interactive abort or a TTY error, never by a
-  human confirming and a session actually starting.
+  2026-08-21 strict-filter extract** (2,921 products, 60.93%). §6–§8 carry the current figures.
+- **`.handoff/invoke_codex.sh`'s interactive "yes" path has never been exercised** — every
+  run ended in a non-interactive abort or a TTY error.
+- Use `scripts/serve_gzip.py`, not `python -m http.server`, for anything performance-related:
+  the plain server does not compress and overstated transfer cost by 12× once already.
