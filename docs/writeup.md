@@ -2,7 +2,7 @@
 
 *How four measurement choices moved the answer more than the supermarkets did — and the one comparison that survived.*
 
-<sub>71.8M price observations, 8 Canadian chains, Feb 2024 – 23 Aug 2026. In-store pickup, one Toronto neighbourhood. Data: [Project Hammer](https://projecthammer.org). Full provenance at the end.</sub>
+<sub>71.8M price observations, 8 Canadian chains, Feb 2024 – 23 Aug 2026. In-store pickup: North York, Toronto for seven chains; Save-On-Foods from a store in Kamloops, BC. Data: [Project Hammer](https://projecthammer.org). Full provenance at the end.</sub>
 
 ---
 
@@ -304,7 +304,7 @@ and that is a fact about Canadian grocery retail, not a defect in the data.
   each retailer would fix it.
 - **Quantities.** Every "share of the shelf" figure here is weighted by price because the
   data has no units sold. Without those, no honest basket weighting is possible.
-- **Wider geography.** One Toronto neighbourhood, pickup prices.
+- **Wider geography.** One area of Toronto — North York — for seven chains, and one store in Kamloops, BC for Save-On-Foods. Nothing here speaks for the wider GTA.
 
 ---
 
@@ -337,7 +337,7 @@ first if someone else had written this.
 price observations from eight Canadian grocery chains, February 2024 to 23 August 2026.
 **The underlying data was sourced from ProjectHammer.org.**
 
-**The scope.** These are *in-store pickup prices for one neighbourhood in Toronto*. Nothing
+**The scope.** These are *in-store pickup prices for North York, Toronto* — except Save-On-Foods, whose prices come from a store in Kamloops, British Columbia. Nothing
 here is a national, provincial or "Canadian" price. The comparison basket also excludes the
 expensive end of the catalogue — its 95th-percentile price is $13.99 against $20.04 for the
 catalogue as a whole — so it describes ordinary mid-market groceries and nothing above that.

@@ -11,7 +11,7 @@ grocery vendor.**
 
 ## Scope, stated up front
 
-The upstream data is the **"in store pickup" price for one neighbourhood in Toronto**.
+The upstream data is the **"in store pickup" price for North York, Toronto** — for seven of the eight chains. **Save-On-Foods is priced at a store in Kamloops, BC**, and is never compared against the Toronto chains.
 Nothing here is a national, provincial, or "Canadian" price. Any number that leaves this
 repo carries that qualifier.
 
@@ -84,7 +84,7 @@ built; refresh automation and deployment in progress. See
 - **No cross-chain ranking of promotional frequency.** Computed, then **withdrawn**: the
   sale flag is not semantically equivalent across chains.
 - **No price-freeze compliance rate for any retailer.** Not measurable from this data.
-- **Nothing national.** One Toronto neighbourhood, pickup prices.
+- **Nothing national, and nothing GTA-wide.** North York, Toronto, pickup prices — except Save-On-Foods, which is Kamloops, BC.
 
 ## Layout
 

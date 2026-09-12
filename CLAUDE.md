@@ -26,9 +26,24 @@ explicitly and stop; do not silently work around it.
 2. **Snapshot immutability.** Every downloaded copy of the dataset is stored with its
    download timestamp and a sha256 of the archive, and is never modified in place.
    Analysis reads from a snapshot, never from a live download.
-3. **Scope is Toronto pickup pricing.** The upstream data is the "in store pickup" price
-   for one Toronto neighbourhood. No claim in this project may be phrased as a national,
-   provincial, or "Canadian" price without that qualifier attached.
+3. **Scope is North York, Toronto pickup pricing** — and for Save-On-Foods, not Toronto at
+   all. The upstream data is the "in store pickup" price for the North York area of Toronto
+   for seven chains. No claim in this project may be phrased as a national, provincial,
+   "Canadian" or GTA-wide price without that qualifier attached.
+
+   **Corrected 2026-09-12. This decision was wrong from Phase 0 for one chain.** It read
+   "one Toronto neighbourhood" for all eight chains, and nothing in the project ever checked
+   it. Upstream's methodology page states North York "except for Save on Foods (that one is a
+   location in Calgary)"; the data puts **97% of Save-On-Foods products at store 2210,
+   Westsyde, Kamloops, BC**, 2 products at store 6634 (Calgary, used only until 2024-11-13)
+   and 451 at store 1982, unidentified. Save-On-Foods has no stores in Ontario. Every
+   cross-chain comparison involving it was a cross-city comparison, and they are withdrawn
+   (Phase 2 findings, W6). Its within-chain results stand, relabelled to Kamloops.
+
+   **North York itself rests on upstream's statement only.** Metro, Walmart and the other
+   chains carry no store identifier in their URLs, so the data can neither confirm nor
+   contradict it — and the same page was wrong in detail about the one chain that could be
+   checked.
 4. **Data range is the data range.** No claim about periods outside the dataset window,
    and no trend line that crosses a known regime change (see Known Contamination) without
    the break marked.
@@ -93,6 +108,9 @@ timestamp and sha256 per the immutability rule below.
   Matched from a Walmart-owned source: Walmart. Fuzzy-matched with a manual QC pass and
   known to possibly contain errors: Loblaws, No Frills, T&T, Voila.
 - **`price_per_unit` is not trustworthy** and may not equal current_price / units.
+- **Save-On-Foods is not priced in Toronto.** 97% of its products point at store 2210 in
+  Kamloops, BC (see locked decision 3). It may appear in within-chain results with that
+  location attached, and never in a cross-chain comparison with a Toronto chain.
 
 ## Honesty rules (non-negotiable)
 

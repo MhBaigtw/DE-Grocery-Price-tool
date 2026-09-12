@@ -439,7 +439,7 @@ COPY (
                    nonpositive_price := nonpositive_price)
           FROM excl)                                                   AS exclusions,
          struct_pack(
-           geography := 'In-store pickup prices for one neighbourhood in Toronto. Not national, not provincial.',
+           geography := 'In-store pickup prices for North York, Toronto. Not national, not provincial, not the wider GTA.',
            products := 'National brands only. Store brands share no barcode and cannot be compared.',
            chains := 'Metro, Save-On-Foods and Walmart. Galleria is excluded because its catalogue barely overlaps the others.',
            comparison := 'Per product only. This tool produces no basket, no total, and no cheapest-store verdict.',
