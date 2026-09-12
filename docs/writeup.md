@@ -30,7 +30,7 @@ barely agree at all:
 
 | Chain | By struck-out price | Rank | By promotional text | Rank |
 |---|---|---|---|---|
-| Save-On-Foods | 32.4% | **1** | 8.6% | **5** |
+| Save-On-Foods *(Kamloops, BC)* | 32.4% | **1** | 8.6% | **5** |
 | Metro | 29.0% | 2 | 0.0% | 7= |
 | Voila | 19.1% | 3 | 19.4% | 2 |
 | Loblaws | 17.8% | **4** | 24.1% | **1** |
@@ -45,7 +45,7 @@ under the other; the one that looks fourth is first.
 
 The two mechanisms agree almost perfectly at some chains and barely at all at others. Where
 a product has a struck-out price, promotional text confirms it on **99.5%** of rows at No
-Frills — and **21.5%** at Save-On-Foods. At Metro the check is impossible: the promotional
+Frills — and **21.5%** at Save-On-Foods (Kamloops). At Metro the check is impossible: the promotional
 text field is empty on all 6,003,385 of its rows.
 
 So "which chain promotes most?" has no stable answer. **I withdrew that comparison rather
@@ -139,7 +139,7 @@ each barcode is stocked by two to four chains, and each chain's listing counts o
 > The analysis applied a deliberately strict rule: it dropped any barcode that was *also*
 > carried by a chain whose barcodes are fuzzy-matched rather than supplied by the retailer,
 > because those chains take part in the analysis and a bad match there would corrupt a
-> result. The tool never reads a price from those chains — only Metro, Save-On-Foods and
+> result. The tool never reads a price from those chains — only Metro and
 > Walmart, whose barcodes come from the retailers — so the rule guards a route the tool does
 > not have, and applying it there would discard good data for nothing. **Every figure in
 > this piece is computed under the strict rule and is unchanged.**
@@ -151,7 +151,7 @@ How much that removes:
 | Chain | Share of price-weighted shelf presence that is store brand |
 |---|---|
 | **Metro** | **30.6%** |
-| Save-On-Foods | 28.8% |
+| Save-On-Foods *(Kamloops, BC)* | 28.8% |
 | Pooled | **22.6%** |
 
 *"Price-weighted shelf presence" means the sum of observed prices across listings. This
@@ -174,9 +174,16 @@ at two chains.
 One comparison came through every check I could think to run.
 
 > **On identical national-brand products stocked by both stores on the same day, Walmart
-> was cheaper than Metro on 100% of 711 observed dates, and cheaper than Save-On-Foods on
-> 100% of 606.** Typical gaps: about 12.6% against Metro, about 17.9% against Save-On-Foods.
-> Metro was cheaper than Save-On-Foods on 91.7% of dates, by about 5.3%.
+> was cheaper than Metro on 100% of 711 observed dates.** The typical gap is about 12.6%.
+> Both stores are priced in North York, Toronto.
+
+**Withdrawn: every comparison with Save-On-Foods.** I originally reported Walmart as about
+17.9% cheaper than Save-On-Foods on every one of 606 dates, and Metro as about 5.3% cheaper
+on 91.7% of them. Those compared Toronto prices with prices from a Save-On-Foods store in
+Kamloops, British Columbia. With one store per chain, a regional price difference and a
+store's own pricing cannot be separated, so those comparisons did not measure what they
+claimed to. The Save-On-Foods figures that describe only its own prices still stand, labelled
+with where they come from.
 
 The qualifier is part of the claim, not a footnote on it. *Identical national-brand
 products. Stocked by both. Same day.*
@@ -184,11 +191,9 @@ products. Stocked by both. Same day.*
 It survived the things that broke everything else:
 
 - **Not one date in 711 goes the other way.** Not an average that hides variation.
-- **Holds in every category** — all eight, for both Walmart comparisons.
-- **The three comparisons are consistent with each other.** Recomputed on only the products
-  all three chains stocked on the same day, no figure moves more than 0.5%, and chaining
-  Metro→Save-On-Foods→Walmart lands within **0.6%** of the direct Metro→Walmart measure.
-  Comparisons built this way are not guaranteed to agree. These do.
+- **Holds in every category** — all eight.
+- *The consistency check I reported here is withdrawn with the rest.* It chained
+  Metro→Save-On-Foods→Walmart, so it ran through a store in another city.
 
 ### Why this is not "so none of it means anything"
 
@@ -214,12 +219,10 @@ can only tell which is which by trying to break them.**
 
 The Walmart result is an aggregate. Shoppers buy specific products.
 
-- For **about half** the individual products in the Walmart comparisons, neither chain is
+- For **about half** of individual products (51%), neither Metro nor Walmart is
   reliably cheaper across the days both stock it.
-- Between Metro and Save-On-Foods that rises to **85%**.
 - The advantage depends on price level. Walmart's edge is largest on cheap items (**17%**
-  against Metro) and smallest on expensive ones (**8%**). Metro's edge over Save-On-Foods
-  is **zero** on the cheapest third of the basket and 9.7% on the dearest.
+  against Metro) and smallest on expensive ones (**8%**).
 
 **The aggregate answer and the shopper's answer disagree, and both are correct.** "Walmart
 is cheaper on national brands" is true of the basket and unreliable for the specific thing
@@ -243,7 +246,7 @@ moved at random, each weekday would carry about a seventh of them: 14.3%.
 |---|---|---|---|
 | Voila | Thursday | **92.6%** | 0.1% |
 | Metro | Thursday | **92.5%** | 0.4% |
-| Save-On-Foods | Thursday | **89.4%** | 0.2% |
+| Save-On-Foods *(Kamloops, BC)* | Thursday | **89.4%** | 0.2% |
 | Loblaws | Thursday | **86.5%** | 0.6% |
 | No Frills | Thursday | **85.4%** | 1.5% |
 | Walmart | Thursday | **63.1%** | 2.4% |

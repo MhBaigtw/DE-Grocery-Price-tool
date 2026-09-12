@@ -5,10 +5,48 @@ else had written it.*
 
 The writeup argues that measurement choices moved the answer more than the supermarkets
 did. That argument is only worth anything if my own measurements are sound. This note is
-the evidence, including **four times I caught myself being wrong** — one of which then
-happened a second time.
+the evidence — starting with **the largest error in the project, which none of my checks
+caught**, and then four times I did catch myself, one of which happened twice.
 
 Every check below is a committed script that can be run against the repository.
+
+---
+
+## The biggest failure: every check verified consistency, and none verified what the data was of
+
+**Every check in this project verified internal consistency. None of them verified what the
+data was of.** The largest error in the project was an unverified scope assumption, locked in
+at Phase 0 and never tested.
+
+The schema contract, the determinism lint, the compute-twice check, the reproducibility
+checksums, forty dbt contracts and the deploy gate all proved that the pipeline did what it
+said to the data it was given. Not one of them asked where the prices came from. That answer
+was assumed on day one and written into the project's locked decisions as "in-store pickup
+prices for one Toronto neighbourhood".
+
+**For one chain it was false.** Save-On-Foods has no stores in Ontario. In this dataset, 97%
+of its products are priced at a store in Kamloops, British Columbia. So I published two
+comparisons — Walmart about 17.9% cheaper than Save-On-Foods, Metro about 5.3% cheaper —
+that were really comparisons between two cities, and I built them into a public tool that
+told visitors it was showing Toronto prices.
+
+**Every check passed the whole time**, because every check was about consistency, and a
+pipeline that is consistent over the wrong scope is still consistent. The evidence was in the
+data from the start: Save-On-Foods' product links carry the store's id. Nothing looked at it,
+because nothing was pointed at it.
+
+It was found by someone asking a plain question — *which neighbourhood?* — and nothing else.
+
+**What I did about it:** took the tool offline before fixing anything; withdrew every
+comparison involving Save-On-Foods (W6 in the findings); rebuilt the tool as Metro against
+Walmart, the only pair priced in the same area; and corrected the locked decision in place,
+with a note saying it was wrong from Phase 0.
+
+**What I have not done** is claim a new check that would have caught it. A control verifies
+what it is pointed at. The honest lesson is that none of mine were pointed at provenance, and
+the controls below — which all worked — should be read with that in mind.
+
+*[findings §9](phase-4-findings.md) · [W6](phase-2-findings.md) · [CLAUDE.md decision 3](../CLAUDE.md)*
 
 ---
 

@@ -1,5 +1,11 @@
 # Phase 4 — Findings
 
+> **Scope correction, 2026-09-12 — read §9 first.** Every Save-On-Foods figure in §1–§8
+> describes a store in **Kamloops, BC**, not North York: its cadence, holds, staleness and
+> absence figures stand as statements about that store. The tool's three-chain builds in
+> §2–§8 compared it with Toronto chains, which was a cross-city comparison; the tool now
+> compares **Metro and Walmart only**.
+
 # §1 — Refresh cadence, measured
 
 The brief says: *do not pick a schedule, derive it.* This document is the derivation. It
@@ -1290,6 +1296,131 @@ The remaining question is whether the first click should pull the whole file:
 
 Revisit if `history.json` passes roughly 500 KB gzipped or the first click passes ~3 s.
 Recorded here so the next person inherits the numbers rather than the conclusion.
+
+---
+
+# §9 — Scope correction: Save-On-Foods is not in Toronto
+
+*2026-09-12. Found by answering a plain question — which neighbourhood? — not by any check.*
+
+## What was assumed, and what is true
+
+From Phase 0, CLAUDE.md locked decision 3 said every price was an in-store pickup price for
+"one Toronto neighbourhood". Nothing tested it. Upstream's methodology page says the prices
+cover "the North York area of Toronto, except for Save on Foods (that one is a location in
+Calgary)". The data is more specific: Save-On-Foods product URLs carry a store id.
+
+| Store id | URL channel | Products | In use | Store |
+|---|---|---|---|---|
+| **2210** | `/sm/pickup/` | **15,766 (97%)** | 2024-09-28 → 2026-09-10 | **Westsyde, 3435 Westsyde Rd, Kamloops, BC** |
+| 1982 | `/sm/planning/` | 451 | 2024-09-28 → 2026-09-10 | **Unidentified** — see below |
+| 6634 | `/sm/pickup/` | 2 | 2024-09-28 → 2024-11-13 | Heritage, 8855 Macleod Trail SW, Calgary, AB |
+
+Save-On-Foods has no stores in Ontario, so no Toronto Save-On-Foods price ever existed.
+
+**Store 1982 could not be identified.** Its store page refuses automated fetches and searches
+do not name it. What the data does show: all 451 of its SKUs are distinct from store 2210's
+(none appear under both), they sit under the site's `/sm/planning/` channel rather than
+`/sm/pickup/`, and they are mostly bakery, confectionery and seasonal lines. It was in use
+alongside 2210 for the whole period, so it is not a store that was swapped out. **Whether
+these are pickup prices at any physical store is not established.** It is recorded as a loose
+end rather than resolved by guessing.
+
+**North York itself rests on upstream's word.** Metro, Walmart and the other chains carry no
+store id in their URLs, so the data can neither confirm nor contradict it — and the page that
+states it was wrong in detail about the one chain that could be checked.
+
+## What changed
+
+| | |
+|---|---|
+| The live site | **Taken down first**, before any fix: a holding page replaced it, all data files 404, auto-builds stopped |
+| The tool | Rebuilt as **Metro vs Walmart only** — the sole reliable-barcode pair priced in the same area. Guaranteed in SQL and in the deploy gate: an out-of-area chain in the extract fails the build |
+| The dashboard | **Not published.** Its pairwise chart includes Save-On-Foods |
+| Published comparisons | Every cross-chain comparison with Save-On-Foods withdrawn as **W6** (Phase 2 findings) |
+| Within-chain results | Stand, relabelled to Kamloops, BC |
+| CLAUDE.md | Decision 3 amended in place with the correction, in its own commit |
+
+**Why the three-chain comparisons cannot be rescued.** With one store per chain, a difference
+between the Kamloops store and a Toronto store is some mix of regional pricing and store
+pricing, and nothing in the data separates the two. "Walmart is 17.9% cheaper than
+Save-On-Foods" might be about Walmart, about British Columbia, or about that one store. It
+is not a statement about anything a shopper could act on.
+
+## The rebuilt tool: Metro and Walmart
+
+*Same snapshot `20260911T200435Z`, extract date 2026-09-10, relaxed basket, verified twice,
+byte-identical. Guarantee: `OK - no fuzzy-tier vendor price can reach this extract`, 0 offers
+from other vendors, 0 rows off reliable tier. The shipped extract contains exactly
+`['Metro', 'Walmart']`.*
+
+| | Three chains (withdrawn) | **Metro and Walmart** |
+|---|---|---|
+| Basket | 6,475 | **3,642** |
+| Products shipped | 6,090 | **3,465** |
+| Comparable — recent price at every compared chain | 3,977 (65.30%) | **1,938 (55.93%)** |
+| One chain only — nothing to compare | 1,643 (26.98%) | **1,253 (36.16%)** |
+| Nothing recent | 470 (7.72%) | **274 (7.91%)** |
+| Offers past the measured horizon | 2,266 | **1,059** |
+| `products.json` | 7.46 MB / 344.3 KB gzipped | **3.65 MB / 179.4 KB gzipped** |
+| `history.json` | 4.31 MB / 173.5 KB gzipped | **1.83 MB / 84.6 KB gzipped** |
+
+**Comparability fell 9.4 pp, and that is not erosion.** With three chains a product was
+comparable if any two had a recent price. With two, it needs both. The same data answers a
+narrower question, and the stricter question is the only honest one left.
+
+7-day staleness, per chain: **Metro 32.11%, Walmart 9.92%.** No pooled figure.
+
+**The deploy gate refused this extract first**, at 3,465 products against a floor of 4,000
+calibrated on the three-chain build — correctly. The floors are now **2,300 products and 40%
+comparable**, calibrated against this population, with the floor history recorded beside
+them in `scripts/check_extract.py`.
+
+## The interface, simplified
+
+Rewritten mobile-first for a 380px phone, with desktop inheriting. The structure is search
+box, the answer, then caveats in smaller type underneath, with no panel competing with the
+result. The scope strip is a single sentence rather than a list, and the writeup is linked
+once. The tool no longer explains its methodology.
+
+| State | What the shopper sees |
+|---|---|
+| Both stores recent | **"$1.51 less at Walmart."** Two prices side by side, the cheaper one marked. A tie reads "Same price at both." and marks neither |
+| One store recent | **"Only Walmart has a recent price — nothing to compare."** then "That does not mean Walmart is cheaper." The other store is shown with its last price and date |
+| Neither recent | **"No recent price — nothing to compare."** Last prices shown, each with its date |
+| Price older than anything measured | **"⚠ Checked 23 Aug — already 18 days old at the last update. How far it has moved has not been measured."** |
+
+**Verified, not asserted:**
+
+- **Render test:** all 3,465 products, **0 failures**, with the test itself unchanged. Every
+  rule it enforced before still passes.
+- **Layout at a true 380px viewport** (an iframe, because Chrome's desktop window will not
+  go that narrow): landing, both-stores, one-store and nothing-recent states. No horizontal
+  overflow, and the price is the largest element on the screen in each.
+- **Phone performance** (380px, CPU 4×, Slow 4G, cold cache, gzipped, medians of 3): first
+  paint **0.86 s**, interactive **2.08 s**, search keystroke 60 ms, first history click
+  0.91 s. `products.json` is 187 KB over the wire.
+
+### Disclosures I kept but would have cut
+
+Where a simplification would have dropped something the render test requires, I kept the
+disclosure and shortened the wording instead. These are the remaining costs:
+
+| Kept | Why it stayed | What it costs |
+|---|---|---|
+| **The basket-divergence paragraph** ("covers more barcodes than the published analysis…") | The test requires "stricter rule" on the landing state; it is the answer to a reader who notices two numbers disagree | The longest caveat on the page by some distance, about six lines at 380px, explaining something almost no shopper will ask |
+| **"has not been measured"** plus an age tied to the last update | The test requires that phrase and the extract's own `days_behind` | Wordier than "178 days old — we don't know how far it's moved". The age is counted to the update date, not today, so the sentence needs "at the last update" to stay true |
+| **"each" after every price** | The test requires the price basis on screen | Reads fine as "$4.48 each", but it is a word on every price that means nothing until per-weight prices exist |
+| **The full attribution sentence in the strip** | The licence wording stays exactly as required | The strip wraps to three lines at 380px, so it is one sentence rather than one line |
+| **Per-chain staleness** ("within a week, about 32% at Metro, about 10% at Walmart") | Brief 3.3 requires how stale the data may be; pooling is forbidden, so both chains get a number | A second sentence where one would read better |
+| **The build line** (snapshot and build stamp, mono type) | Not required by any test; kept as provenance | Could go. It is the one kept item nothing enforces |
+
+### Changed from the brief's example, deliberately
+
+**Dates read "checked 10 Sep", not "checked 2 days ago".** The data is refreshed weekly, so
+any "ago" becomes false between refreshes without anything changing on the page, while a
+calendar date stays true. The exact ISO date still travels in the `datetime` attribute, so
+nothing is lost and the render test can check it.
 
 ---
 

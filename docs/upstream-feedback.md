@@ -485,6 +485,48 @@ it has an accuracy problem we could not bound. We are not asking you to build it
 asking for the sentence that stops the next consumer assuming their basket is
 representative.
 
+## 12. The Save-On-Foods location: the methodology page and the data disagree
+
+*Added 2026-09-12.*
+
+**The methodology page says:** *"Prices are gathered daily and cover the North York area of
+Toronto, except for Save on Foods (that one is a location in Calgary)."*
+
+**What the data shows.** Save-On-Foods product URLs carry a store id (`/rsid/NNNN/`), so the
+location can be read from the data itself. Across the whole history:
+
+| Store id | URL path | Products | First seen | Last seen | Store |
+|---|---|---|---|---|---|
+| **2210** | `/sm/pickup/` | **15,766 (97%)** | 2024-09-28 | 2026-09-10 | Westsyde, Kamloops, BC |
+| 6634 | `/sm/pickup/` | 2 | 2024-09-28 | 2024-11-13 | Heritage, Calgary, AB |
+| 1982 | `/sm/planning/` | 451 | 2024-09-28 | 2026-09-10 | Not identified by us |
+
+**We do not think the page is simply wrong.** The evidence fits a changed configuration
+better: a Calgary store (6634) does appear, early, and stops in November 2024, while the
+Kamloops store carries almost everything since. A pickup store that was changed once, with
+the page written before or around the change, would produce exactly this pattern. You will
+know which it was; we cannot tell from the outside.
+
+Store 1982 we could not place. Its 451 products are all distinct from store 2210's, sit under
+`/sm/planning/` rather than `/sm/pickup/`, and are mostly bakery, confectionery and seasonal
+items. It was in use alongside 2210 for the whole period.
+
+**Why it matters to a consumer.** We read the page, took "North York" as the scope for every
+chain but did not register the Save-On-Foods exception, and compared Save-On-Foods with
+Toronto chains as if they were in the same area. That mistake is ours, not yours — but a
+consumer who reads the page carefully would still conclude Calgary, and a Calgary/Kamloops
+difference matters to anyone comparing regions.
+
+**Smallest fix:** update that sentence to name the store actually configured, or say that
+the Save-On-Foods location has changed over time. If store 1982 is intentional, a line on
+what it represents would help.
+
+**One question, if you have a moment:** could you confirm the North York location used for
+the other seven chains — a postal code or store would do? Their URLs carry no store id, so
+it is the one part of the scope we cannot verify from the data.
+
+---
+
 ## What is already good, and worth not losing
 
 Stated because feedback documents skew negative, and because these are properties we

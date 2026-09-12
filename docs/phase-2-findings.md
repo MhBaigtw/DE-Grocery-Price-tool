@@ -9,6 +9,11 @@ Every number comes from a committed query in [analysis/phase2/](../analysis/phas
 `d1f90ee`/`f6d7345`/`6d01e90`/`01ff1a1`/`b584c32`/`b2f47b3`/`bfc7be8`), on snapshot
 `20260822T134045Z`, and verified twice with `scripts/verify_twice.py`.
 
+> **Scope correction, 2026-09-12.** Seven chains in this document are priced in North York,
+> Toronto. **Save-On-Foods is not:** 97% of its products point at store 2210 in Kamloops, BC.
+> Every cross-chain comparison involving it is withdrawn as **W6**. Its within-chain results
+> stand and describe that store. See CLAUDE.md locked decision 3.
+
 ---
 
 # Consolidated record — the version Phase 3 writes from
@@ -37,7 +42,7 @@ sentence** — the qualifiers are not caveats, they are part of the finding.
 
 ### R2 — Sale frequency (D2). Within-vendor only.
 
-> **At Save-On-Foods the median product carries a struck-out price on 32.12% of its
+> **At Save-On-Foods (store in Kamloops, BC) the median product carries a struck-out price on 32.12% of its
 > observed days, and 21.08% of its products do so on more than half of them. At Metro,
 > 26.44% and 18.28%.** n = 117,803 products observed 90+ days.
 
@@ -48,17 +53,19 @@ vendor's own data under one consistent definition, and they are unaffected by Lo
 ### R3 — Cross-vendor price comparison (D4). National brand only.
 
 > **On identical national-brand products co-observed on the same day: Walmart is ~12.6%
-> cheaper than Metro, Walmart ~17.9% cheaper than Save-On-Foods, and Metro ~5.3% cheaper
-> than Save-On-Foods.**
+> cheaper than Metro.** Both are priced in North York, Toronto.
 
-- **Stable in aggregate.** Walmart is cheaper on **100% of 606–713 dates** against both;
-  Metro beats Save-On-Foods on 91.74% of dates and in 7 of 8 categories.
-- **Transitive.** Recomputed on the three-way common set, no pairwise median moves more
-  than 0.5% and the transitivity residual is **1.0059**.
-- **It depends on price level.** Metro's advantage over Save-On-Foods grows with price
-  (nil on the cheapest third, 9.7% on the dearest); Walmart's shrinks (21% → 9% vs Metro).
-- **It does not hold per product.** 84.61% of Metro/Save-On-Foods GTINs have no
-  consistent cheaper vendor; ~50% for the Walmart pairs.
+- **Stable in aggregate.** Walmart is cheaper than Metro on **all 711 dates**, and in
+  all 8 categories.
+- **It depends on price level.** Walmart's advantage shrinks as price rises (21% → 9% vs
+  Metro).
+- **It does not hold per product.** For 50.96% of Metro/Walmart GTINs, neither is
+  consistently cheaper.
+- **Withdrawn (W6):** Walmart ~17.9% cheaper than Save-On-Foods; Metro ~5.3% cheaper than
+  Save-On-Foods, on 91.74% of dates and in 7 of 8 categories; Metro's advantage over
+  Save-On-Foods by price level; 84.61% of Metro/Save-On-Foods GTINs with no consistent
+  winner; and the transitivity check (residual 1.0059), which used Save-On-Foods as its
+  middle link. All compared Toronto with Kamloops, BC.
 
 **Blind to private label — 22.64% of price-weighted shelf exposure, 30.60% at Metro.**
 (§3.5, §3.8)
@@ -72,6 +79,7 @@ vendor's own data under one consistent definition, and they are unaffected by Lo
 | **W3** | Galleria from the D4 comparison | Its pairs share 5–8% of the basket against 48–65% for the others. Not a coverage failure — Galleria has the second-best barcode coverage of the four, but only 11.13% of its GTINs are carried by any other reliable vendor. A genuinely disjoint catalogue. | §3.7 |
 | **W4** | Any **D1 per-vendor freeze-compliance rate** | Selection-versus-outcome, compounded by an observation-length confound. A survivors-only rate differs from an all-window rate by −0.7 pp to 13.3 pp depending on vendor — not reliably wrong in a knowable direction, so no correction applies. | §4.2 |
 | **W5** | Phase 1 §2.6's Walmart marketplace-ID recommendation *(carried forward)* | Rested on 416 events of which 367 were our own 100× parse error. | Phase 1 §5.5 |
+| **W6** | **Every cross-chain comparison involving Save-On-Foods** — Walmart ~17.9% cheaper than it, Metro ~5.3% cheaper than it (91.74% of dates, 7 of 8 categories), the price-level split, the 84.61% per-product figure, and the transitivity check that ran through it *(withdrawn 2026-09-12)* | Save-On-Foods is not priced in Toronto. 97% of its products point at store 2210, Westsyde, Kamloops, BC. These compared two cities, and with one store per chain, regional pricing cannot be separated from store pricing — so no statement about which chain charges more survives. The error was a Phase 0 scope assumption that no check ever tested. Its within-chain results stand, relabelled to Kamloops. | §3.8, CLAUDE.md decision 3 |
 
 ## The exclusion ledger
 
@@ -108,7 +116,10 @@ overlap = **9,636**. Exact.
 - **"Vendor X complied with its price freeze."** Not computed and not computable (W4).
 - **Anything about Loblaws, No Frills, T&T or Voila in a cross-vendor price claim** —
   fuzzy tier, excluded by honesty rule 2.
-- **Anything national, provincial or "Canadian."** One Toronto neighbourhood, pickup price.
+- **Anything national, provincial, "Canadian" or GTA-wide.** North York, Toronto, pickup
+  price — and Save-On-Foods is Kamloops, BC.
+- **Any price comparison between Save-On-Foods and another chain.** Different cities;
+  regional and store pricing cannot be separated (W6).
 - **Anything about the expensive end.** The D4 basket's p95 is $13.99 against the
   catalogue's $20.04.
 
@@ -1314,6 +1325,12 @@ they predate assertion 2 and should be re-verified under the new checker when ne
 ---
 
 ## Section 3 — D4, basket comparison
+
+> **W6 (2026-09-12): every comparison in this section involving Save-On-Foods is
+> withdrawn.** Its prices come from a store in Kamloops, BC, not North York, so each
+> Save-On-Foods pair compared two cities. The tables are left as computed, because they are
+> the record of what was claimed; they do not support any statement about which chain
+> charges more. Metro/Walmart results stand. See the withdrawals table.
 
 *Computed under build `2026-08-28T17:48:35Z` — models `d1f90ee`/`f6d7345`/`6d01e90`/`01ff1a1`/`b584c32`/`b2f47b3`/`bfc7be8`. Verified with `verify_twice.py`: 16 result sets, both runs clean and identical.*
 

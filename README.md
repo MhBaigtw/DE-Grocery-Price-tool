@@ -21,11 +21,11 @@ repo carries that qualifier.
 repo. *The hard part of comparing grocery prices isn't getting the prices.*
 
 **→ [The price tool](https://de-grocery-project.netlify.app)** — what one
-product costs at Metro, Save-On-Foods and Walmart, for the 6,090 barcodes where that
-question can be answered. It refuses to answer for the 35% where it cannot, and says which
+product costs at Metro and Walmart in North York, Toronto, for the 3,465 barcodes where that
+question can be answered. It refuses to answer for the 44% where it cannot, and says which
 chains it actually compared. Its basket is deliberately wider than the analysis basket of
-3,477 — see [findings §7](docs/phase-4-findings.md) for why the two differ. Deployed from
-Netlify on every push to `main`, and the build refuses to publish an extract that fails
+3,477 — see [findings §7](docs/phase-4-findings.md) for why the two differ. **Currently offline** while a scope error is corrected — see
+[findings §9](docs/phase-4-findings.md). Deployed from Netlify on every push to `main`, and the build refuses to publish an extract that fails
 `scripts/check_extract.py`. Locally: serve the repo over HTTP and open `tool/index.html`. Locally: serve the repo over HTTP and open `tool/index.html`.
 
 **→ [The dashboard](dashboard/index.html)** — four charts, including the comparison that
