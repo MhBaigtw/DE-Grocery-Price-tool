@@ -1336,7 +1336,7 @@ states it was wrong in detail about the one chain that could be checked.
 |---|---|
 | The live site | **Taken down first**, before any fix: a holding page replaced it, all data files 404, auto-builds stopped |
 | The tool | Rebuilt as **Metro vs Walmart only** — the sole reliable-barcode pair priced in the same area. Guaranteed in SQL and in the deploy gate: an out-of-area chain in the extract fails the build |
-| The dashboard | **Not published.** Its pairwise chart includes Save-On-Foods |
+| The dashboard | **Retired permanently** (`dashboard/RETIRED.md`); the build refuses to publish it |
 | Published comparisons | Every cross-chain comparison with Save-On-Foods withdrawn as **W6** (Phase 2 findings) |
 | Within-chain results | Stand, relabelled to Kamloops, BC |
 | CLAUDE.md | Decision 3 amended in place with the correction, in its own commit |
@@ -1421,6 +1421,15 @@ disclosure and shortened the wording instead. These are the remaining costs:
 any "ago" becomes false between refreshes without anything changing on the page, while a
 calendar date stays true. The exact ISO date still travels in the `datetime` attribute, so
 nothing is lost and the render test can check it.
+
+### Resolved after review
+
+| Item | What changed | Verified |
+|---|---|---|
+| **The build line** | Cut from the interface. No test required it | Render test passes without it |
+| **"each" after every price** | Suppressed while every offer's basis is `each`. The guarantee stays: the render test now fails if any other basis appears without its label, and once one exists, every price must be labelled | Shown to fail: a per-weight offer on a page that never labels exits 1 |
+| **The basket-divergence paragraph** | The render test asserted only that "stricter rule" is present, not the paragraph, so it is now one sentence with a link. It also **no longer makes a size claim**: "more products than the analysis" was true of the three-chain build and false of this one, at 3,465 products against 3,477 barcodes | Extract rebuilt twice with the new sentence |
+| **The dashboard** | Retired, not rebuilt. After W6 the analysis has one surviving pairwise comparison, the writeup carries it, and every chart is a surface where a withdrawn claim can resurface | Shown to fail: a build that copies the dashboard back in exits 1 |
 
 ---
 

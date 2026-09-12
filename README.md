@@ -20,23 +20,22 @@ repo carries that qualifier.
 **→ [The writeup](docs/writeup.md)** — the argument, for a reader who will never open this
 repo. *The hard part of comparing grocery prices isn't getting the prices.*
 
-**→ [The price tool](https://de-grocery-project.netlify.app)** — what one
-product costs at Metro and Walmart in North York, Toronto, for the 3,465 barcodes where that
-question can be answered. It refuses to answer for the 44% where it cannot, and says which
-chains it actually compared. Its basket is deliberately wider than the analysis basket of
-3,477 — see [findings §7](docs/phase-4-findings.md) for why the two differ. **Currently offline** while a scope error is corrected — see
-[findings §9](docs/phase-4-findings.md). Deployed from Netlify on every push to `main`, and the build refuses to publish an extract that fails
-`scripts/check_extract.py`. Locally: serve the repo over HTTP and open `tool/index.html`. Locally: serve the repo over HTTP and open `tool/index.html`.
-
-**→ [The dashboard](dashboard/index.html)** — four charts, including the comparison that
-could not be made and why. Serve the repo over HTTP (`python -m http.server`) and open
-`dashboard/index.html`.
+**→ [The price tool](https://de-grocery-project.netlify.app)** — what one product costs at
+Metro and Walmart, in-store pickup in North York, Toronto, across 3,465 national-brand
+barcodes. For 44% of them only one store, or neither, has a recent price, and the tool says so
+rather than guessing. Its 3,465 products are slightly fewer than the analysis basket's 3,477
+barcodes, and not the same set: the tool compares only Metro and Walmart and does not apply the
+analysis's stricter matching rule ([findings §7](docs/phase-4-findings.md) explains why).
+**Currently offline** while a scope error is corrected ([findings §9](docs/phase-4-findings.md)).
+It deploys from Netlify on every push to `main`, and the build refuses to publish an extract
+that fails `scripts/check_extract.py`. Locally: serve the repo over HTTP and open
+`tool/index.html`.
 
 **→ [The findings](docs/phase-2-findings.md)** — every number, denominator, exclusion and
 withdrawal. Opens with a consolidated record.
 
-**→ [The method note](docs/method-note.md)** — how I know the numbers are trustworthy, and
-four times I caught myself being wrong.
+**→ [The method note](docs/method-note.md)** — how I know the numbers are trustworthy,
+starting with the largest error in the project, which none of the checks caught.
 
 ---
 
@@ -47,20 +46,26 @@ verdict on each proposed analysis. No findings.
 
 **Phase 1 — representation. Complete.** A computable price and an owned product identity.
 100.000% of price rows in both snapshots resolve to a unit price or an explicit `unparsed`
-verdict (33 unparsed of 71.8M / 72.0M). An owned product key with **0 collisions** across
+verdict (33 unparsed in each snapshot, of 71.8M / 72.0M rows). An owned product key with **0 collisions** across
 both snapshots. 40 dbt tests passing on both, 23 of 23 demonstrated to fail when they
 should.
 
-**Phase 2 — findings. Complete.** Three results, five withdrawals, a full exclusion ledger
-with a bias verdict on each class.
+**Phase 2 — findings. Complete.** Three results, six withdrawals, a full exclusion ledger
+with a bias verdict on each class. The sixth, W6, withdraws every comparison involving
+Save-On-Foods, whose prices come from a store in Kamloops, BC.
 
-**Phase 3 — publication. Complete.** Writeup, method note and dashboard.
+**Phase 3 — publication. Complete:** the writeup and the method note. Phase 3 also
+published a dashboard, since **retired**: after W6 the analysis has one surviving pairwise
+comparison, the writeup carries it, and every chart is a surface where a withdrawn claim can
+resurface. It stays in the repository as a record and is never published
+([`dashboard/RETIRED.md`](dashboard/RETIRED.md)).
 
-**Phase 4 — the price tool. In progress.** Refresh cadence measured rather than assumed
-(Thursday is the flyer day at six of eight chains, and a daily refresh beats a
-correctly-timed weekly one by under 2 percentage points). Static extract and interface
-built; refresh automation and deployment in progress. See
-[the Phase 4 findings](docs/phase-4-findings.md).
+**Phase 4 — the price tool. Built; offline pending review.** Refresh cadence measured rather
+than assumed (Thursday is the flyer day at six of eight chains, and a daily refresh beats a
+correctly-timed weekly one by under 2 percentage points). Deployed to Netlify, then taken
+offline on 2026-09-12 when Save-On-Foods was found to be priced in Kamloops, BC; rebuilt as
+Metro vs Walmart and awaiting review before it goes back up. See
+[the Phase 4 findings](docs/phase-4-findings.md), §9.
 
 ### What this project found, and what it did not
 
@@ -70,8 +75,10 @@ built; refresh automation and deployment in progress. See
   supported by the fortnight before the sale — a **bracket, not a point**, with most of the
   gap attributable to ordinary repricing.
 - **On identical national-brand products stocked by both chains on the same day**, Walmart
-  was cheaper than Metro on 100% of 711 observed dates and cheaper than Save-On-Foods on
-  100% of 606 — stable across categories and consistent with the third comparison.
+  was cheaper than Metro on 100% of 711 observed dates and in all 8 categories, by about
+  12.6%. Both are priced in
+  North York, Toronto. For about half of individual products (51%), neither is reliably
+  cheaper.
 - **One exclusion in the pipeline is biased**, not merely large, which is why every headline
   result is scoped to 2025–26.
 
@@ -84,41 +91,62 @@ built; refresh automation and deployment in progress. See
 - **No cross-chain ranking of promotional frequency.** Computed, then **withdrawn**: the
   sale flag is not semantically equivalent across chains.
 - **No price-freeze compliance rate for any retailer.** Not measurable from this data.
+- **No comparison between Save-On-Foods and any other chain.** Computed, then **withdrawn**
+  (W6): its prices come from a store in Kamloops, BC, and with one store per chain, regional
+  pricing cannot be separated from store pricing.
 - **Nothing national, and nothing GTA-wide.** North York, Toronto, pickup prices — except Save-On-Foods, which is Kamloops, BC.
 
 ## Layout
 
 ```
-CLAUDE.md                       project rules: locked decisions, honesty rules
+CLAUDE.md                       project rules: locked decisions, honesty rules, handoff rules
+AGENTS.md                       entry point for non-Claude agents; points at docs/RESUME.md
 README.md                       this file
+LICENSE                         MIT, for the code only -- not the data
+netlify.toml                    deploy config: gated build, headers, only main publishes
 config/
   expected_schema.json          asserted column names + types of raw and product
 docs/
-  phase-0-brief.md              the Phase 0 assignment
-  phase-0-findings.md           the Phase 0 deliverable
-  phase-1-brief.md              the Phase 1 assignment
-  phase-1-findings.md           the Phase 1 deliverable
-  retention-design.md           snapshot retention scheme (proposed)
-  upstream-feedback.md          ergonomics feedback for the maintainer
+  RESUME.md                     how to pick this project up without prior context
   FILES.md                      file manifest (what each file is for)
-analysis/phase0/                one .sql per finding; every number traces to one of these
-analysis/phase1/                same rule, for Phase 1
+  phase-0-brief.md ...          one brief per phase, phase-0 to phase-4
+  phase-0-findings.md           data reconnaissance
+  phase-1-findings.md           representation: parsing and an owned product identity
+  phase-2-findings.md           the results, withdrawals W1-W6, what must never be said
+  phase-3-thesis.md             the argument the writeup makes
+  phase-4-findings.md           refresh cadence, the tool, the scope correction (section 9)
+  writeup.md                    the public piece
+  method-note.md                how the numbers were checked, and what the checks missed
+  retention-design.md           snapshot retention scheme (proposed)
+  upstream-feedback.md          feedback for the dataset's maintainer
+analysis/phase0/ ... phase4/    one .sql per finding; every number traces to one of these
 models/                         the parsing macros and the staging/intermediate models
 dbt/                            the dbt project: contracts and tests (dbt test, not dbt run)
+tool/                           the price tool: index.html and its generated data/ extract
+dashboard/                      RETIRED Phase 3 dashboard, kept as a record, never published
 scripts/
   fetch_snapshot.py             download a snapshot + record sha256/timestamps
-  load_snapshot.py              load a snapshot into DuckDB (read-only over the source)
+  load_snapshot.py              load a snapshot into DuckDB (deletes its target DB first)
   build_models.py               materialise the models; asserts rows in == rows out
   compact_db.py                 reclaim dead pages DuckDB does not free on rebuild
   run_query.py                  run a saved query against the analysis DB
+  verify_twice.py               run a query twice: both must succeed and agree
+  refresh.py                    the weekly refresh: fetch, gate, rebuild, regenerate the extract
+  netlify_build.sh              the deploy build: gates first, then assemble _site
   run_dbt_tests.py              run the dbt suite on both snapshots, report counts
   check_schema.py               assert the loaded schema matches config/
   check_layering.py             assert product_id appears nowhere below staging
   check_model_parity.py         assert the two model build paths have not drifted
+  check_determinism.py          flag SQL that could return a different answer twice
   check_manifest.py             verify docs/FILES.md matches the repo
+  check_extract.py              the deploy gate for the tool's extract
   verify_reproducible.py        assert the materialisation is a cache, not an artifact
-  test_check_schema.py          prove check_schema.py fails when it should
-  test_dbt_contracts.py         prove every dbt test fails when it should
+  verify_deploy.py              check the live site over HTTP, compression included
+  measure_phone.js              time the tool on a mid-range phone profile
+  serve_gzip.py                 a local server that compresses, like the real host
+  test_*.py, test_*.js          prove each check fails when it should
+.handoff/                       where the last session stopped -- not a record of what is true
+.github/workflows/probe.yml     daily upstream check; opens an issue when a refresh is due
 data/snapshots/                 downloaded archives (gitignored for size, not licence)
 ```
 
@@ -226,7 +254,7 @@ gitignored. Cloning this repo gets you the code and the findings, never the data
 
 The maintainer has confirmed by email that publishing derived analysis and redistributing
 the dataset are both permitted, and that redistribution is encouraged. That permission
-comes with a required attribution, used here and in every writeup and dashboard footer:
+comes with a required attribution, used here, in the writeup and in the tool:
 
 > The underlying data was sourced from ProjectHammer.org
 

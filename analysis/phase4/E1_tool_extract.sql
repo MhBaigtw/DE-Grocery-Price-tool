@@ -451,13 +451,13 @@ COPY (
            products := 'National brands only. Store brands share no barcode and cannot be compared.',
            chains := 'Metro and Walmart, both priced in North York, Toronto. Save-On-Foods is excluded because its prices come from a store in Kamloops, BC; Galleria because its catalogue barely overlaps the others.',
            comparison := 'Per product only. This tool produces no basket, no total, and no cheapest-store verdict.',
-           basket := 'This tool covers more barcodes than the published analysis did. The '
-                  || 'analysis used a stricter rule that dropped any barcode also carried by '
-                  || 'a chain whose barcodes are fuzzy-matched; this tool does not need that '
-                  || 'rule, because it only ever reads prices from Metro and '
-                  || 'Walmart, whose barcodes come from the retailers themselves. The '
-                  || 'analysis figures were computed under the stricter rule and are '
-                  || 'unchanged.',
+           -- One sentence. The reasoning lives in the writeup and findings §7, and the
+           -- interface links to it rather than carrying it on a phone screen.
+           -- Deliberately no size comparison. The tool's 3,465 products and the analysis
+           -- basket's 3,477 barcodes are different sets that happen to be close in number,
+           -- and "more" or "fewer" flips with every refresh. What stays true is why they differ.
+           basket := 'This tool is not the published analysis basket: it compares only Metro and '
+                  || 'Walmart, without the stricter rule the analysis used; the analysis figures are unchanged.',
            staleness := 'Reported per chain. There is deliberately no pooled figure: pooling understates the chain you are most likely to be wrong about.'
          )                                                             AS scope,
          'The underlying data was sourced from ProjectHammer.org'       AS attribution

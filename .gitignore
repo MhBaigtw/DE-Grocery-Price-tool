@@ -35,7 +35,7 @@ dbt/dbt_packages/
 logs/
 dbt/.user.yml
 
-# Netlify build output. Assembled by scripts/netlify_build.sh from tool/ and dashboard/;
+# Netlify build output. Assembled by scripts/netlify_build.sh from tool/ only;
 # nothing in it is authored.
 _site/
 

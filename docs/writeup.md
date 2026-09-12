@@ -2,7 +2,7 @@
 
 *How four measurement choices moved the answer more than the supermarkets did — and the one comparison that survived.*
 
-<sub>71.8M price observations, 8 Canadian chains, Feb 2024 – 23 Aug 2026. In-store pickup: North York, Toronto for seven chains; Save-On-Foods from a store in Kamloops, BC. Data: [Project Hammer](https://projecthammer.org). Full provenance at the end.</sub>
+<sub>71.8M price observations, 8 Canadian chains, Feb 2024 – 21 Aug 2026. In-store pickup: North York, Toronto for seven chains; Save-On-Foods from a store in Kamloops, BC. Data: [Project Hammer](https://projecthammer.org). Full provenance at the end.</sub>
 
 ---
 
@@ -25,23 +25,33 @@ There are two reasonable ways to tell whether a product is on sale. Either the r
 publishes a struck-out "was" price, or its listing carries promotional text — `SALE`,
 `Rollback`, `2 for $7`.
 
-Rank all eight chains by how often their products are on sale, and the two definitions
-barely agree at all:
+Rank the chains by how often their products are on sale, and the two definitions agree only
+weakly:
 
-| Chain | By struck-out price | Rank | By promotional text | Rank |
+| Chain | By struck-out price | Rank (of 8) | By promotional text | Rank (of 6) |
 |---|---|---|---|---|
 | Save-On-Foods *(Kamloops, BC)* | 32.4% | **1** | 8.6% | **5** |
-| Metro | 29.0% | 2 | 0.0% | 7= |
+| Metro | 29.0% | 2 | *not measurable* | — |
 | Voila | 19.1% | 3 | 19.4% | 2 |
 | Loblaws | 17.8% | **4** | 24.1% | **1** |
 | No Frills | 14.1% | 5 | 14.1% | 4 |
 | Walmart | 12.2% | 6 | 17.1% | 3 |
 | T&T | 6.2% | 7 | 0.9% | 6 |
-| Galleria | 0.8% | 8 | 0.0% | 7= |
+| Galleria | 0.8% | 8 | *not measurable* | — |
 
-**Rank correlation between the two orderings: 0.196** — statistically indistinguishable
-from no relationship. The chain that looks most promotional under one definition is fifth
-under the other; the one that looks fourth is first.
+Two chains cannot be ranked by promotional text at all. Metro's promotional-text field is
+empty on every row. Galleria's is filled on over two million rows, but only with availability
+text such as "Out of Stock", never with promotional wording. **Their rate is not zero; it
+cannot be measured.**
+
+**Rank correlation between the two orderings, across the six chains measurable both ways:
+0.31.** That is weakly positive, and with only six chains nothing short of near-perfect
+agreement could be told apart from none. I first published this figure as 0.196. That version
+ranked Metro's and Galleria's unmeasurable rates as measured zeros, tied for last — the same
+mistake as reading "cannot be checked" as "never confirmed" — and it understated how much the
+two definitions agree. The conclusion survives the correction: the chain that looks most
+promotional under one definition is fifth under the other, and the one that looks fourth is
+first.
 
 The two mechanisms agree almost perfectly at some chains and barely at all at others. Where
 a product has a struck-out price, promotional text confirms it on **99.5%** of rows at No
@@ -53,7 +63,7 @@ than pick a definition and publish the ranking it produced.** I am not showing t
 because one ordering is right — I am showing it because neither is.
 
 *Not a claim about any retailer's behaviour. A claim about the word "sale".*
-→ [`Q2d_flag_semantics.sql`](../analysis/phase2/Q2d_flag_semantics.sql) · [findings §2.7](phase-2-findings.md)
+→ [`Q2d_flag_semantics.sql`](../analysis/phase2/Q2d_flag_semantics.sql) · [`Q2e_flag_rank_correlation.sql`](../analysis/phase2/Q2e_flag_rank_correlation.sql) · [findings §2.7](phase-2-findings.md)
 
 ### 2. Which "before" price you pick moves apparent pre-sale inflation sixfold
 
@@ -135,7 +145,8 @@ My matched basket covers **3,477 distinct barcodes, which is 8,448 product listi
 each barcode is stocked by two to four chains, and each chain's listing counts once.
 
 > **A note on a second number you may see.** The [price tool](../tool/index.html) built on
-> this work covers **more** barcodes than the 3,477 here, and the two are not in conflict.
+> this work covers 3,465 products — slightly fewer than the 3,477 barcodes here, and not the
+> same set — and the two are not in conflict.
 > The analysis applied a deliberately strict rule: it dropped any barcode that was *also*
 > carried by a chain whose barcodes are fuzzy-matched rather than supplied by the retailer,
 > because those chains take part in the analysis and a bad match there would corrupt a
@@ -143,6 +154,7 @@ each barcode is stocked by two to four chains, and each chain's listing counts o
 > Walmart, whose barcodes come from the retailers — so the rule guards a route the tool does
 > not have, and applying it there would discard good data for nothing. **Every figure in
 > this piece is computed under the strict rule and is unchanged.**
+
 **Exactly one of those 8,448 listings is a store brand.** The catalogue contains 16,106
 store-brand products.
 
@@ -191,7 +203,8 @@ products. Stocked by both. Same day.*
 It survived the things that broke everything else:
 
 - **Not one date in 711 goes the other way.** Not an average that hides variation.
-- **Holds in every category** — all eight.
+- **Holds in every category** — all eight, for this pair on its own. Metro's prices are
+  higher in each, from about 6% on eggs to about 20% on produce.
 - *The consistency check I reported here is withdrawn with the rest.* It chained
   Metro→Save-On-Foods→Walmart, so it ran through a store in another city.
 
@@ -317,7 +330,7 @@ Every figure traces to a committed query:
 
 | Claim | Query |
 |---|---|
-| Sale-definition scramble | [`Q2d_flag_semantics.sql`](../analysis/phase2/Q2d_flag_semantics.sql) |
+| Sale-definition scramble | [`Q2d_flag_semantics.sql`](../analysis/phase2/Q2d_flag_semantics.sql), [`Q2e_flag_rank_correlation.sql`](../analysis/phase2/Q2e_flag_rank_correlation.sql) |
 | 3.4%–21.3% bracket | [`Q2a_presale_inflation.sql`](../analysis/phase2/Q2a_presale_inflation.sql) |
 | Freeze-rate sensitivity | [`Q4_d1_bounded.sql`](../analysis/phase2/Q4_d1_bounded.sql) |
 | Store-brand blind spot, Galleria | [`Q3b_basket_blindspot.sql`](../analysis/phase2/Q3b_basket_blindspot.sql) |
@@ -337,7 +350,7 @@ first if someone else had written this.
 ## Data, scope and licence
 
 **The data.** The [Project Hammer](https://projecthammer.org) public dataset: 71.8 million
-price observations from eight Canadian grocery chains, February 2024 to 23 August 2026.
+price observations from eight Canadian grocery chains, February 2024 to 21 August 2026.
 **The underlying data was sourced from ProjectHammer.org.**
 
 **The scope.** These are *in-store pickup prices for North York, Toronto* — except Save-On-Foods, whose prices come from a store in Kamloops, British Columbia. Nothing
@@ -345,9 +358,12 @@ here is a national, provincial or "Canadian" price. The comparison basket also e
 expensive end of the catalogue — its 95th-percentile price is $13.99 against $20.04 for the
 catalogue as a whole — so it describes ordinary mid-market groceries and nothing above that.
 
-**The vintage.** My newest snapshot is 23 August 2026. The dataset's maintainer is actively
-fixing several of the defects described here, so parts of this piece describe a moment in
-time rather than a permanent state. Anything he fixed after that date is invisible to me.
+**The vintage.** Every figure in this piece was computed on one snapshot, downloaded on 22
+August 2026, with prices up to 21 August 2026. I now hold a newer snapshot, with prices up to
+10 September 2026; the price tool uses it, and this piece was not recomputed on it. The
+dataset's maintainer is actively fixing several of the defects described here, so parts of
+this piece describe a moment in time rather than a permanent state. Anything he fixed after 21
+August is invisible to these figures.
 
 **The licence.** The analysis code and documentation are MIT licensed. The dataset is not
 mine, is not redistributed in this repository, and carries its own attribution requirement,

@@ -1248,7 +1248,7 @@ Ordering under the two mechanisms differs materially:
 | Vendor | % rows `old_price` present | % rows promotional `other` |
 |---|---|---|
 | SaveOnFoods | **32.39%** (1st) | 8.62% (5th) |
-| Metro | 28.98% (2nd) | 0.00% (7th=) |
+| Metro | 28.98% (2nd) | *not measurable* — no rank |
 | Voila | 19.12% (3rd) | 19.39% (2nd) |
 | Loblaws | 17.78% (4th) | **24.07%** (1st) |
 | NoFrills | 14.11% (5th) | 14.13% (4th) |
@@ -1258,6 +1258,8 @@ Ordering under the two mechanisms differs materially:
 and fifth under the other; Loblaws is fourth under one and first under the other. A
 cross-vendor ranking that reverses under an equally defensible definition of the same
 concept is not a finding.
+
+*Corrected 2026-09-12.* This table first showed Metro at 0.00% and ranked it 7th equal, which read an unmeasurable rate as a measured zero; the table above already called Metro untestable. Galleria, also unmeasurable, is omitted here as before. The writeup's rank correlation had the same flaw: 0.196 over eight chains with both treated as zero. Over the six chains measurable both ways it is **0.314**. Both are reproduced by `Q2e_flag_rank_correlation.sql`.
 
 #### What 2B still supports
 

@@ -68,10 +68,10 @@ echo
 echo "--- assembling _site ---------------------------------------------"
 mkdir -p _site
 cp -r tool/. _site/
-# The Phase 3 dashboard is NOT published (2026-09-12). Its pairwise chart compares
-# Save-On-Foods, priced in Kamloops, BC, against Toronto chains -- the cross-city comparison
-# withdrawn as W6. It stays in the repository as a record and comes back only once it is
-# rebuilt without that comparison.
+# The Phase 3 dashboard is RETIRED (2026-09-12) and is never published. It is not coming
+# back in a rebuilt form: the analysis has one surviving pairwise comparison, the writeup
+# carries it, and every chart is a surface where a withdrawn claim can resurface. It stays
+# in the repository as a record -- see dashboard/RETIRED.md.
 
 # The tool's own CNAME (if one is ever added) belongs to GitHub Pages, not Netlify, where a
 # custom domain is configured in the UI. Shipping it would do nothing but confuse a reader.
@@ -81,6 +81,13 @@ rm -f _site/CNAME
 for f in index.html data/meta.json data/products.json data/history.json; do
     [ -s "_site/$f" ] || { echo "MISSING or empty: _site/$f"; exit 1; }
 done
+
+# Retirement is enforced, not remembered. If anything ever copies the dashboard into the
+# publish directory again, the build stops here.
+if [ -e _site/dashboard ]; then
+    echo "REFUSED: _site/dashboard exists. The dashboard is retired; see dashboard/RETIRED.md."
+    exit 1
+fi
 
 echo
 du -sh _site 2>/dev/null || true

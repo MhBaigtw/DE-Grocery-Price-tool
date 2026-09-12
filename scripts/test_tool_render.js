@@ -50,6 +50,10 @@ const card = sandbox.card;
 let fail = 0, checked = 0;
 const bad = (g, msg) => { fail++; if (fail <= 12) console.log("  FAIL " + g + ": " + msg); };
 
+// Whether any offer anywhere is on a basis other than 'each'. It decides whether the page
+// must label every price, and it is computed from the extract, not taken from the page.
+const BASIS_MIXED = products.some(p => p.offers.some(o => o.basis !== "each"));
+
 const counts = {0:0, 1:0, 2:0, 3:0};
 for (const p of products) {
   const html = card(p);
@@ -97,7 +101,18 @@ for (const p of products) {
   for (const o of p.offers) {
     if (!html.includes(o.observed_date)) bad(p.gtin14, "missing observed_date for " + o.chain);
   }
-  if (!html.includes(">" + p.basis + "<")) bad(p.gtin14, "basis tag missing");
+  // The price basis. While every offer in the extract is 'each', the label carries no
+  // information and the page may omit it. The guarantee does not move: any offer on another
+  // basis must be labelled, and once one exists anywhere, every price must be, so a
+  // per-weight price can never sit unlabelled beside an each-price. Counted per offer, so
+  // one label cannot stand in for two prices.
+  for (const b of new Set(p.offers.map(o => o.basis))) {
+    if (b === "each" && !BASIS_MIXED) continue;
+    const need = p.offers.filter(o => o.basis === b).length;
+    const have = html.split(">" + b + "<").length - 1;
+    if (have < need)
+      bad(p.gtin14, "price basis '" + b + "' labelled " + have + " of " + need + " times");
+  }
 }
 
 // 5. No pooled staleness figure exists to leak. meta must carry staleness only per chain.
@@ -135,6 +150,9 @@ console.log("  3 chains        : " + counts[3]);
 console.log("  2 chains        : " + counts[2]);
 console.log("  1 chain         : " + counts[1] + "   (renders as 'nothing to compare')");
 console.log("  0 chains        : " + counts[0] + "   (renders as 'nothing to compare')");
+console.log("basis labels      : " + (BASIS_MIXED
+  ? "required on every price (a non-'each' basis exists)"
+  : "suppressed (every offer is 'each'); any other basis must be labelled"));
 console.log("failures          : " + fail);
 if (fail) { console.log("\nFAIL - the interface breaks a rule the extract enforces."); process.exit(1); }
 console.log("\nOK - every product renders with its chains, dates, basis and staleness warnings.");

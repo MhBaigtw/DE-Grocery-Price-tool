@@ -76,7 +76,6 @@
   footer{font-size:.8rem;color:var(--muted);margin:14px 2px 0}
   footer p{margin:0 0 6px}
   a{color:var(--accent)}
-  .mono{font-family:ui-monospace,Menlo,monospace;font-size:.7rem}
 
   /* ---- always visible, one line ---- */
   .strip{position:fixed;left:0;right:0;bottom:0;background:var(--card);
@@ -113,7 +112,6 @@
 <footer>
   <p>Why it works this way, and what it can’t tell you:
   <a href="https://github.com/MhBaigtw/DE-Grocery-Price-tool/blob/main/docs/writeup.md">read the writeup</a>.</p>
-  <p id="prov" class="mono"></p>
 </footer>
 </div>
 
@@ -152,10 +150,23 @@ function warnOld(o){
        + o.days_behind + " days old at the last update. How far it has moved has not been measured.</p>";
 }
 
+/* The price basis is shown only when it carries information. While every offer in the
+ * extract is 'each', the word says nothing. The moment any other basis appears anywhere,
+ * every price is labelled, so a per-weight price can never sit unlabelled beside an
+ * each-price. The render test fails if that ever stops being true. */
+let BASIS_OF = null, BASIS_MIXED = false;
+function basisLabel(o){
+  if (BASIS_OF !== PRODUCTS){
+    BASIS_OF = PRODUCTS;
+    BASIS_MIXED = PRODUCTS.some(p => p.offers.some(x => x.basis !== "each"));
+  }
+  return (o.basis !== "each" || BASIS_MIXED) ? ' <span class="u">' + esc(o.basis) + "</span>" : "";
+}
+
 function priceBox(o, badge){
   return '<div class="box' + (badge ? " win" : "") + '">'
     + '<span class="chain">' + esc(o.chain_label) + "</span>"
-    + '<span class="price">' + money(o.price) + ' <span class="u">' + esc(o.basis) + "</span></span>"
+    + '<span class="price">' + money(o.price) + basisLabel(o) + "</span>"
     + (badge ? '<span class="badge">' + badge + "</span>" : "")
     + '<span class="checked">checked ' + when(o.observed_date) + "</span>"
     + "</div>";
@@ -176,7 +187,7 @@ function extras(o){
 function oldRow(o){
   return '<div class="old"><span class="chain">' + esc(o.chain_label) + "</span>"
     + '<p class="small">Not compared — ' + esc(o.not_comparable_reason || "no recent price")
-    + ". Last price " + money(o.price) + ' <span class="u">' + esc(o.basis) + "</span>, checked "
+    + ". Last price " + money(o.price) + basisLabel(o) + ", checked "
     + when(o.observed_date) + ".</p>" + warnOld(o) + "</div>";
 }
 
@@ -312,12 +323,11 @@ function renderCover(counts){
     + '<p>Prices as of <time datetime="' + esc(META.extract_date) + '">'
     + human(META.extract_date, true) + "</time>, updated weekly. Prices can change after they are checked"
     + (moves ? ": within a week, " + moves : "") + ".</p>"
-    + (META.scope && META.scope.basket ? "<p>" + esc(META.scope.basket) + "</p>" : "");
+    + (META.scope && META.scope.basket ? "<p>" + esc(META.scope.basket)
+        + ' <a href="https://github.com/MhBaigtw/DE-Grocery-Price-tool/blob/main/docs/writeup.md#4-matching-products-by-barcode-makes-a-quarter-of-the-shelf-invisible">Why</a></p>' : "");
 
   const sd = document.getElementById("stripdate");
   if (sd) sd.textContent = human(META.extract_date, true);
-  $("#prov").textContent = "Data " + META.extract_date + " · snapshot " + META.snapshot_id
-    + " · build " + String(META.built_utc).slice(0, 19);
 }
 
 /* ---- boot ---- */

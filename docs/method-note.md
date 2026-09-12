@@ -163,7 +163,7 @@ remains* is how an exclusion becomes a finding. Of 71,809,333 price observations
 | kept | 70,883,862 (98.71%) | — |
 | **no product record** | **878,559 (1.22%)** | **Biased on time.** Removes 26.8% of Metro's 2024 sale events against 0.4% of its 2025 events |
 | ambiguous price | 46,884 (0.07%) | Distinct in kind, immaterial in effect |
-| unparseable | 28 | Too few to test |
+| unparseable | 28 *(of 33; the other 5 are also orphans, counted above)* | Too few to test |
 
 The time bias is why **every headline result in the writeup is scoped to 2025–2026**, with
 2024 reported separately. The exclusion was not merely large; it was concentrated in one
