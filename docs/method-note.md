@@ -57,6 +57,7 @@ the controls below — which all worked — should be read with that in mind.
 | [`check_schema.py`](../scripts/check_schema.py) | The upstream schema matches a committed contract; ingest fails loudly rather than casting or inferring | 6 of 6 cases |
 | [`check_determinism.py`](../scripts/check_determinism.py) | No SQL construct can return a different answer on the same data without a written, checkable justification | 8 of 8 cases |
 | [`verify_twice.py`](../scripts/verify_twice.py) | Every published number is computed twice and both runs **succeeded** and agree | 5 of 5 cases |
+| [`check_claims.py`](../scripts/check_claims.py) | Every figure in the writeup, the README and this note is listed in [`CLAIMS.md`](CLAIMS.md) against a committed source | 7 of 7 cases |
 | [`check_layering.py`](../scripts/check_layering.py) | An upstream row id cannot leak into the analysis layer | shown to fail |
 | [`check_model_parity.py`](../scripts/check_model_parity.py) | Two build paths cannot silently disagree about what a model means | shown to fail |
 | [`verify_reproducible.py`](../scripts/verify_reproducible.py) | The materialised data matches its own definition, column by column | 22 of 22 columns |
@@ -65,6 +66,29 @@ the controls below — which all worked — should be read with that in mind.
 "Shown to fail when it should" is the load-bearing column. **A check that has never failed
 has not been tested**, so each one has a companion that deliberately breaks it and asserts
 it complains.
+
+**The last row arrived late, and a reviewer found the gap before any check did.** The rule
+that every published figure has a committed query was written down from the start and
+enforced by nothing. The writeup carried a rank correlation of 0.196 that no committed query
+produced — computed, it turned out, over two chains whose promotional text is not rare but
+absent. The project owner found it by reading the draft. No control fired.
+
+The response was a sweep and a check. The sweep traced every figure in the three published
+documents as they stood at commit `66ecb20`: **197 figure occurrences, and 1 with no
+committed source** — the 97% of Save-On-Foods products at the Kamloops store, above, which
+came from queries deleted after they ran. `R6_save_on_foods_store_ids.sql` now regenerates it
+(15,766 of 16,258). Of the rest, 105,540 was already recorded as provenance-lost and stays
+that way; 614 and the determinism lint's 44 (16 plus 28) trace to committed scripts but
+describe an earlier state of them, and are marked historical. `CLAIMS.md` records, entry by
+entry, whether the number was confirmed against its source's output for the sweep or traced
+through the findings document that quotes it.
+
+`check_claims.py` now fails if a figure in those documents has no entry, if an entry names a
+file that is not committed, or if an entry no longer matches its sentence. **It is narrower
+than it sounds.** It proves a source exists, not that the source produces the number; that is
+still a person. It sees digits only, so a figure written as a word passes unseen. And it
+covers three documents: the findings documents and the upstream feedback carry far more
+figures and are not in it.
 
 ---
 

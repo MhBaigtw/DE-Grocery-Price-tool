@@ -29,6 +29,7 @@ Run every check before touching anything:
     git status
     git branch -a
     python scripts/check_manifest.py
+    python scripts/check_claims.py
     python scripts/check_schema.py
     python scripts/check_layering.py
     python scripts/verify_reproducible.py

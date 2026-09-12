@@ -1,4 +1,4 @@
-# Handoff — 2026-09-12 20:40, Claude Opus 5
+# Handoff — 2026-09-12 19:15, Claude Opus 5
 
 > Rewritten in full at the end of every completed section, at the same time as the
 > commit. Never written in a hurry at the end of a session — a note written while
@@ -15,82 +15,67 @@ below as verified state — verify them.
 
 ## Current phase and section
 
-Phase 4 (the price-lookup tool), end of the **scope-correction pass**. Save-On-Foods is
-priced at a store in Kamloops, BC, so CLAUDE.md locked decision 3 was wrong from Phase 0 for
-one chain; `docs/phase-4-findings.md` §9 is the record and Phase 2 findings carry it as W6.
-
-Two rounds of owner review have been applied since the correction. **Everything requested is
-done and committed. Nothing is pushed and nothing is redeployed.** The owner is reading the
-writeup, README, method note and upstream feedback before the push, and said to hold.
+Phase 4 (the price-lookup tool), after the scope correction and two owner review rounds. The
+**claims sweep** is complete: the owner named it as the last item before the push. Every
+figure in `docs/writeup.md`, `README.md` and `docs/method-note.md` is now in `docs/CLAIMS.md`
+against a committed source, and `scripts/check_claims.py` enforces it.
 
 ## Last commit
 
-See `git log -1`. The review round landed as one commit alongside this note. The tree was
-clean when written.
+See `git log -1`. The sweep landed as one commit alongside this note; the tree was clean when
+written apart from gitignored logs.
 
-**`main` is ahead of `origin/main`. NOTHING HAS BEEN PUSHED.** The public GitHub repository
-still shows pre-correction content until the owner approves a push.
+**`main` is ahead of `origin/main`. NOTHING HAS BEEN PUSHED.** The public repository still
+shows pre-correction content.
 
 ## What the last session completed
 
-- **Dashboard retired**, not rebuilt: build guard added, `dashboard/RETIRED.md` records why.
-  The guard was shown to fail.
-- **Interface:** build line cut; the "each" basis label suppressed while every offer is
-  `each`, with the render test made to fail on any unlabelled other basis (shown to fail); the
-  basket disclosure cut to one sentence with a link, and it no longer makes a size claim.
-- **Six README/writeup corrections from review:** the section 1 table and rank correlation,
-  withdrawn claims removed from the README, dashboard references, the basket direction, the
-  vintage, and README layout/duplication/unparsed wording.
-- **Verified rather than inherited:** Walmart cheaper than Metro in all 8 categories for
-  that pair alone, re-run on the analysis snapshot.
+- **Sweep:** 197 figure occurrences in the three documents at `66ecb20`. One had no committed
+  source (the Save-On-Foods 97%); `analysis/phase4/R6_save_on_foods_store_ids.sql` now
+  regenerates it and was verified twice. The method note's controls section records the gap,
+  that 0.196 was found by review rather than by a check, and what the check does not do.
+- **Check:** `check_claims.py` plus `test_check_claims.py` (7 of 7). Convention: a claims
+  manifest with anchor phrases, not inline tags — the reasoning is in the script's docstring.
+- README Checks and Layout, `docs/RESUME.md` Step 2 and `docs/FILES.md` updated.
 
 ## Immediate next steps
 
 1. **Wait for the owner's go on the push.** Do not push before it.
-2. On a go to redeploy: push `main`, set Netlify `stop_builds` back to `false`, let the push
-   build through the gate or deploy explicitly, then run `verify_deploy.py` against the live
-   URL, compression included, and confirm the holding page is gone.
-3. Later: custom domain (owner supplies the hostname), and contact the maintainer — upstream
-   feedback item 12 is written to be sent.
+2. On a go to redeploy (approved separately): push `main`, set Netlify `stop_builds` back to
+   `false`, deploy through the gate, run `verify_deploy.py` against the live URL, compression
+   included, and confirm the holding page is gone.
+3. Later: the custom domain (the owner supplies the hostname), and contact the maintainer —
+   upstream feedback item 12 is written to be sent.
 
 ## Open questions and blockers
 
-**Blocked on the project owner:**
+**Blocked on the project owner:** the push; then the redeploy; the custom domain hostname.
 
-- **The push**, then **the redeploy** — separately approved, both pending.
-- **The custom domain hostname.**
-
-**Decided by the owner, recorded so it is not relitigated:**
-
-- Scope is North York, Toronto; GTA-wide data is not available from this dataset. The tool
-  compares Metro and Walmart only.
-- The dashboard is retired permanently, not rebuilt.
-- Down is better than wrong: the holding page stays up until the owner approves.
-- Publish independently and tell the maintainer afterwards; nothing about his site in the
-  repo or the interface. Attribution unchanged. Deploy target is Netlify.
+**Not started, and not requested:** extending `check_claims.py` to the findings documents and
+`docs/upstream-feedback.md`, which carry far more figures and are not covered.
 
 ## Known constraints
 
 - **Netlify `stop_builds` is `true`** and the live URL serves a holding page. Pushes will not
-  build or deploy until `stop_builds` is set back.
-- **Two databases, two purposes.** `hammer.duckdb` is the newest snapshot (`20260911T200435Z`,
-  prices to 2026-09-10) and feeds the tool. `hammer-20260822T134045Z.duckdb` is the Phase 2/3
-  analysis build (prices to 2026-08-21); every published analysis figure, including the new
-  `Q2e_flag_rank_correlation.sql`, is reproduced against it.
-- **Deploy floors** are 2,300 products / 40% comparable, calibrated against the two-chain
-  build; history in `scripts/check_extract.py`.
+  build or deploy until it is set back.
+- **Two databases, two purposes.** `hammer.duckdb` (snapshot `20260911T200435Z`) feeds the tool
+  and R6. `hammer-20260822T134045Z.duckdb` is the Phase 2/3 analysis build; published analysis
+  figures are reproduced against it.
+- **Any edit to a figure in the three published documents needs a `docs/CLAIMS.md` entry**, or
+  `check_claims.py` fails. Editing a sentence that holds a figure can make its anchor stale.
 
 ## Anything the next agent should distrust
 
-- **North York rests on upstream's word only.** No store id exists in Metro's or Walmart's
-  URLs, and the same methodology page was wrong in detail about Save-On-Foods.
-- **Store 1982 is unidentified** (451 products under `/sm/planning/`).
-- **The owner's review may surface further corrections.** Two rounds each found real errors in
-  published text (withdrawn claims still in the README, a correlation computed over
-  unmeasurable zeros with no committed query, a wrong vintage date). Assume a third pass is
-  possible before the push.
-- **Other published figures may lack a committed query**, as 0.196 did. That was found by
-  review, not by any check. No sweep for others has been run.
+- **`check_claims.py` proves a source exists, not that it produces the number.** In
+  `CLAIMS.md`, 164 entries were confirmed against saved run output; 9 were only traced through
+  a findings document that names the query (Phase 0/1 figures in the README, 279,596 in the
+  writeup, 33 and 5 in the method note); 8 are historical (614, and 44/16/28, each appearing
+  twice) and their scripts no longer print them. Logs are gitignored, so "confirmed" cannot be
+  re-checked without re-running.
+- **"Walmart cheaper on 100% of 711 dates"** is derived from `pct_dates_first_cheaper = 0.00`
+  in Q3c, which counts Metro cheaper only where the daily median ratio is below 1.0. A date at
+  exactly 1.0 would count for neither, and the query does not print that case. Not re-run.
+- **North York rests on upstream's word only**; store 1982 is unidentified.
 - **The gates on Netlify's builder are inferred, not read from a log**, the refusal path has
   never run there, and `probe.yml` has never executed.
 - Use `scripts/serve_gzip.py`, not `python -m http.server`, for anything performance-related.

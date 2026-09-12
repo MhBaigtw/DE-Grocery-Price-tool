@@ -109,6 +109,7 @@ config/
 docs/
   RESUME.md                     how to pick this project up without prior context
   FILES.md                      file manifest (what each file is for)
+  CLAIMS.md                     every published figure and the committed source behind it
   phase-0-brief.md ...          one brief per phase, phase-0 to phase-4
   phase-0-findings.md           data reconnaissance
   phase-1-findings.md           representation: parsing and an owned product identity
@@ -139,6 +140,7 @@ scripts/
   check_model_parity.py         assert the two model build paths have not drifted
   check_determinism.py          flag SQL that could return a different answer twice
   check_manifest.py             verify docs/FILES.md matches the repo
+  check_claims.py               verify every published figure has a committed source
   check_extract.py              the deploy gate for the tool's extract
   verify_reproducible.py        assert the materialisation is a cache, not an artifact
   verify_deploy.py              check the live site over HTTP, compression included
@@ -190,6 +192,8 @@ read-only. Analysis reads from a snapshot, never from a live download.
 python scripts/check_schema.py         # schema drift (catches the announced product_id change)
 python scripts/test_check_schema.py    # proves the above actually fails when it should  (6 of 6)
 python scripts/check_manifest.py       # docs/FILES.md vs the repo
+python scripts/check_claims.py         # every figure in the published docs has a committed source
+python scripts/test_check_claims.py    # proves the above fails when it should  (7 of 7)
 python scripts/check_layering.py       # product_id must not appear below staging
 python scripts/check_model_parity.py   # models/ and dbt/models/ must not have drifted
 python scripts/check_determinism.py    # SQL that could return a different answer twice
