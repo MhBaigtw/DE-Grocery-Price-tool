@@ -1,4 +1,4 @@
-# Handoff — 2026-09-12 19:15, Claude Opus 5
+# Handoff — 2026-09-12, Claude Opus 5
 
 > Rewritten in full at the end of every completed section, at the same time as the
 > commit. Never written in a hurry at the end of a session — a note written while
@@ -15,67 +15,58 @@ below as verified state — verify them.
 
 ## Current phase and section
 
-Phase 4 (the price-lookup tool), after the scope correction and two owner review rounds. The
-**claims sweep** is complete: the owner named it as the last item before the push. Every
-figure in `docs/writeup.md`, `README.md` and `docs/method-note.md` is now in `docs/CLAIMS.md`
-against a committed source, and `scripts/check_claims.py` enforces it.
+Phase 4 (the price-lookup tool). The claims sweep and the owner's two follow-ups are done:
+the tie case behind "Walmart cheaper on 100% of 711 dates" is closed, and the method note says
+plainly that the claims check covers three documents, not the repository. The owner gave the
+go to push, re-enable Netlify builds and verify the live site; this note is committed
+immediately before that push.
 
 ## Last commit
 
-See `git log -1`. The sweep landed as one commit alongside this note; the tree was clean when
-written apart from gitignored logs.
-
-**`main` is ahead of `origin/main`. NOTHING HAS BEEN PUSHED.** The public repository still
-shows pre-correction content.
+See `git log -1`. Written alongside the commit; the tree was clean apart from gitignored logs.
 
 ## What the last session completed
 
-- **Sweep:** 197 figure occurrences in the three documents at `66ecb20`. One had no committed
-  source (the Save-On-Foods 97%); `analysis/phase4/R6_save_on_foods_store_ids.sql` now
-  regenerates it and was verified twice. The method note's controls section records the gap,
-  that 0.196 was found by review rather than by a check, and what the check does not do.
-- **Check:** `check_claims.py` plus `test_check_claims.py` (7 of 7). Convention: a claims
-  manifest with anchor phrases, not inline tags — the reasoning is in the script's docstring.
-- README Checks and Layout, `docs/RESUME.md` Step 2 and `docs/FILES.md` updated.
+- **Tie case closed.** `Q3c_pairwise_stability.sql` gained a final statement that bins every
+  date: Metro / Walmart has 711 of 711 with Walmart cheaper, 0 at exactly 1.0, closest 1.0264.
+  Verified twice on the analysis snapshot. The claim stands as written.
+- **Found along the way:** Metro / Save-On-Foods has 55 of 666 dates at exactly 1.0, and the
+  writeup's quote of that withdrawn comparison gave its 91.7% the wrong pair's date count (606).
+  Corrected to 666.
+- **Method note:** the claims check covers the writeup, README and method note only; the five
+  unchecked documents hold 6,613 figures by the same unreviewed extractor.
 
 ## Immediate next steps
 
-1. **Wait for the owner's go on the push.** Do not push before it.
-2. On a go to redeploy (approved separately): push `main`, set Netlify `stop_builds` back to
-   `false`, deploy through the gate, run `verify_deploy.py` against the live URL, compression
-   included, and confirm the holding page is gone.
-3. Later: the custom domain (the owner supplies the hostname), and contact the maintainer —
+1. If the push, the Netlify re-enable or the live verification did not complete, finish them:
+   `git push origin main`; `stop_builds` to `false`; build the pushed commit; run
+   `scripts/verify_deploy.py https://de-grocery-project.netlify.app/`, compression included.
+2. Later: the custom domain (the owner supplies the hostname), and contact the maintainer —
    upstream feedback item 12 is written to be sent.
 
 ## Open questions and blockers
 
-**Blocked on the project owner:** the push; then the redeploy; the custom domain hostname.
+**Blocked on the project owner:** the custom domain hostname.
 
-**Not started, and not requested:** extending `check_claims.py` to the findings documents and
-`docs/upstream-feedback.md`, which carry far more figures and are not covered.
+**Not started, and not requested:** extending `check_claims.py` to the findings documents,
+`docs/upstream-feedback.md` and the Phase 3 thesis. The owner said not now.
 
 ## Known constraints
 
-- **Netlify `stop_builds` is `true`** and the live URL serves a holding page. Pushes will not
-  build or deploy until it is set back.
 - **Two databases, two purposes.** `hammer.duckdb` (snapshot `20260911T200435Z`) feeds the tool
   and R6. `hammer-20260822T134045Z.duckdb` is the Phase 2/3 analysis build; published analysis
   figures are reproduced against it.
 - **Any edit to a figure in the three published documents needs a `docs/CLAIMS.md` entry**, or
-  `check_claims.py` fails. Editing a sentence that holds a figure can make its anchor stale.
+  `check_claims.py` fails. A reworded or re-wrapped sentence can make an anchor stale.
 
 ## Anything the next agent should distrust
 
-- **`check_claims.py` proves a source exists, not that it produces the number.** In
-  `CLAIMS.md`, 164 entries were confirmed against saved run output; 9 were only traced through
-  a findings document that names the query (Phase 0/1 figures in the README, 279,596 in the
-  writeup, 33 and 5 in the method note); 8 are historical (614, and 44/16/28, each appearing
-  twice) and their scripts no longer print them. Logs are gitignored, so "confirmed" cannot be
-  re-checked without re-running.
-- **"Walmart cheaper on 100% of 711 dates"** is derived from `pct_dates_first_cheaper = 0.00`
-  in Q3c, which counts Metro cheaper only where the daily median ratio is below 1.0. A date at
-  exactly 1.0 would count for neither, and the query does not print that case. Not re-run.
+- **`check_claims.py` proves a source exists, not that it produces the number.** Entries marked
+  "traced" or "historical" in `CLAIMS.md` were not re-run. Logs are gitignored.
+- **Phase 2 findings §3.8 still reads "Metro beats Save-On-Foods on 91.74% of dates"** without
+  saying the remaining 55 dates are exact ties. The comparison is withdrawn (W6); the findings
+  text was not edited.
 - **North York rests on upstream's word only**; store 1982 is unidentified.
-- **The gates on Netlify's builder are inferred, not read from a log**, the refusal path has
-  never run there, and `probe.yml` has never executed.
+- **Whether the live deploy verified cleanly** is in the session report and `git log`, not
+  here — this note was written before the push.
 - Use `scripts/serve_gzip.py`, not `python -m http.server`, for anything performance-related.

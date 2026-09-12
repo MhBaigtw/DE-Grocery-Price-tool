@@ -191,7 +191,7 @@ One comparison came through every check I could think to run.
 
 **Withdrawn: every comparison with Save-On-Foods.** I originally reported Walmart as about
 17.9% cheaper than Save-On-Foods on every one of 606 dates, and Metro as about 5.3% cheaper
-on 91.7% of them. Those compared Toronto prices with prices from a Save-On-Foods store in
+on 91.7% of its 666 dates. Those compared Toronto prices with prices from a Save-On-Foods store in
 Kamloops, British Columbia. With one store per chain, a regional price difference and a
 store's own pricing cannot be separated, so those comparisons did not measure what they
 claimed to. The Save-On-Foods figures that describe only its own prices still stand, labelled

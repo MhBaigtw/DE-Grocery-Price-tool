@@ -97,13 +97,14 @@ The check sees digits only. A figure written in words ("sixfold", "eight chains"
 | 30.6% | **30.6%** | analysis/phase2/Q3b_basket_blindspot.sql | confirmed |
 | 28.8% | 28.8% | analysis/phase2/Q3b_basket_blindspot.sql | confirmed: 28.78 |
 | 22.6% | **22.6%** | analysis/phase2/Q3b_basket_blindspot.sql | confirmed |
-| 100% | 100% of 711 | derived: 100 − pct_dates_first_cheaper (0.00) from analysis/phase2/Q3c_pairwise_stability.sql | confirmed input. The query counts Metro cheaper where the daily median ratio is below 1.0; a date at exactly 1.0 would count for neither chain, and the query does not print that case separately |
+| 100% | 100% of 711 | analysis/phase2/Q3c_pairwise_stability.sql | checked 2026-09-12, tie case closed: the last statement bins every date — Walmart cheaper on 711, exactly 1.0 on 0, Metro cheaper on 0; the closest date was a ratio of 1.0264. Verified twice on the analysis snapshot |
 | 711 | 100% of 711 | analysis/phase2/Q3c_pairwise_stability.sql | confirmed |
 | 12.6% | about 12.6% | derived: 1 − 1/1.1447 from analysis/phase2/Q3c_pairwise_stability.sql | confirmed input |
 | 17.9% | 17.9% cheaper | derived: 1 − 1/1.2186 from analysis/phase2/Q3c_pairwise_stability.sql | confirmed input; a withdrawn comparison, quoted in its withdrawal |
 | 606 | 606 dates | analysis/phase2/Q3c_pairwise_stability.sql | confirmed; withdrawn comparison |
 | 5.3% | 5.3% cheaper | derived: 1 − 0.9475 from analysis/phase2/Q3c_pairwise_stability.sql | confirmed input; withdrawn comparison |
-| 91.7% | 91.7% | analysis/phase2/Q3c_pairwise_stability.sql | confirmed: 91.74; withdrawn comparison |
+| 91.7% | 91.7% | analysis/phase2/Q3c_pairwise_stability.sql | confirmed: 91.74, 611 of 666; the other 55 dates sit at exactly 1.0, none has Save-On-Foods cheaper. Withdrawn comparison |
+| 666 | its 666 dates | analysis/phase2/Q3c_pairwise_stability.sql | confirmed: Metro / Save-On-Foods n_dates. Until 2026-09-12 the writeup said "91.7% of them", after 606, the wrong pair's date count |
 | 711 | in 711 | analysis/phase2/Q3c_pairwise_stability.sql | confirmed |
 | 6% | 6% on eggs | derived: 1.0639 − 1 from analysis/phase2/Q3c_pairwise_stability.sql | confirmed input, re-run 2026-09-12 on the analysis snapshot |
 | 20% | 20% on produce | derived: 1.2035 − 1 from analysis/phase2/Q3c_pairwise_stability.sql | confirmed input, re-run 2026-09-12 |
@@ -164,7 +165,7 @@ The check sees digits only. A figure written in words ("sixfold", "eight chains"
 | 2 | under 2 percentage | derived: daily against weekly-on-Thursday mean staleness, largest gap 1.61 pp, from analysis/phase4/R4_refresh_day_matrix.sql | confirmed inputs |
 | 3.4% | 3.4% and 21.3% | analysis/phase2/Q2a_presale_inflation.sql | confirmed: 3.39 |
 | 21.3% | 3.4% and 21.3% | analysis/phase2/Q2a_presale_inflation.sql | confirmed: 21.27 |
-| 100% | 100% of 711 | derived: 100 − pct_dates_first_cheaper (0.00) from analysis/phase2/Q3c_pairwise_stability.sql | confirmed input; same caveat as the writeup entry: a date at a ratio of exactly 1.0 is not separated |
+| 100% | 100% of 711 | analysis/phase2/Q3c_pairwise_stability.sql | checked 2026-09-12, tie case closed, as the writeup entry: 711 of 711, 0 dates at exactly 1.0, closest 1.0264 |
 | 711 | 100% of 711 | analysis/phase2/Q3c_pairwise_stability.sql | confirmed |
 | 8 | all 8 categories | analysis/phase2/Q3c_pairwise_stability.sql | confirmed: re-run 2026-09-12, 8 categories for Metro / Walmart |
 | 12.6% | 12.6% | derived: 1 − 1/1.1447 from analysis/phase2/Q3c_pairwise_stability.sql | confirmed input |
@@ -227,3 +228,6 @@ The check sees digits only. A figure written in words ("sixfold", "eight chains"
 | 44 | lint's 44 | scripts/check_determinism.py | historical: first run, as above |
 | 16 | (16 plus 28) | scripts/check_determinism.py | historical: first run disposition |
 | 28 | (16 plus 28) | scripts/check_determinism.py | historical: first run disposition |
+| 197 | "197 figures checked" | scripts/check_claims.py | confirmed: the sweep's count, as above |
+| 6,613 | counts 6,613 | scripts/check_claims.py | confirmed 2026-09-12: `--inventory --docs` over phase-0, 1, 2 and 4 findings and upstream-feedback.md, 1,641 + 1,868 + 1,833 + 996 + 275. Unreviewed extractor count; the document says so |
+| 197 | 197 in these three | scripts/check_claims.py | confirmed: the sweep's count, as above |

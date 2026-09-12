@@ -184,3 +184,22 @@ SELECT round((SELECT med FROM m WHERE va='Metro' AND vb='SaveOnFoods'), 4)   AS 
 -- 8. Size of the common set, so results 6 and 7 carry their n.
 SELECT count(*) AS gtin_day_basis_cells, count(DISTINCT gtin14) AS gtins,
        count(DISTINCT d) AS dates FROM common3;
+
+-- ============================ 6. THE TIE CASE IN RESULT 2 =========================
+
+-- 9. Result 2 counts a date as "first cheaper" only where its median ratio is below 1.0, so
+--    "the second vendor was cheaper on 100% of dates" silently assumes no date sits at
+--    exactly 1.0. Added 2026-09-12, after the claims sweep found that assumption unexamined
+--    behind the writeup's headline "100% of 711". Same daily medians, same n >= 30 filter,
+--    every date put in exactly one of three bins, plus the closest any date came to 1.0.
+WITH daily AS (
+  SELECT va, vb, d, count(*) AS n, median(ratio) AS r
+  FROM ratios GROUP BY 1,2,3 HAVING count(*) >= 30)
+SELECT va || ' / ' || vb                                   AS pair,
+       count(*)                                            AS n_dates,
+       count(*) FILTER (WHERE r < 1.0)                     AS dates_first_cheaper,
+       count(*) FILTER (WHERE r = 1.0)                     AS dates_exactly_1,
+       count(*) FILTER (WHERE r > 1.0)                     AS dates_second_cheaper,
+       round(min(r), 4)                                    AS min_daily_median,
+       round(max(r), 4)                                    AS max_daily_median
+FROM daily GROUP BY 1 ORDER BY pair;

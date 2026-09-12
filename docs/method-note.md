@@ -86,9 +86,16 @@ through the findings document that quotes it.
 `check_claims.py` now fails if a figure in those documents has no entry, if an entry names a
 file that is not committed, or if an entry no longer matches its sentence. **It is narrower
 than it sounds.** It proves a source exists, not that the source produces the number; that is
-still a person. It sees digits only, so a figure written as a word passes unseen. And it
-covers three documents: the findings documents and the upstream feedback carry far more
-figures and are not in it.
+still a person. It sees digits only, so a figure written as a word passes unseen.
+
+**It covers three documents, not the repository.** "197 figures checked" means the writeup,
+the README and this note, and nothing else. The four findings documents and
+`upstream-feedback.md` are not checked at all, and they carry far more figures than the
+checked surface: the same extractor counts 6,613 figure occurrences in those five against
+197 in these three. That count is the extractor's, tuned on the three checked documents and
+not reviewed against the other five, so read it as an order of magnitude. The Phase 3 thesis
+is not checked either. The findings documents are where most numbers were first computed; a
+figure in them can still lack a committed source, and no sweep has looked.
 
 ---
 
