@@ -68,8 +68,10 @@ echo
 echo "--- assembling _site ---------------------------------------------"
 mkdir -p _site
 cp -r tool/. _site/
-mkdir -p _site/dashboard
-cp -r dashboard/. _site/dashboard/
+# The Phase 3 dashboard is NOT published (2026-09-12). Its pairwise chart compares
+# Save-On-Foods, priced in Kamloops, BC, against Toronto chains -- the cross-city comparison
+# withdrawn as W6. It stays in the repository as a record and comes back only once it is
+# rebuilt without that comparison.
 
 # The tool's own CNAME (if one is ever added) belongs to GitHub Pages, not Netlify, where a
 # custom domain is configured in the UI. Shipping it would do nothing but confuse a reader.

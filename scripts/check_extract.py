@@ -22,11 +22,15 @@ VENDOR_CODES = ("SaveOnFoods",)          # keys that must never reach a reader
 # phrases, so a real brand that merely contains "save" (LIFESAVERS) is not refused.
 PROMO_BRAND = re.compile("[$][0-9]|you save|current price")
 
-# The three chains the tool reads, all reliable tier. This is the guarantee the relaxed
-# basket rests on: Phase 4 dropped `is_reliable_only` because a fuzzy-tier vendor's price
-# can never reach the extract, and that is only true while the extract contains these three
-# and nothing else. E1 asserts it in SQL at build time; this asserts it on what shipped.
-ALLOWED_CHAINS = {"Metro", "SaveOnFoods", "Walmart"}
+# The chains the tool compares. Two guarantees rest on this set, and it must hold both:
+#   - reliable tier: `is_reliable_only` was relaxed because no fuzzy-tier vendor's price can
+#     reach the extract;
+#   - same area: both are priced in North York, Toronto. Save-On-Foods was removed on
+#     2026-09-12 because its prices come from a store in Kamloops, BC -- a comparison with it
+#     was a cross-city comparison (CLAUDE.md locked decision 3).
+# E1 asserts it in SQL at build time; this asserts it on what shipped. Do not add a chain
+# here without establishing both, from evidence rather than from upstream's description.
+ALLOWED_CHAINS = {"Metro", "Walmart"}
 FAILS: list[str] = []
 WARNS: list[str] = []
 
@@ -79,8 +83,8 @@ def check_meta(meta: dict, args) -> None:
         if c["chain"] in VENDOR_CODES and c["chain_label"] == c["chain"]:
             bad(f"chain {c['chain']!r} has no display label")
         if c["chain"] not in ALLOWED_CHAINS:
-            bad(f"meta.json lists chain {c['chain']!r}, which is not one of the three "
-                f"reliable-tier chains {sorted(ALLOWED_CHAINS)}. The relaxed basket is only "
+            bad(f"meta.json lists chain {c['chain']!r}, outside the chains this tool compares "
+                f"{sorted(ALLOWED_CHAINS)}: reliable tier and priced in North York, Toronto. The relaxed basket is only "
                 "safe while the extract reads these and nothing else.")
 
     # 3. The attribution the licence requires.
@@ -172,8 +176,8 @@ def check_products(products: list, meta: dict, args) -> None:
             if o["chain"] in VENDOR_CODES and o["chain_label"] == o["chain"]:
                 bad(f"{g}/{o['chain']}: offer has no display label")
             if o["chain"] not in ALLOWED_CHAINS:
-                bad(f"{g}: offer from {o['chain']!r}, outside the three reliable-tier "
-                    "chains. A fuzzy-tier price may have reached the extract; do not deploy.")
+                bad(f"{g}: offer from {o['chain']!r}, outside the chains this tool compares "
+                    "(Metro, Walmart). A fuzzy-tier or out-of-area price may have reached the extract; do not deploy.")
             # The §2 defect: an unmeasured age must never carry a measured figure.
             if o["staleness_exceeds_measured"] and o["staleness_pct"] is not None:
                 bad(f"{g}/{o['chain']}: {o['days_behind']}d old but carries a staleness figure")
@@ -196,24 +200,31 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dir", default="tool/data", help="directory holding the extract")
-    # FLOORS: CALIBRATED 2026-09-12 against the build of snapshot 20260911T200435Z
-    # (extract date 2026-09-10, relaxed basket): 6,090 products shipped, 65.30% comparable.
-    # They sit at roughly two thirds of that population, which is enough headroom to survive
-    # one chain missing from a refresh and tight enough to catch a collapse.
+    # FLOORS: CALIBRATED 2026-09-12 against the TWO-CHAIN build (Metro and Walmart only) of
+    # snapshot 20260911T200435Z, extract date 2026-09-10: 3,465 products shipped, 55.93%
+    # comparable. The product floor sits at about two thirds of that population; the
+    # comparable floor about 16 pp below it.
     #
-    # A floor outlives its population. These replaced 1,500 / 40%, calibrated against a
-    # 2,921-product build, and by the time they were reset the product floor had drifted to a
-    # QUARTER of the live population -- it would have passed an extract that had lost three
-    # quarters of its contents. If the shipped population moves far from 6,090 / 65.30%,
-    # these are stale too: recalibrate them deliberately and update this note, rather than
-    # lowering whichever one is failing.
-    ap.add_argument("--min-products", type=int, default=4000,
+    # With two chains, a product is comparable only if BOTH have a recent price. If either
+    # chain drops out of a refresh, comparability collapses toward zero and this gate refuses.
+    # That is intended: a tool showing one chain has nothing to compare.
+    #
+    # Floor history, because a floor outlives its population:
+    #   1,500 / 40%  calibrated against a 2,921-product three-chain build; had drifted to a
+    #                quarter of the live population before it was reset.
+    #   4,000 / 50%  calibrated against the 6,090-product three-chain build; lasted one day,
+    #                because Save-On-Foods was removed (it is priced in Kamloops, BC) and the
+    #                population changed by decision rather than by drift.
+    #   2,300 / 40%  current.
+    # If the shipped population moves far from 3,465 / 55.93%, these are stale: recalibrate
+    # deliberately and extend this history, rather than lowering whichever floor is failing.
+    ap.add_argument("--min-products", type=int, default=2300,
                     help="floor on products shipped; below this the extract is too thin to "
-                         "deploy under a fresh date (default 4000, calibrated 2026-09-12 "
-                         "against 6,090)")
-    ap.add_argument("--min-comparable-pct", type=float, default=50.0,
-                    help="floor on the share of products with 2+ recent chains (default 50, "
-                         "calibrated 2026-09-12 against 65.30%%)")
+                         "deploy under a fresh date (default 2300, calibrated 2026-09-12 "
+                         "against 3,465, two chains)")
+    ap.add_argument("--min-comparable-pct", type=float, default=40.0,
+                    help="floor on the share of products with a recent price at both chains "
+                         "(default 40, calibrated 2026-09-12 against 55.93%%)")
     ap.add_argument("--max-extract-age-days", type=int, default=21,
                     help="hard limit on extract vintage (default 21 = three missed weeks)")
     ap.add_argument("--warn-extract-age-days", type=int, default=10)

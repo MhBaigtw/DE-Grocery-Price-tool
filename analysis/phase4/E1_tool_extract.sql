@@ -34,12 +34,20 @@
 -- The staleness curve is RECOMPUTED here rather than copied from the findings, so meta.json
 -- cannot drift away from the build that produced it.
 --
+-- TWO CHAINS, NOT THREE (2026-09-12). Metro and Walmart only. Save-On-Foods was removed
+-- because its prices come from a store in Kamloops, BC (97% of its products, store 2210),
+-- not North York: comparing it with the Toronto chains was a cross-city comparison, and with
+-- one store per chain, regional pricing cannot be separated from store pricing. Metro and
+-- Walmart are the only reliable-barcode pair priced in the same area. Comments below that
+-- quote three-chain figures describe the build they were measured on. See CLAUDE.md locked
+-- decision 3 and Phase 2 findings W6.
+--
 -- THE BASKET IS DELIBERATELY LOOSER THAN THE ANALYSIS BASKET. Phase 2 and Phase 3 used
 -- `is_reliable_only`, which drops any barcode a FUZZY-TIER vendor (Loblaws, No Frills, T&T,
 -- Voila) also carries. This file does not, and the divergence is intentional:
 --
 --   * The filter guards a path this tool does not have. It reads prices from Metro,
---     Save-On-Foods and Walmart only, all reliable tier, so a bad fuzzy match at Loblaws
+--     Walmart only, both reliable tier, so a bad fuzzy match at Loblaws
 --     cannot reach a price the tool displays -- that vendor's rows are never read.
 --   * It ratchets downward by construction. Fuzzy vendors accumulate barcode sightings as
 --     the dataset grows and never release one, so the reliable-only set can only shrink:
@@ -70,7 +78,7 @@ SELECT m.gtin14, m.vendor, s.observed_date AS d, s.price_basis AS basis,
        min(s.unit_price) AS px
 FROM stg_price s
 JOIN int_upc_match m ON m.product_key = s.product_key
-WHERE m.vendor IN ('Metro','SaveOnFoods','Walmart')
+WHERE m.vendor IN ('Metro','Walmart')
   AND s.parse_confidence <> 'ambiguous' AND s.offer_type <> 'unparsed'
   AND s.unit_price IS NOT NULL AND s.unit_price > 0
   AND s.observed_date >= DATE '2024-06-11'
@@ -116,7 +124,7 @@ SELECT m.gtin14, m.vendor, s.observed_date AS d, s.price_basis AS basis,
        max(CASE WHEN s.old_offer_type <> 'blank' THEN 1 ELSE 0 END) AS on_sale
 FROM stg_price s
 JOIN int_upc_match m ON m.product_key = s.product_key
-WHERE m.vendor IN ('Metro','SaveOnFoods','Walmart')
+WHERE m.vendor IN ('Metro','Walmart')
   AND m.gtin14 IN (SELECT gtin14 FROM g90)
   AND s.parse_confidence <> 'ambiguous' AND s.offer_type <> 'unparsed'
   AND s.unit_price IS NOT NULL AND s.unit_price > 0
@@ -242,7 +250,7 @@ FROM (
   FROM stg_price s
   JOIN int_upc_match m ON m.product_key = s.product_key
   JOIN stg_product sp  ON sp.product_key = s.product_key
-  WHERE m.vendor IN ('Metro','SaveOnFoods','Walmart')
+  WHERE m.vendor IN ('Metro','Walmart')
     AND m.gtin14 IN (SELECT gtin14 FROM g90)
     AND s.observed_date >= DATE '2025-01-01'
   GROUP BY 1,2,3,4)
@@ -303,22 +311,22 @@ LEFT JOIN stale st ON st.vendor = o.vendor
 CREATE OR REPLACE TEMP TABLE guarantee AS
 SELECT
   (SELECT count(*) FROM offer_flagged
-    WHERE vendor NOT IN ('Metro','SaveOnFoods','Walmart'))                AS offers_from_other_vendors,
+    WHERE vendor NOT IN ('Metro','Walmart'))                AS offers_from_other_vendors,
   (SELECT count(*) FROM int_upc_match
-    WHERE vendor IN ('Metro','SaveOnFoods','Walmart')
+    WHERE vendor IN ('Metro','Walmart')
       AND vendor_upc_tier NOT IN ('vendor_upc','matched_upc'))            AS tool_chain_rows_not_reliable_tier,
   (SELECT count(DISTINCT vendor_upc_tier) FROM int_upc_match
-    WHERE vendor IN ('Metro','SaveOnFoods','Walmart'))                    AS distinct_tiers_seen;
+    WHERE vendor IN ('Metro','Walmart'))                    AS distinct_tiers_seen;
 
 SELECT CASE
   WHEN (SELECT offers_from_other_vendors FROM guarantee) > 0
     THEN error('GUARANTEE VIOLATED: the extract carries offers from a vendor outside '
-               || 'Metro/SaveOnFoods/Walmart. The relaxed basket is only safe because the '
+               || 'Metro/Walmart. The relaxed basket is only safe because the '
                || 'tool reads reliable-tier chains only. Do not ship this build.')
   WHEN (SELECT tool_chain_rows_not_reliable_tier FROM guarantee) > 0
-    THEN error('GUARANTEE VIOLATED: one of Metro/SaveOnFoods/Walmart is no longer '
+    THEN error('GUARANTEE VIOLATED: one of Metro/Walmart is no longer '
                || 'reliable tier (vendor_upc or matched_upc). is_reliable_only was relaxed '
-               || 'on the basis that all three are reliable tier. Re-examine the relaxation '
+               || 'on the basis that both are reliable tier. Re-examine the relaxation '
                || 'before shipping; do not simply widen the allowed tiers.')
   ELSE 'OK - no fuzzy-tier vendor price can reach this extract'
 END                                                     AS fuzzy_tier_guarantee,
@@ -351,7 +359,7 @@ SELECT count(*)                                                        AS rows_i
 FROM stg_price s
 LEFT JOIN int_upc_match m ON m.product_key = s.product_key
 WHERE s.observed_date >= (SELECT extract_date FROM params) - 200
-  AND m.vendor IN ('Metro','SaveOnFoods','Walmart');
+  AND m.vendor IN ('Metro','Walmart');
 
 -- 3. How the comparison verdict actually lands. This is the number constraint 2 exists for:
 --    how often the tool can say "cheapest" without qualification, and how often it cannot.
@@ -395,7 +403,7 @@ SELECT count(*)                                                          AS rows
 FROM stg_price s
 LEFT JOIN int_upc_match m ON m.product_key = s.product_key
 WHERE s.observed_date >= (SELECT extract_date FROM params) - 200
-  AND m.vendor IN ('Metro','SaveOnFoods','Walmart');
+  AND m.vendor IN ('Metro','Walmart');
 
 -- meta.json -- build provenance, extract vintage, per-chain freshness, per-chain staleness
 -- curve, exclusion counts, scope and attribution. NO POOLED STALENESS FIGURE EXISTS HERE.
@@ -410,7 +418,7 @@ COPY (
          (SELECT products_shipped FROM shipped)                        AS products_shipped,
          (SELECT struct_pack(
                    count := omitted_no_recent_observation,
-                   note := 'Barcodes in the comparison basket with no observation at any of the three chains in the last 200 days. They are delisted or dormant, have no price to show, and are not in products.json. Stated here so this count and the published basket size cannot silently disagree.')
+                   note := 'Barcodes in the comparison basket with no observation at either chain in the last 200 days. They are delisted or dormant, have no price to show, and are not in products.json. Stated here so this count and the published basket size cannot silently disagree.')
           FROM shipped)                                                AS omitted,
          -- determinism-ok: this list() IS ordered -- `ORDER BY vendor` sits at the close of
          -- the struct_pack six lines below, and vendor is the GROUP BY key of the derived
@@ -441,12 +449,12 @@ COPY (
          struct_pack(
            geography := 'In-store pickup prices for North York, Toronto. Not national, not provincial, not the wider GTA.',
            products := 'National brands only. Store brands share no barcode and cannot be compared.',
-           chains := 'Metro, Save-On-Foods and Walmart. Galleria is excluded because its catalogue barely overlaps the others.',
+           chains := 'Metro and Walmart, both priced in North York, Toronto. Save-On-Foods is excluded because its prices come from a store in Kamloops, BC; Galleria because its catalogue barely overlaps the others.',
            comparison := 'Per product only. This tool produces no basket, no total, and no cheapest-store verdict.',
            basket := 'This tool covers more barcodes than the published analysis did. The '
                   || 'analysis used a stricter rule that dropped any barcode also carried by '
                   || 'a chain whose barcodes are fuzzy-matched; this tool does not need that '
-                  || 'rule, because it only ever reads prices from Metro, Save-On-Foods and '
+                  || 'rule, because it only ever reads prices from Metro and '
                   || 'Walmart, whose barcodes come from the retailers themselves. The '
                   || 'analysis figures were computed under the stricter rule and are '
                   || 'unchanged.',

@@ -132,6 +132,13 @@ def fuzzy_tier_chain(meta, prods):
     return meta, prods
 
 
+def out_of_area_chain(meta, prods):
+    # Save-On-Foods is reliable tier but priced in Kamloops, BC. Reliable tier is not enough.
+    prods[0]["offers"][0]["chain"] = "SaveOnFoods"
+    prods[0]["offers"][0]["chain_label"] = "Save-On-Foods"
+    return meta, prods
+
+
 CASES = [
     ("a pooled staleness figure is refused",            pooled,                  "pooled"),
     ("an unmeasured age carrying a figure is refused",  unmeasured_figure,       "carries a staleness figure"),
@@ -145,7 +152,8 @@ CASES = [
     ("missing scope statements are refused",            scope_gone,              "scope does not state"),
     ("an excluded chain with no reason is refused",     excluded_without_reason, "no reason given"),
     ("promotional text in the brand field is refused",  promo_brand,             "promotional text"),
-    ("a fuzzy-tier chain in the extract is refused",    fuzzy_tier_chain,        "reliable-tier"),
+    ("a fuzzy-tier chain in the extract is refused",    fuzzy_tier_chain,        "outside the chains"),
+    ("an out-of-area chain in the extract is refused",  out_of_area_chain,       "outside the chains"),
 ]
 
 
