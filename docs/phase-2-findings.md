@@ -62,7 +62,8 @@ vendor's own data under one consistent definition, and they are unaffected by Lo
 - **It does not hold per product.** For 50.96% of Metro/Walmart GTINs, neither is
   consistently cheaper.
 - **Withdrawn (W6):** Walmart ~17.9% cheaper than Save-On-Foods; Metro ~5.3% cheaper than
-  Save-On-Foods, on 91.74% of dates and in 7 of 8 categories; Metro's advantage over
+  Save-On-Foods, on 611 of 666 dates (91.74%; the other 55 were exact ties) and in 7 of 8
+  categories; Metro's advantage over
   Save-On-Foods by price level; 84.61% of Metro/Save-On-Foods GTINs with no consistent
   winner; and the transitivity check (residual 1.0059), which used Save-On-Foods as its
   middle link. All compared Toronto with Kamloops, BC.
@@ -1629,7 +1630,15 @@ comparison for a stated, measured reason rather than a convenient one.
 
 *Verified with `verify_twice.py`: 14 result sets, both runs clean and identical.*
 
-> ### On identical national-brand products, Walmart is cheaper than Metro, and Metro is cheaper than Save-On-Foods — on every one of 600–713 dates. But at the level of an individual product, roughly half the time there is no consistent winner, and for Metro vs Save-On-Foods that rises to 85%.
+*Corrected 2026-09-12. `Q3c` gained a 15th result set that sorts every date into first
+cheaper, exactly 1.0, or second cheaper; re-run twice on the same analysis snapshot under the
+same build (`2026-08-28T17:48:35Z`, model hashes as stamped above), clean and identical, with
+result sets 1–14 unchanged. It showed that 55 of Metro / Save-On-Foods' 666
+dates sit at a median ratio of exactly 1.0. This section had said Metro was cheaper "on every
+one of 600–713 dates" and "on 91.74% of dates" without the ties. Both are restated below.
+Every Save-On-Foods comparison here is withdrawn regardless (W6: Kamloops, not Toronto).*
+
+> ### On identical national-brand products, Walmart is cheaper than Metro on every one of 711 dates. Metro was cheaper than Save-On-Foods on 611 of 666 dates and tied at exactly 1.0 on the other 55 — a comparison since withdrawn (W6). But at the level of an individual product, roughly half the time there is no consistent winner, and for Metro vs Save-On-Foods that rises to 85%.
 
 A ratio below 1.00 means the **first-named** vendor is cheaper.
 
@@ -1650,9 +1659,21 @@ Walmart ~12.6% cheaper than Metro, and Walmart ~17.9% cheaper than Save-On-Foods
 | Metro / Walmart | 711 | 1.1412 | 1.0931 | 1.2028 | **0.00%** |
 | SaveOnFoods / Walmart | 606 | 1.2181 | 1.1916 | 1.2553 | **0.00%** |
 
-**Walmart is cheaper than both on 100% of dates**, and the p10–p90 bands never cross 1.00.
-Metro beats Save-On-Foods on 91.74% of dates with a p90 of 0.9967 — also never crossing.
-This is not a marginal or noisy ordering.
+"% of dates first cheaper" counts dates with a median ratio **below** 1.0, so it does not say
+what happened on the rest. Every date, binned (result set 15):
+
+| Pair | n dates | First cheaper | Exactly 1.0 | Second cheaper | Lowest daily median | Highest daily median |
+|---|---|---|---|---|---|---|
+| Metro / SaveOnFoods | 666 | 611 | **55** | 0 | 0.8584 | 1.0000 |
+| Metro / Walmart | 711 | 0 | **0** | 711 | 1.0264 | 1.2592 |
+| SaveOnFoods / Walmart | 606 | 0 | **0** | 606 | 1.1280 | 1.3329 |
+
+**Walmart is cheaper than both on 100% of dates** — 711 of 711 and 606 of 606, with no ties;
+the closest any date came was 1.0264. Metro was cheaper than Save-On-Foods on **611 of 666
+dates (91.74%)** and **tied at exactly 1.0 on the other 55 (8.26%)**; Save-On-Foods was
+cheaper on none. The p90 of 0.9967 never crosses 1.00, but the highest daily median reaches it.
+The Walmart orderings are not marginal or noisy; the Metro / Save-On-Foods one is weaker than
+this section first said, and is withdrawn in any case (W6).
 
 #### Stability across categories: near-total
 

@@ -1237,7 +1237,39 @@ down, 150 ms RTT); **cold cache**, disabled per request. Three runs, medians rep
 after `products.json` has been parsed and the search box will actually answer. That is the
 first moment the tool is *usable*, not the first moment something is on screen.
 
-## The numbers
+## Re-measured on the live site, two-chain build
+
+*Measured 2026-09-12 against `https://de-grocery-project.netlify.app/`, deploy `adcfcb5`, same
+script and profile, five runs, medians reported.* The numbers further down are from the
+four-chain build on a local server. Dropping to Metro and Walmart roughly halved the payload,
+so they no longer describe the site.
+
+| | First measurement: four chains, local gzip server, 3 runs | **Now: two chains, live Netlify, 5 runs** | Change |
+|---|---|---|---|
+| First contentful paint | 1.17 s | **1.22 s** | +0.05 s |
+| **Interactive (usable)** | 3.31 s | **2.80 s** (runs 2.48–3.08 s) | **−0.51 s** |
+| Search keystroke | 53 ms | **68 ms** | +15 ms |
+| First history click | 1.57 s | **1.29 s** | −0.28 s |
+| `products.json` over the wire | 360 KB, gzip | **163 KB, Brotli** | |
+| `products.json` decoded | 7.46 MB | **3.65 MB** | about half |
+| Download window | 0.51 s → 2.61 s (2.10 s) | **1.13 s → 2.18 s (1.05 s)** | transfer halved, starts 0.62 s later |
+| After download: parse, index, first render | 0.70 s | **0.62 s** | −0.08 s |
+
+**Halving the payload saved 0.51 s, not the ~0.9 s this section predicted.** The transfer
+itself halved, as predicted; the download also started 0.62 s later. The two measurements
+are not like for like, and I have not isolated which difference accounts for that:
+- the first went to localhost with emulated throttling;
+- this one goes over the real internet to Netlify's CDN, TLS included, under the same
+  emulation;
+- and this one is served Brotli rather than gzip.
+
+The CPU share barely moved (0.70 s → 0.62 s) on half the JSON. A search keystroke got 15 ms
+slower on a smaller index. I have medians only for that, not per-run values, and it is not
+explained.
+
+**Verdict unchanged: not poor, and no history depth is cut.** Five runs spread 2.48–3.08 s.
+
+## The numbers at first measurement: four chains, local server
 
 | | Median of 3 |
 |---|---|
@@ -1278,7 +1310,11 @@ uncompressed**, naming the 3.3 s / 40 s consequence. Demonstrated both ways agai
 local servers.
 
 **This measurement assumes the host compresses.** GitHub Pages does; the check confirms it
-against the live URL rather than trusting it.
+against the live URL rather than trusting it. *Update 2026-09-12:* the host is now Netlify.
+At deploy `adcfcb5` it serves `products.json` as Brotli to Chrome and as gzip to a client that
+accepts only gzip (198,321 bytes on the wire). The uncompressed 40 s case was not re-measured
+for the two-chain payload, and `verify_deploy.py`'s failure message still quotes the
+four-chain 7.5 MB / 360 KB / 3.3 s / 40 s figures.
 
 ## Does history need to load on first paint?
 
@@ -1296,6 +1332,9 @@ The remaining question is whether the first click should pull the whole file:
 
 Revisit if `history.json` passes roughly 500 KB gzipped or the first click passes ~3 s.
 Recorded here so the next person inherits the numbers rather than the conclusion.
+
+*At deploy `adcfcb5` (two chains, 3,465 products): first click 1.29 s, `history.json` 101,391
+bytes gzipped. The table above is the four-chain build's; the verdict holds with more margin.*
 
 ---
 

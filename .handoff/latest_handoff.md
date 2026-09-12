@@ -15,58 +15,57 @@ below as verified state — verify them.
 
 ## Current phase and section
 
-Phase 4 (the price-lookup tool). The claims sweep and the owner's two follow-ups are done:
-the tie case behind "Walmart cheaper on 100% of 711 dates" is closed, and the method note says
-plainly that the claims check covers three documents, not the repository. The owner gave the
-go to push, re-enable Netlify builds and verify the live site; this note is committed
-immediately before that push.
+Phase 4 (the price-lookup tool). The site is **live** again on Netlify at deploy `adcfcb5`,
+verified with `verify_deploy.py`. The owner asked for two corrections before announcing it:
+Phase 2 findings §3.8 (the Metro / Save-On-Foods ties) and a phone re-measurement against the
+live site. Both are done in this commit.
 
 ## Last commit
 
 See `git log -1`. Written alongside the commit; the tree was clean apart from gitignored logs.
+**This commit is not pushed** — pushing needs the owner's go, and a push now triggers a
+Netlify build because auto-builds are back on.
 
 ## What the last session completed
 
-- **Tie case closed.** `Q3c_pairwise_stability.sql` gained a final statement that bins every
-  date: Metro / Walmart has 711 of 711 with Walmart cheaper, 0 at exactly 1.0, closest 1.0264.
-  Verified twice on the analysis snapshot. The claim stands as written.
-- **Found along the way:** Metro / Save-On-Foods has 55 of 666 dates at exactly 1.0, and the
-  writeup's quote of that withdrawn comparison gave its 91.7% the wrong pair's date count (606).
-  Corrected to 666.
-- **Method note:** the claims check covers the writeup, README and method note only; the five
-  unchecked documents hold 6,613 figures by the same unreviewed extractor.
+- Phase 2 findings §3.8: headline, prose and summary restated. 611 of 666 dates had Metro
+  cheaper, 55 were exact ties, none had Save-On-Foods cheaper. A correction note carries the
+  build stamp.
+- Phase 4 findings §8: re-measured on the live site. Interactive in 2.80 s against 3.31 s, 5 runs,
+  with a before/after table. The earlier four-chain numbers are kept and labelled.
+- Earlier the same day: the claims sweep and check, the Q3c tie case, the push, builds
+  re-enabled, and the live verification.
 
 ## Immediate next steps
 
-1. If the push, the Netlify re-enable or the live verification did not complete, finish them:
-   `git push origin main`; `stop_builds` to `false`; build the pushed commit; run
-   `scripts/verify_deploy.py https://de-grocery-project.netlify.app/`, compression included.
+1. **Wait for the owner's go to push this commit.** It triggers a rebuild; after it goes live,
+   run `verify_deploy.py` against the live URL again.
 2. Later: the custom domain (the owner supplies the hostname), and contact the maintainer —
    upstream feedback item 12 is written to be sent.
 
 ## Open questions and blockers
 
-**Blocked on the project owner:** the custom domain hostname.
+**Blocked on the project owner:** the push of this commit; the custom domain hostname; whether
+to refresh the stale four-chain figures quoted in `verify_deploy.py`'s comment and failure
+message. The owner earlier said to keep that script exactly as is, so it was not edited.
 
-**Not started, and not requested:** extending `check_claims.py` to the findings documents,
-`docs/upstream-feedback.md` and the Phase 3 thesis. The owner said not now.
+**Not started, and not requested:** extending `check_claims.py` beyond its three documents.
 
 ## Known constraints
 
-- **Two databases, two purposes.** `hammer.duckdb` (snapshot `20260911T200435Z`) feeds the tool
-  and R6. `hammer-20260822T134045Z.duckdb` is the Phase 2/3 analysis build; published analysis
-  figures are reproduced against it.
-- **Any edit to a figure in the three published documents needs a `docs/CLAIMS.md` entry**, or
-  `check_claims.py` fails. A reworded or re-wrapped sentence can make an anchor stale.
+- **Netlify auto-builds are on** (`stop_builds` false). Every push to `main` builds and deploys
+  through the gate.
+- **Two databases, two purposes.** `hammer.duckdb` (snapshot `20260911T200435Z`) feeds the tool.
+  `hammer-20260822T134045Z.duckdb` (build `2026-08-28T17:48:35Z`) is the Phase 2/3 analysis
+  build.
 
 ## Anything the next agent should distrust
 
-- **`check_claims.py` proves a source exists, not that it produces the number.** Entries marked
-  "traced" or "historical" in `CLAIMS.md` were not re-run. Logs are gitignored.
-- **Phase 2 findings §3.8 still reads "Metro beats Save-On-Foods on 91.74% of dates"** without
-  saying the remaining 55 dates are exact ties. The comparison is withdrawn (W6); the findings
-  text was not edited.
+- **The phone before/after is not like for like:** localhost against the live CDN, gzip against
+  Brotli, 3 runs against 5. Only 0.51 s of the predicted ~0.9 s saving showed up, and the cause is
+  not isolated. Search keystroke got 15 ms slower, unexplained.
+- **`check_claims.py` proves a source exists, not that it produces the number**, and covers
+  three documents only.
 - **North York rests on upstream's word only**; store 1982 is unidentified.
-- **Whether the live deploy verified cleanly** is in the session report and `git log`, not
-  here — this note was written before the push.
-- Use `scripts/serve_gzip.py`, not `python -m http.server`, for anything performance-related.
+- **The gates on Netlify's builder passed in a successful build, but the build log was not
+  read.**
