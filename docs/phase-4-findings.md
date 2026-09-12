@@ -1461,6 +1461,12 @@ any "ago" becomes false between refreshes without anything changing on the page,
 calendar date stays true. The exact ISO date still travels in the `datetime` attribute, so
 nothing is lost and the render test can check it.
 
+*Superseded 2026-09-12 (§10).* The reasoning was right about baking an age into the data and
+wrong about the page: the page can compute the age at view time, where it cannot go stale.
+Dates still read as calendar dates; the landing state now adds "— N days ago", computed in
+the browser. The same review found the page had judged every price's age against the build
+date rather than today, which is corrected in §10.
+
 ### Resolved after review
 
 | Item | What changed | Verified |
@@ -1469,6 +1475,179 @@ nothing is lost and the render test can check it.
 | **"each" after every price** | Suppressed while every offer's basis is `each`. The guarantee stays: the render test now fails if any other basis appears without its label, and once one exists, every price must be labelled | Shown to fail: a per-weight offer on a page that never labels exits 1 |
 | **The basket-divergence paragraph** | The render test asserted only that "stricter rule" is present, not the paragraph, so it is now one sentence with a link. It also **no longer makes a size claim**: "more products than the analysis" was true of the three-chain build and false of this one, at 3,465 products against 3,477 barcodes | Extract rebuilt twice with the new sentence |
 | **The dashboard** | Retired, not rebuilt. After W6 the analysis has one surviving pairwise comparison, the writeup carries it, and every chart is a surface where a withdrawn claim can resurface | Shown to fail: a build that copies the dashboard back in exits 1 |
+
+---
+
+# §10 — Automated refresh, triggered by publication
+
+*2026-09-12. Built after the feasibility measurement below, on the owner's decisions. Figures
+come from `scripts/refresh_light.py --measure`, `scripts/check_light_parity.py`,
+`scripts/measure_repo_growth.py` and `scripts/test_tool_render.js`, run on this date.*
+
+## The question, and the answer
+
+Can the site stay within a day of upstream's publications, unattended and free, without being
+less guarded than the full rebuild? **Yes, on a standard GitHub-hosted runner**, by building
+the tool's extract from a load of only the two chains it reads.
+
+## Design, and what was rejected
+
+- **Triggered by publication, not a clock.** A daily probe reads `hammer-lastupdated.txt` and
+  compares it with the newest record in `data/provenance/`; the refresh runs only when the
+  stamp changes. **Rejected: pulling the archive daily regardless.** By §1.4 that buys about
+  one percentage point of staleness over a correctly timed refresh, at seven times the
+  maintainer's bandwidth.
+- **Two chains, full history.** Metro and Walmart only, every date. **Rejected: recent dates
+  only.** E1's basket rule counts co-observed days back to 2024-06-11, so a date cut would
+  change the extract.
+- **The SQLite archive, not the CSV.** The CSV archive is about half the size. **Rejected**
+  because a CSV has no column types, so the schema contract would stop catching the announced
+  change of `product_id` from string to number.
+- **Commit the extract to `main`, and let Netlify build it through its gates.** That keeps
+  "what is live is in git". Accepted conditionally on the growth measurement below.
+- **Provenance, not archives** (CLAUDE.md locked decision 2, amended in place). Each light
+  refresh commits download timestamps, sha256, size and upstream's stamp, then deletes the
+  archive. Archives are retained only by manual full rebuilds.
+
+**Every gate that guards the extract runs:**
+- the vendor filter is asserted equal to every vendor list in E1 and the extract gate;
+- the schema contract;
+- the model row-count contracts;
+- the layering, determinism and model-parity checks;
+- E1 twice, with its in-SQL reliable-tier assertion;
+- the extract gate;
+- the render gate;
+- the file manifest.
+
+**Not run on the light path:** the dbt suite and `verify_reproducible`, which need the full
+database. They stay with full rebuilds. **Weakened, and stated:** half of E1's reliable-tier
+assertion ("no offers from other chains") is true by construction once other chains are not
+loaded. The other half (both chains still reliable tier) still bites.
+
+## Measured
+
+On snapshot `20260911T200435Z`, on this machine (12 logical CPUs, 7.3 GB RAM), with the
+archive already on disk:
+
+| Stage | Seconds | Peak memory (GiB) | Peak work-dir disk (GiB) |
+|---|---|---|---|
+| Unzip and filtered load | 92.6 | 0.94 | 4.35 |
+| Schema contract | 2.1 | 0.12 | 0.20 |
+| Build models | 106.6 | 2.42 | 0.78 |
+| Code checks | 1.1 | 0.03 | 0.78 |
+| Extract, twice | 65.9 | 2.71 | 0.78 |
+| Extract gate | 0.4 | 0.04 | 0.78 |
+| **Total / peak** | **268.7** | **2.71** | **4.35** |
+
+**Rows loaded:**
+
+| Snapshot | Products loaded | Price rows loaded |
+|---|---|---|
+| `20260911T200435Z` | 64,299 of 187,685 | 14,849,571 of 73,741,443 (20.1%) |
+| `20260824T132829Z` | 64,241 of 187,070 | 14,603,491 of 72,022,652 (20.3%) |
+| `20260822T134045Z` | 64,225 of 187,028 | 14,575,960 of 71,809,333 (20.3%) |
+
+**Not included above:**
+- **The download.** It took 84 s for the 975 MB archive on this connection
+  (`20260911T200435Z` manifest).
+- **The archive on the runner's disk.** On a runner the archive sits in the work directory
+  until the unzip completes, so peak disk there is about 5.3 GiB (4.35 + 0.91).
+
+**The runner:** a standard hosted Linux runner for a public repository has 4 CPUs, 16 GB RAM
+and 14 GB SSD, is free, and allows 6 hours per job (GitHub documentation). **Runner
+wall-clock has not been measured**; the workflow runs with `--measure`, so the first run's log
+records it.
+
+## The filter is proven, not assumed
+
+For the same snapshot, the light extract and the full rebuild's extract are **byte-identical**:
+`products.json` and `history.json` byte for byte, and `meta.json` differing only in
+`built_utc`. `check_light_parity.py` now runs at the end of every full rebuild and fails it
+loudly on any difference. Its test refuses a dropped product, one changed byte in history, a
+changed `meta.json` field, a missing file and a different snapshot, and it accepts
+`built_utc` alone (7 of 7).
+
+**Not demonstrated: identity across platforms.** Parity was judged on one Windows machine. The
+runner is Linux, with duckdb pinned to the same version (1.5.5). A runner-built extract can be
+byte-compared with a full rebuild only if both capture the same upstream publication.
+
+## Repository growth per refresh
+
+Extracts for three snapshots were committed in date order into a fresh repository:
+
+| Extract | Extract date | Raw | Compressed, unpacked | Pack growth after `gc --aggressive` |
+|---|---|---|---|---|
+| `20260822T134045Z` | 2026-08-21 | 5,484 KB | 269 KB | baseline |
+| `20260824T132829Z` | 2026-08-23 | 5,494 KB | 270 KB | **161 KB** |
+| `20260911T200435Z` | 2026-09-10 | 5,620 KB | 284 KB | **198 KB** |
+
+**About 160–200 KB of clone size per refresh** after packing, and 270–284 KB before it, plus a
+provenance record of about 1.3 KB. That is within the few hundred KB set as the condition.
+
+**Estimate, not a measurement:** if upstream published every day, that would compound to
+roughly 60–70 MB of history a year. Only two intervals were measured, and GitHub's server-side
+packing was not.
+
+## The page judged ages against the build date, not today
+
+A correctness defect, not a wording one:
+- **Ages were understated.** Every age the page showed or acted on was `days_behind`, an age *at
+  the last update*. Read later, every price was older than the page said by the extract's own
+  age, in the direction that makes the tool look fresher than it is.
+- **Warnings fired late.** A price warned only once it was 14 days old *at build time*.
+- **Comparisons outlived their prices.** A comparison licensed at build time stood however old
+  its prices became.
+- **The landing state promised a cadence.** It said "updated weekly", which nothing verified.
+
+**Fixed:**
+- Ages are now `days_behind` plus the extract's age, in the visitor's calendar days.
+- A price past the 14-day measured horizon today carries a warning stating its age today.
+- A comparison is **withheld** once either price is more than 7 days old today. The page may
+  withhold what the extract licensed; it never creates a comparison the extract did not.
+- The landing state reads "as of <date> — N days ago" and shows a warning once the data passes
+  the horizon.
+- No cadence is promised.
+
+**The render test now renders the page as if viewed 0, 1, 3, 10 and 20 days after the
+update.** Comparisons withheld by viewing day:
+
+| Days after the update | 0 | 1 | 3 | 10 | 20 |
+|---|---|---|---|---|---|
+| Comparisons withheld (of 1,938) | 0 | 29 | 99 | 1,938 | 1,938 |
+
+On the previous page the test exits 1 with 13,941 failures, including a Walmart price 199
+days old today with no warning stating that age. The test also fails if the page's 7-day
+window is ever looser than E1's.
+
+## The age limit guards data deploys, not every deploy
+
+`check_extract.py` refused any extract older than 21 days on every build. After three quiet
+weeks that would have blocked a documentation commit or an interface fix, which cannot make
+the data staler.
+
+**Now, via `scripts/netlify_changes.sh`:**
+- **Nothing that ships changed:** Netlify skips the build.
+- **Interface changed, `tool/data/` unchanged:** it builds with every gate, and the age limit
+  is reported, not enforced.
+- **`tool/data/` changed:** the limit is enforced.
+- **The change cannot be established** (no cached commit, the same commit rebuilt, or a commit
+  missing from the clone): it builds and enforces the limit.
+
+This is tested against real commits in this repository (12 of 12). `check_extract.py --vintage
+warn` relaxes nothing but the age limit, and its test shows that too.
+
+## Not yet verified
+
+- **The runner itself:** wall-clock, and memory and disk on the runner rather than on this
+  machine.
+- **The commit to `main`:** whether the workflow's `contents: write` permission is honoured
+  under the repository's workflow-permission setting.
+- **Netlify:** the `ignore` command and `CACHED_COMMIT_REF` have been tested locally against
+  real commits, not yet on Netlify's builder.
+- **Byte identity between a Linux runner and this Windows machine.**
+- **The old workflow run:** the failed run of the removed `deploy.yml` (GitHub Pages was
+  never enabled) is still visible in the public Actions history. Deleting it needs an
+  authenticated GitHub session, which this machine does not have.
 
 ---
 

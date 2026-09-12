@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
-"""The weekly refresh: fetch, gate on schema, rebuild, check, regenerate the extract, gate
+"""The FULL refresh: fetch, gate on schema, rebuild, check, regenerate the extract, gate
 again. It does not deploy — it produces an extract that is safe to deploy, and says so.
+
+SINCE 2026-09-12 THIS IS THE MANUAL, ANALYSIS PATH. The site is kept current by the automated
+light refresh (scripts/refresh_light.py, .github/workflows/refresh.yml), which runs whenever
+upstream publishes. This script remains the only path that builds the full database, retains
+the archives (CLAUDE.md locked decision 2, as amended), runs the dbt suite and
+verify_reproducible, and proves the light path's filter with check_light_parity.py. The
+cadence notes below describe the weekly schedule it was written for.
 
 CADENCE. Weekly, consuming Thursday's scrape, run Friday 05:00 UTC, with a daily cheap probe
 of hammer-lastupdated.txt so a late file is picked up without pulling 1.45 GB a day. That
@@ -131,6 +138,7 @@ def verify_steps(args) -> int:
         ("extract gate",  [PY, "scripts/check_extract.py"],                  ["--dir"]),
         ("render gate",   ["node", "scripts/test_tool_render.js"],           []),
         ("manifest",      [PY, "scripts/check_manifest.py"],                 []),
+        ("light parity",  [PY, "scripts/check_light_parity.py"],             ["--workdir"]),
     ]
     bad = 0
     for name, cmd, flags in checks:
@@ -244,6 +252,19 @@ def main() -> int:
         run("extract gate", [PY, "scripts/check_extract.py"], args.dry_run)
         run("render gate", ["node", "scripts/test_tool_render.js"], args.dry_run)
         run("manifest", [PY, "scripts/check_manifest.py"], args.dry_run)
+
+        # The light refresh's filter is proven here, not assumed (decided 2026-09-12). Build the
+        # light extract from this same snapshot and require it to be byte-identical to the one
+        # this full rebuild just produced. A mismatch means the filter drops or changes rows the
+        # extract needs, so every automated refresh since the last passing check is suspect.
+        run("light parity", [PY, "scripts/check_light_parity.py", snap], args.dry_run)
+
+        # Record what this rebuild consumed. The automated light refresh starts only when
+        # upstream's last-updated stamp differs from the newest record, so without this it
+        # would re-fetch a publication a full rebuild had already shipped.
+        if not args.dry_run:
+            import refresh_light
+            say("provenance", str(refresh_light.record_full(SNAPDIR / snap).relative_to(ROOT)))
 
     except Stop as e:
         say("REFUSED", str(e))

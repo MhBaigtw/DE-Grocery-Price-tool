@@ -8,15 +8,16 @@
  * them. The page's script is loaded from index.html itself rather than copied, so this
  * cannot drift from what ships.
  *
- * Run: node scripts/test_tool_render.js
+ * Run: node scripts/test_tool_render.js [tool-dir]     (default: the repository's tool/)
  */
 "use strict";
 const fs = require("fs"), path = require("path"), vm = require("vm");
 
 const ROOT = path.join(__dirname, "..");
-const html = fs.readFileSync(path.join(ROOT, "tool/index.html"), "utf8");
-const meta = JSON.parse(fs.readFileSync(path.join(ROOT, "tool/data/meta.json"), "utf8"));
-const products = JSON.parse(fs.readFileSync(path.join(ROOT, "tool/data/products.json"), "utf8"));
+const TOOL = process.argv[2] ? path.resolve(process.argv[2]) : path.join(ROOT, "tool");
+const html = fs.readFileSync(path.join(TOOL, "index.html"), "utf8");
+const meta = JSON.parse(fs.readFileSync(path.join(TOOL, "data/meta.json"), "utf8"));
+const products = JSON.parse(fs.readFileSync(path.join(TOOL, "data/products.json"), "utf8"));
 
 // Pull the page's real script out of the page. No copy, no drift.
 const src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
@@ -40,8 +41,10 @@ vm.createContext(sandbox);
 vm.runInContext(src, sandbox);
 // Inject the real data instead of fetching it, and do the same per-product preparation
 // the page's boot step does, so the search index exists.
+// TODAY_ISO pins the page's "today" to the extract date for sections 1-6, so those sections
+// check the extract as built. Section 7 moves it forward.
 vm.runInContext(
-  "META = __M; PRODUCTS = __P;" +
+  "META = __M; PRODUCTS = __P; TODAY_ISO = __M.extract_date;" +
   "for (const x of PRODUCTS) {" +
   "  x._s = ((x.name||'') + ' ' + (x.brand||'') + ' ' + (x.size||'')).toLowerCase();" +
   "}", sandbox);
@@ -145,6 +148,61 @@ for (const need of ["national-brand", "Store brands cannot be compared", "Toront
                     "not always possible"])
   if (!coverStatic.includes(need)) bad("cover", "static landing state omits: " + need);
 
+// 7. Age is judged against TODAY, not against the last update. days_behind is an age at the
+//    last update; a visitor reading later sees older prices. Judging by days_behind alone
+//    understates every age by the extract's own age -- the direction that makes the tool look
+//    fresher than it is. So the page is rendered as if viewed on later days, and at each:
+//      - every price older than the measured horizon TODAY carries a warning stating that age;
+//      - no two prices are compared unless both are within the comparison window TODAY, and a
+//        comparison both prices still support is not withheld;
+//      - the landing state states the data's age, and warns once it passes the horizon;
+//      - the page promises no cadence.
+const addDays = (iso, n) => new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1,
+  +iso.slice(8, 10)) + n * 86400000).toISOString().slice(0, 10);
+const HORIZON = Math.max(...meta.chains.flatMap(c => (c.staleness || []).map(s => s.days)));
+let RECENT;
+try { RECENT = vm.runInContext("RECENT_DAYS", sandbox); }
+catch (e) { bad("page", "defines no RECENT_DAYS comparison window"); RECENT = 7; }
+// The page's window must not be looser than the extract's.
+for (const p of products) for (const o of p.offers)
+  if (o.comparable && o.days_behind > RECENT)
+    bad(p.gtin14, "the extract compares a price " + o.days_behind + "d old, outside the page's "
+        + RECENT + "-day window: the two windows have drifted apart");
+if (/updated weekly|refreshed weekly|updated daily/i.test(html))
+  bad("page", "the page promises an update cadence it cannot verify");
+const aged = [];
+for (const AGE of [0, 1, 3, 10, HORIZON + 6]) {
+  vm.runInContext("TODAY_ISO = " + JSON.stringify(addDays(meta.extract_date, AGE)), sandbox);
+  let withheld = 0;
+  for (const p of products) {
+    const out = card(p);
+    const recentToday = p.offers.filter(o => o.comparable && o.days_behind + AGE <= RECENT).length;
+    const compared = /less at |Same price at both/.test(out);
+    if (compared && recentToday < 2)
+      bad(p.gtin14, "viewed " + AGE + "d after the update, compares prices not both from the last "
+          + RECENT + " days");
+    if (!compared && recentToday >= 2)
+      bad(p.gtin14, "viewed " + AGE + "d after the update, withholds a comparison both prices support");
+    if (p.comparison.n_compared >= 2 && !compared) withheld++;
+    for (const o of p.offers) {
+      const today = o.days_behind + AGE;
+      if (today > HORIZON && !out.includes(today + " days old"))
+        bad(p.gtin14, o.chain + " is " + today + "d old today but no warning states that age");
+    }
+  }
+  sandbox.renderCover({total: products.length, n0: counts[0], n1: counts[1], n2: counts[2], n3: counts[3]});
+  // A page that never writes the age warning leaves no node; that is a failure, not a crash.
+  const c = nodes["#covbody"].innerHTML, w = nodes["#agewarn"] || {};
+  const ago = AGE === 0 ? "today" : AGE === 1 ? "yesterday" : AGE + " days ago";
+  if (!c.includes(ago)) bad("cover", "viewed " + AGE + "d after the update, does not state the age ('" + ago + "')");
+  if (AGE > HORIZON && !(w.hidden === false && w.innerHTML.includes(AGE + " days old")))
+    bad("cover", "viewed " + AGE + "d after the update, past the " + HORIZON + "-day horizon, shows no age warning");
+  if (AGE <= HORIZON && w.hidden === false)
+    bad("cover", "age warning shown at " + AGE + "d, inside the " + HORIZON + "-day horizon");
+  aged.push(AGE + "d: " + withheld + " withheld");
+}
+vm.runInContext("TODAY_ISO = " + JSON.stringify(meta.extract_date), sandbox);
+
 console.log("products rendered : " + checked);
 console.log("  3 chains        : " + counts[3]);
 console.log("  2 chains        : " + counts[2]);
@@ -153,6 +211,7 @@ console.log("  0 chains        : " + counts[0] + "   (renders as 'nothing to com
 console.log("basis labels      : " + (BASIS_MIXED
   ? "required on every price (a non-'each' basis exists)"
   : "suppressed (every offer is 'each'); any other basis must be labelled"));
+console.log("viewed later      : " + aged.join(", ") + "  (comparisons the extract licensed, withheld as prices aged)");
 console.log("failures          : " + fail);
 if (fail) { console.log("\nFAIL - the interface breaks a rule the extract enforces."); process.exit(1); }
 console.log("\nOK - every product renders with its chains, dates, basis and staleness warnings.");

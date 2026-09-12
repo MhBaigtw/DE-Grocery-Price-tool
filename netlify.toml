@@ -13,6 +13,9 @@
 [build]
   command = "bash scripts/netlify_build.sh"
   publish = "_site"
+  # Skip the build when nothing that ships changed (a documentation-only commit). Exit 0 skips.
+  # Fails safe: if the change cannot be established, it builds. See scripts/netlify_changes.sh.
+  ignore  = "bash scripts/netlify_changes.sh ignore"
 
 [build.environment]
   PYTHON_VERSION = "3.12"

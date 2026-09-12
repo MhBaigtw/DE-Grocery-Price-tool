@@ -178,6 +178,8 @@ The check sees digits only. A figure written in words ("sixfold", "eight chains"
 | 8 | (8 of 8) | scripts/test_check_determinism.py | confirmed: re-run 2026-09-12 |
 | 23 | (23 of 23) | scripts/test_dbt_contracts.py | confirmed |
 | 7 | (7 of 7) | scripts/test_check_claims.py | confirmed: run 2026-09-12 |
+| 7 | refused  (7 of 7) | scripts/test_check_light_parity.py | confirmed: run 2026-09-12 |
+| 12 | (12 of 12) | scripts/test_netlify_changes.py | confirmed: run 2026-09-12 |
 | 1.4 GB | ~1.4 GB | derived: 498,288,065 + 950,260,692 bytes recorded by scripts/fetch_snapshot.py | the snapshot manifest's archive sizes |
 
 ## docs/method-note.md

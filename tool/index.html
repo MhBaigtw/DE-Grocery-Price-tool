@@ -99,6 +99,7 @@
   <h1>Metro or Walmart?</h1>
   <p class="sub">Search a product. See both prices.</p>
 </header>
+<p id="agewarn" class="warn" hidden></p>
 
 <input id="q" type="search" autocomplete="off" spellcheck="false"
        placeholder="Try “ketchup” or “Kraft”" aria-label="Search a product or brand">
@@ -129,8 +130,8 @@ let META = null, PRODUCTS = [], HIST = null, HISTPROM = null;
 
 /* Dates are shown as "9 May", never as a field or an ISO string. The ISO date still travels
  * in the datetime attribute, so the exact day is not lost and the render test can check it.
- * Deliberately not "2 days ago": the data is refreshed weekly, so any "ago" would silently
- * become false between refreshes. A calendar date stays true. */
+ * An age ("2 days ago") is never baked into the data, where it would go false between
+ * refreshes. It is computed here, at view time, against the visitor's own today. */
 function human(iso, withYear){
   const s = String(iso || "");
   const y = s.slice(0, 4), m = Number(s.slice(5, 7)), d = Number(s.slice(8, 10));
@@ -143,11 +144,52 @@ function when(iso){
        + human(iso, String(iso).slice(0, 4) !== dataYear) + "</time>";
 }
 
-/* The least trustworthy thing in the data gets a warning, never a blank. */
+/* ---- how old a price is TODAY ----
+ * Every age in the extract (days_behind) is an age AT THE LAST UPDATE: the extract cannot know
+ * when it will be read. Judging a price by that alone understates its age by the extract's own
+ * age, in the direction that makes the tool look fresher than it is. So every age shown or
+ * acted on here is days_behind plus the extract's age, counted in the visitor's calendar days.
+ * TODAY_ISO is null in the browser; the render test pins it to check the page at other dates. */
+let TODAY_ISO = null;
+// The extract compares a chain only if its price is within 7 days of the last update (E1). The
+// page may WITHHOLD a comparison once that stops being true today; it never creates one the
+// extract did not license. The render test fails if this window is ever looser than E1's.
+const RECENT_DAYS = 7;
+function dayNum(iso){
+  const s = String(iso || "");
+  return Date.UTC(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10))) / 86400000;
+}
+function todayNum(){
+  if (TODAY_ISO) return dayNum(TODAY_ISO);
+  const t = new Date();
+  return Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) / 86400000;
+}
+function dataAge(){ return Math.max(0, Math.round(todayNum() - dayNum(META.extract_date))); }
+function ageOf(o){ return o.days_behind + dataAge(); }
+// The longest age at which price movement was measured (14 days). Beyond it there is no figure.
+function horizon(){
+  return Math.max(0, ...META.chains.flatMap(c => (c.staleness || []).map(s => s.days)));
+}
+function agoText(n){ return n === 0 ? "today" : n === 1 ? "yesterday" : n + " days ago"; }
+
+function asOfToday(p){
+  if (dataAge() === 0) return p;
+  const offers = p.offers.map(o => (o.comparable && ageOf(o) > RECENT_DAYS)
+    ? Object.assign({}, o, {comparable: false,
+        not_comparable_reason: "no price from the last " + RECENT_DAYS + " days"})
+    : o);
+  const n = offers.filter(o => o.comparable).length;
+  return Object.assign({}, p, {offers: offers,
+    comparison: Object.assign({}, p.comparison, {n_compared: n})});
+}
+
+/* The least trustworthy thing in the data gets a warning, never a blank. Judged on its age
+ * today, not its age at the last update. */
 function warnOld(o){
-  if (!o.staleness_exceeds_measured) return "";
-  return '<p class="warn">⚠ Checked ' + when(o.observed_date) + " — already "
-       + o.days_behind + " days old at the last update. How far it has moved has not been measured.</p>";
+  const age = ageOf(o);
+  if (age <= horizon()) return "";
+  return '<p class="warn">⚠ Checked ' + when(o.observed_date) + " — " + age
+       + " days old. How far it has moved has not been measured.</p>";
 }
 
 /* The price basis is shown only when it carries information. While every offer in the
@@ -236,8 +278,9 @@ function cardCompare(p){
 }
 
 function card(p){
-  const n = p.comparison.n_compared;
-  return n === 0 ? cardNone(p) : n === 1 ? cardOne(p) : cardCompare(p);
+  const q = asOfToday(p);
+  const n = q.comparison.n_compared;
+  return n === 0 ? cardNone(q) : n === 1 ? cardOne(q) : cardCompare(q);
 }
 
 /* ---- 6-week history, drawn as steps so gaps stay visible ---- */
@@ -306,6 +349,7 @@ function search(q){
 
 /* ---- caveats, below the answer ---- */
 function renderCover(counts){
+  const age = dataAge(), H = horizon();
   const total = Math.max(1, counts.total);
   const notPossible = Math.round(100 * (counts.n0 + counts.n1) / total);
   const chains = META.chains.map(c => esc(c.chain_label || c.chain)).join(" and ");
@@ -321,13 +365,27 @@ function renderCover(counts){
     + "<p>A comparison is not possible for " + notPossible
     + "% of products: only one store, or neither, has a recent price.</p>"
     + '<p>Prices as of <time datetime="' + esc(META.extract_date) + '">'
-    + human(META.extract_date, true) + "</time>, updated weekly. Prices can change after they are checked"
+    + human(META.extract_date, true) + "</time> — " + agoText(age)
+    + ". Prices can change after they are checked"
     + (moves ? ": within a week, " + moves : "") + ".</p>"
     + (META.scope && META.scope.basket ? "<p>" + esc(META.scope.basket)
         + ' <a href="https://github.com/MhBaigtw/DE-Grocery-Price-tool/blob/main/docs/writeup.md#4-matching-products-by-barcode-makes-a-quarter-of-the-shelf-invisible">Why</a></p>' : "");
 
   const sd = document.getElementById("stripdate");
   if (sd) sd.textContent = human(META.extract_date, true);
+
+  // The page states the data's age; it never promises when the next update will come.
+  const aw = document.getElementById("agewarn");
+  if (aw){
+    if (age > H){
+      aw.innerHTML = "⚠ These prices are " + age + " days old — older than the " + H
+        + " days over which this tool measured how prices move. Treat every price here as out of date.";
+      aw.hidden = false;
+    } else {
+      aw.innerHTML = "";
+      aw.hidden = true;
+    }
+  }
 }
 
 /* ---- boot ---- */
@@ -339,7 +397,7 @@ Promise.all([
   const counts = {total: p.length, n0: 0, n1: 0, n2: 0, n3: 0};
   for (const x of p){
     x._s = ((x.name || "") + " " + (x.brand || "") + " " + (x.size || "")).toLowerCase();
-    counts["n" + Math.min(3, x.comparison.n_compared)]++;
+    counts["n" + Math.min(3, asOfToday(x).comparison.n_compared)]++;
   }
   renderCover(counts);
   $("#q").addEventListener("input", e => search(e.target.value));

@@ -23,9 +23,29 @@ These are decided. Do not relitigate them mid-task. If you think one is wrong, s
 explicitly and stop; do not silently work around it.
 
 1. **No scraping of grocery vendor sites.** Downstream consumer only.
-2. **Snapshot immutability.** Every downloaded copy of the dataset is stored with its
-   download timestamp and a sha256 of the archive, and is never modified in place.
-   Analysis reads from a snapshot, never from a live download.
+2. **Snapshot immutability.** Every downloaded copy of the dataset is recorded with its
+   download timestamp, the sha256 of the archive and upstream's last-updated stamp, and is
+   never modified in place. Analysis reads from a snapshot, never from a live download.
+
+   **Amended 2026-09-12: provenance always; archives only from full rebuilds.** Until this
+   date the rule also meant every downloaded archive was *kept*. That changed deliberately,
+   when the tool's refresh was automated:
+   - **The light refresh** (`scripts/refresh_light.py`) runs on a GitHub-hosted runner whose
+     disk is discarded after every job, and it runs each time upstream publishes. Keeping a
+     ~975 MB archive per run is not possible there and not proportionate. So it records
+     provenance (download timestamps, sha256, byte size, upstream's last-updated stamp) in
+     `data/provenance/`, commits that record with the extract it produced, and **retains no
+     archive**.
+   - **Archives are retained only by manual full rebuilds** (`scripts/refresh.py`, into
+     `data/snapshots/`). The mirroring commitment in the licence section now lives there.
+
+   **What this gives up, stated rather than hidden:** a light refresh's extract can be tied to
+   the exact archive by hash, but that archive can be re-read later only if upstream still
+   serves it or a full rebuild happened to capture the same publication. **What it keeps:**
+   the light path still reads a downloaded archive, never a live query; every extract it
+   ships names the hash of the file it came from; and its filter is proven rather than
+   assumed. Every full rebuild asserts that its extract is byte-identical to the light extract
+   for the same snapshot (`scripts/check_light_parity.py`), and a mismatch fails loudly.
 3. **Scope is North York, Toronto pickup pricing** — and for Save-On-Foods, not Toronto at
    all. The upstream data is the "in store pickup" price for the North York area of Toronto
    for seven chains. No claim in this project may be phrased as a national, provincial,
@@ -64,7 +84,9 @@ The maintainer has confirmed by email:
 
 Because redistribution is encouraged, we **mirror our own snapshots** rather than
 depending on upstream availability at read time. Snapshots are kept with their download
-timestamp and sha256 per the immutability rule below.
+timestamp and sha256 per the immutability rule below. **Since 2026-09-12 that mirror is kept
+by manual full rebuilds only.** The automated light refresh records provenance and keeps no
+archive; see locked decision 2 as amended.
 
 ## Upstream volatility (confirmed by maintainer, 2026-08-22)
 

@@ -58,14 +58,14 @@ FAILURE_MARKERS = (
 
 
 def run_once(sql: str, db: str, memory_limit: str, temp_dir: str,
-             max_rows: int) -> tuple[int, str]:
+             max_rows: int, cwd: str = str(REPO)) -> tuple[int, str]:
     cmd = [sys.executable, str(RUNNER), sql, "--all",
            "--memory-limit", memory_limit, "--max-rows", str(max_rows)]
     if db:
         cmd += ["--db", db]
     if temp_dir:
         cmd += ["--temp-dir", temp_dir]
-    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(REPO))
+    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
     # The progress bar writes carriage-return spam; strip it so the comparison is on
     # content rather than on terminal animation.
     out = "\n".join(l for l in (proc.stdout + proc.stderr).splitlines()
@@ -89,17 +89,27 @@ def main() -> int:
     ap.add_argument("--min-rows", type=int, default=0,
                     help="every result set must have at least this many rows")
     ap.add_argument("--save", default=None, help="write run 1's output to this path")
+    ap.add_argument("--cwd", default=str(REPO),
+                    help="working directory for the query. Relative paths inside the SQL -- "
+                         "E1's COPY ... TO 'tool/data/...' -- resolve against it, which is how "
+                         "the light-parity check builds an extract without touching tool/data/")
     args = ap.parse_args()
 
     if not (REPO / args.sql_file).exists() and not pathlib.Path(args.sql_file).exists():
         print(f"no such query file: {args.sql_file}", file=sys.stderr)
         return 2
 
+    sql = args.sql_file
+    if pathlib.Path(args.cwd).resolve() != REPO.resolve():
+        # A relative query path would resolve against the other directory; pin it.
+        sql = str((REPO / args.sql_file) if (REPO / args.sql_file).exists()
+                  else pathlib.Path(args.sql_file).resolve())
+
     print(f"query        : {args.sql_file}")
     outs, codes = [], []
     for i in (1, 2):
-        code, out = run_once(args.sql_file, args.db, args.memory_limit,
-                             args.temp_dir, args.max_rows)
+        code, out = run_once(sql, args.db, args.memory_limit,
+                             args.temp_dir, args.max_rows, args.cwd)
         codes.append(code); outs.append(out)
         print(f"run {i}        : exit {code}, {len(statements(out))} result sets")
 

@@ -1,0 +1,144 @@
+# The automated refresh of the tool's extract, triggered by upstream PUBLISHING, not by a clock.
+#
+# TWO JOBS. `probe` is cheap and runs daily. It reads hammer-lastupdated.txt (a few hundred
+# bytes) and compares it with the newest record in data/provenance/. `refresh` runs only when
+# that stamp has changed. Pulling the 975 MB archive every day regardless would buy about one
+# percentage point of staleness over a correctly timed refresh, and cost the maintainer's
+# volunteer server seven times the bandwidth (docs/phase-4-findings.md §1.4, §10).
+#
+# WHY A HOSTED RUNNER IS ENOUGH. scripts/refresh_light.py loads only the two chains the tool reads
+# (their full history) and runs every gate that guards the extract's correctness. Measured on
+# snapshot 20260911T200435Z: peak disk ~5 GiB, peak memory 2.7 GiB (§10). A standard hosted Linux
+# runner for a public repository has 14 GB SSD and 16 GB RAM, and is free.
+#
+# WHAT SHIPS. On success the job commits tool/data/ and a provenance record to main, and Netlify
+# builds that push through its own gates (scripts/netlify_build.sh). On any refusal nothing is
+# committed, the site keeps serving the previous extract (whose age the page states), and an
+# issue is opened. A silent refresh failure is the failure this workflow exists to prevent.
+name: refresh
+
+on:
+  schedule:
+    # 05:00 UTC daily -- after the observed upstream publication window (20:20-21:48 ET).
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Refresh even if upstream's last-updated stamp matches the newest record
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    outputs:
+      changed: ${{ steps.probe.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+
+      - name: Has upstream published since the newest provenance record?
+        id: probe
+        run: python scripts/refresh_light.py --probe-only
+
+      # Separate from "a refresh is due": this is the alarm for a pipeline that has stopped.
+      - name: Is the live extract still inside its age limit?
+        id: age
+        continue-on-error: true
+        run: python scripts/check_extract.py
+
+      - name: Alert -- the live extract is past its age limit
+        if: steps.age.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'The live extract is past its age limit';
+            const body = [
+              '**The extract the site is serving is older than `check_extract.py` allows.**',
+              'The automated refresh has stopped, is failing, or upstream has not published.',
+              'The page states the data\'s age and warns once it passes the measured horizon,',
+              'so visitors are told; this issue is for the people who can fix it.',
+              '', `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            const open = (await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open'})).data
+              .find(i => i.title === title);
+            if (open) await github.rest.issues.createComment({owner: context.repo.owner,
+              repo: context.repo.repo, issue_number: open.number, body});
+            else await github.rest.issues.create({owner: context.repo.owner,
+              repo: context.repo.repo, title, body});
+
+      - name: Fail the run when the live extract is past its limit
+        if: steps.age.outcome == 'failure'
+        run: |
+          echo "The live extract no longer passes its own age limit. Deliberately loud."
+          exit 1
+
+  refresh:
+    needs: probe
+    # !cancelled(): a stale-extract alarm in `probe` must not stop the refresh that fixes it.
+    if: ${{ !cancelled() && (needs.probe.outputs.changed == 'true' || inputs.force == true) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '20'}
+
+      # duckdb pinned to the version the committed extract and its parity check were built with.
+      - name: Install
+        run: python -m pip install --quiet duckdb==1.5.5 pandas psutil
+
+      - name: Light refresh -- fetch, filtered load, every correctness gate
+        run: python scripts/refresh_light.py --measure ${{ inputs.force == true && '--force' || '' }}
+
+      - name: Commit the extract and its provenance
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tool/data data/provenance
+          if git diff --cached --quiet; then
+            echo "Nothing changed. Nothing to commit."
+            exit 0
+          fi
+          rec=$(ls data/provenance/*.json | sort | tail -1)
+          msg=$(python -c "import json,sys; r=json.load(open(sys.argv[1])); print('Refresh: snapshot', r['snapshot_id'], '- upstream', r['upstream_lastupdated_raw'], '- extract', r['extract']['extract_date'])" "$rec")
+          git commit -q -m "$msg"
+          git pull --rebase --quiet origin main
+          git push origin HEAD:main
+
+      - name: Alert -- the refresh refused or failed
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Automated refresh refused or failed';
+            const body = [
+              '**A light refresh did not complete. Nothing was committed; the site keeps serving the previous extract.**',
+              'A refusal by a gate is the designed behaviour, not an outage. Read the run log for which gate and why.',
+              '', `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            const open = (await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open'})).data
+              .find(i => i.title === title);
+            if (open) await github.rest.issues.createComment({owner: context.repo.owner,
+              repo: context.repo.repo, issue_number: open.number, body});
+            else await github.rest.issues.create({owner: context.repo.owner,
+              repo: context.repo.repo, title, body});

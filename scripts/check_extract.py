@@ -105,8 +105,14 @@ def check_meta(meta: dict, args) -> None:
     d = dt.date.fromisoformat(str(meta["extract_date"])[:10])
     age = (dt.date.today() - d).days
     if age > args.max_extract_age_days:
-        bad(f"extract is {age} days old (limit {args.max_extract_age_days}); "
-            "refresh has stopped or is failing silently")
+        msg = (f"extract is {age} days old (limit {args.max_extract_age_days}); "
+               "refresh has stopped or is failing silently")
+        if args.vintage == "fail":
+            bad(msg)
+        else:
+            # A deploy that does not change the data cannot make it staler. The limit guards a
+            # DATA deploy; netlify_build.sh decides which kind this is, failing safe to "data".
+            warn(msg + " -- not refused: this deploy does not change the data")
     elif age > args.warn_extract_age_days:
         warn(f"extract is {age} days old")
 
@@ -228,6 +234,10 @@ def main() -> int:
     ap.add_argument("--max-extract-age-days", type=int, default=21,
                     help="hard limit on extract vintage (default 21 = three missed weeks)")
     ap.add_argument("--warn-extract-age-days", type=int, default=10)
+    ap.add_argument("--vintage", choices=["fail", "warn"], default="fail",
+                    help="fail (default): an extract past --max-extract-age-days refuses the "
+                         "deploy. warn: report it without refusing -- only for a deploy that "
+                         "does not change tool/data/ (scripts/netlify_changes.sh decides)")
     args = ap.parse_args()
 
     d = pathlib.Path(args.dir)

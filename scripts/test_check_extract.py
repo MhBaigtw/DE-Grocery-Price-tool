@@ -188,6 +188,16 @@ def main() -> int:
     print(f"  {'PASS' if stale_ok else 'FAIL'}  a stale extract is refused on vintage alone")
     ok.append(stale_ok)
 
+    # The same stale extract, on a deploy that does not change the data, is reported and not
+    # refused -- and nothing else is relaxed: a malformed extract is still refused in warn mode.
+    rc, out = run(SRC, "--max-extract-age-days", "0", "--vintage", "warn")
+    warn_ok = rc == 0 and "not refused" in out
+    print(f"  {'PASS' if warn_ok else 'FAIL'}  --vintage warn reports a stale extract without refusing it")
+    ok.append(warn_ok)
+    warn_other = case("--vintage warn relaxes nothing but vintage", pooled, "pooled",
+                      "--max-extract-age-days", "0", "--vintage", "warn")
+    ok.append(warn_other)
+
     print(f"\n{sum(ok)} of {len(ok)} cases behaved correctly.")
     if not all(ok):
         print("FAIL - the deploy gate does not refuse something it must refuse.")

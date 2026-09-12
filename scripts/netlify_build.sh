@@ -52,7 +52,14 @@ rm -rf _site
 # --- 1. the deploy gate ------------------------------------------------------------------
 echo
 echo "--- extract gate -------------------------------------------------"
-"$PY" scripts/check_extract.py
+# The age limit guards a DATA deploy. Every other check in the gate runs either way.
+if bash scripts/netlify_changes.sh data-changed; then
+    echo "age limit: ENFORCED"
+    "$PY" scripts/check_extract.py
+else
+    echo "age limit: reported, not enforced (this deploy does not change tool/data/)"
+    "$PY" scripts/check_extract.py --vintage warn
+fi
 
 # --- 2. the interface must not betray what the extract enforces --------------------------
 if command -v node >/dev/null 2>&1; then

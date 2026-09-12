@@ -15,57 +15,67 @@ below as verified state — verify them.
 
 ## Current phase and section
 
-Phase 4 (the price-lookup tool). The site is **live** again on Netlify at deploy `adcfcb5`,
-verified with `verify_deploy.py`. The owner asked for two corrections before announcing it:
-Phase 2 findings §3.8 (the Metro / Save-On-Foods ties) and a phone re-measurement against the
-live site. Both are done in this commit.
+Phase 4. **The automated refresh is built and committed locally, and NOT pushed.** The owner
+asked for a report before the first automated run goes live. Pushing this commit puts the
+`refresh` workflow on `main`, and its next scheduled probe (05:00 UTC) would refresh straight
+away: upstream published 2026-09-11 22:14 ET, which is newer than the live extract's
+publication. The page fix and the vintage-scope fix ride in the same commit.
 
 ## Last commit
 
-See `git log -1`. Written alongside the commit; the tree was clean apart from gitignored logs.
-**This commit is not pushed** — pushing needs the owner's go, and a push now triggers a
-Netlify build because auto-builds are back on.
+See `git log -1`. **`main` is ahead of `origin/main` by that one commit.** `5032c7a` (the
+findings §3.8 ties and the phone re-measurement) was pushed, deployed and verified live
+earlier the same day.
 
 ## What the last session completed
 
-- Phase 2 findings §3.8: headline, prose and summary restated. 611 of 666 dates had Metro
-  cheaper, 55 were exact ties, none had Save-On-Foods cheaper. A correction note carries the
-  build stamp.
-- Phase 4 findings §8: re-measured on the live site. Interactive in 2.80 s against 3.31 s, 5 runs,
-  with a before/after table. The earlier four-chain numbers are kept and labelled.
-- Earlier the same day: the claims sweep and check, the Q3c tie case, the push, builds
-  re-enabled, and the live verification.
+- **Light refresh and trigger:** `scripts/refresh_light.py` and `.github/workflows/refresh.yml`,
+  replacing `probe.yml`.
+- **Parity proof:** `scripts/check_light_parity.py`, wired into `refresh.py`.
+- **Provenance records:** under `data/provenance/`, seeded from the live snapshot.
+- **Locked decision 2** amended in place.
+- **Page:** ages judged against today; the vintage limit applies to data deploys only.
+- **Findings §10** holds the design, measurements, growth, and what is not yet verified.
+- **Tests all passing:**
+  - parity 7 of 7;
+  - Netlify changes 12 of 12;
+  - extract gate 19 of 19;
+  - render test on the new page;
+  - the render test fails the old page.
 
 ## Immediate next steps
 
-1. **Wait for the owner's go to push this commit.** It triggers a rebuild; after it goes live,
-   run `verify_deploy.py` against the live URL again.
-2. Later: the custom domain (the owner supplies the hostname), and contact the maintainer —
-   upstream feedback item 12 is written to be sent.
+1. **Wait for the owner's go to push.** Then watch the first scheduled run, or trigger it with
+   `workflow_dispatch`. Check each of these:
+   - the `--measure` table on the runner;
+   - that the commit to `main` succeeds (`contents: write`);
+   - that Netlify builds that push through its gates, with the age limit ENFORCED;
+   - that `verify_deploy.py` passes on the new extract;
+   - that a later documentation-only push is skipped by Netlify's `ignore`.
+2. The owner to delete the failed `deploy.yml` run in the Actions tab, or authorise `gh`.
+3. Later: the custom domain (the owner supplies it), and contacting the maintainer, now also
+   about the automated fetch per publication.
 
 ## Open questions and blockers
 
-**Blocked on the project owner:** the push of this commit; the custom domain hostname; whether
-to refresh the stale four-chain figures quoted in `verify_deploy.py`'s comment and failure
-message. The owner earlier said to keep that script exactly as is, so it was not edited.
-
-**Not started, and not requested:** extending `check_claims.py` beyond its three documents.
+**Blocked on the project owner:** the push; deleting the old failed run (needs GitHub auth);
+the custom domain; whether to refresh the stale four-chain figures in `verify_deploy.py`'s
+comment and failure message (owner earlier said keep that script as is).
 
 ## Known constraints
 
-- **Netlify auto-builds are on** (`stop_builds` false). Every push to `main` builds and deploys
-  through the gate.
-- **Two databases, two purposes.** `hammer.duckdb` (snapshot `20260911T200435Z`) feeds the tool.
-  `hammer-20260822T134045Z.duckdb` (build `2026-08-28T17:48:35Z`) is the Phase 2/3 analysis
-  build.
+- **Netlify auto-builds are on.** A push of this commit builds (tool/ changed).
+- **Two databases.** `hammer.duckdb` (snapshot `20260911T200435Z`) is the full tool build.
+  `hammer-20260822T134045Z.duckdb` is the Phase 2/3 analysis build.
 
 ## Anything the next agent should distrust
 
-- **The phone before/after is not like for like:** localhost against the live CDN, gzip against
-  Brotli, 3 runs against 5. Only 0.51 s of the predicted ~0.9 s saving showed up, and the cause is
-  not isolated. Search keystroke got 15 ms slower, unexplained.
-- **`check_claims.py` proves a source exists, not that it produces the number**, and covers
-  three documents only.
-- **North York rests on upstream's word only**; store 1982 is unidentified.
-- **The gates on Netlify's builder passed in a successful build, but the build log was not
-  read.**
+- **Runner behaviour is unmeasured.** Every light-path number is from this Windows machine.
+- **Linux and Windows byte identity is not demonstrated.** Parity was judged on one machine.
+- **Netlify's `ignore` and `CACHED_COMMIT_REF` are tested locally against real commits, not on
+  Netlify's builder.**
+- **The page now withholds comparisons as data ages** — 29 of 1,938 one day after an update,
+  all of them after 10 days. That is the intended correction, but it is a visible change for
+  visitors if the automation ever stalls.
+- **Repository growth of 160–200 KB per refresh comes from two intervals only.** The ~60–70
+  MB per year figure is an estimate.

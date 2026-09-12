@@ -60,12 +60,14 @@ comparison, the writeup carries it, and every chart is a surface where a withdra
 resurface. It stays in the repository as a record and is never published
 ([`dashboard/RETIRED.md`](dashboard/RETIRED.md)).
 
-**Phase 4 — the price tool. Built; offline pending review.** Refresh cadence measured rather
-than assumed (Thursday is the flyer day at six of eight chains, and a daily refresh beats a
-correctly-timed weekly one by under 2 percentage points). Deployed to Netlify, then taken
-offline on 2026-09-12 when Save-On-Foods was found to be priced in Kamloops, BC; rebuilt as
-Metro vs Walmart and awaiting review before it goes back up. See
-[the Phase 4 findings](docs/phase-4-findings.md), §9.
+**Phase 4 — the price tool. Live.** Refresh cadence measured rather than assumed (Thursday is
+the flyer day at six of eight chains, and a daily refresh beats a correctly-timed weekly one
+by under 2 percentage points). Taken offline on 2026-09-12 when Save-On-Foods was found to be
+priced in Kamloops, BC, rebuilt as Metro vs Walmart, and put back up after review
+([findings](docs/phase-4-findings.md) §9). **Refreshed automatically when upstream publishes**,
+not on a clock: a light refresh loads only the two chains the tool reads, runs every gate that
+guards the extract on a free GitHub runner, and is proven byte-identical to the full rebuild
+(§10). The page states how old its prices are rather than promising when they will update.
 
 ### What this project found, and what it did not
 
@@ -132,7 +134,10 @@ scripts/
   compact_db.py                 reclaim dead pages DuckDB does not free on rebuild
   run_query.py                  run a saved query against the analysis DB
   verify_twice.py               run a query twice: both must succeed and agree
-  refresh.py                    the weekly refresh: fetch, gate, rebuild, regenerate the extract
+  refresh_light.py              the automated refresh: two chains only, every extract gate
+  refresh.py                    the full rebuild (manual): keeps archives, proves the light path
+  check_light_parity.py         the light extract must equal the full extract, byte for byte
+  netlify_changes.sh            skip builds nothing ships from; age limit only on data deploys
   netlify_build.sh              the deploy build: gates first, then assemble _site
   run_dbt_tests.py              run the dbt suite on both snapshots, report counts
   check_schema.py               assert the loaded schema matches config/
@@ -148,7 +153,8 @@ scripts/
   serve_gzip.py                 a local server that compresses, like the real host
   test_*.py, test_*.js          prove each check fails when it should
 .handoff/                       where the last session stopped -- not a record of what is true
-.github/workflows/probe.yml     daily upstream check; opens an issue when a refresh is due
+.github/workflows/refresh.yml   daily probe; refreshes only when upstream has published
+data/provenance/                what each shipped extract was built from (hash, timestamps)
 data/snapshots/                 downloaded archives (gitignored for size, not licence)
 ```
 
@@ -194,6 +200,8 @@ python scripts/test_check_schema.py    # proves the above actually fails when it
 python scripts/check_manifest.py       # docs/FILES.md vs the repo
 python scripts/check_claims.py         # every figure in the published docs has a committed source
 python scripts/test_check_claims.py    # proves the above fails when it should  (7 of 7)
+python scripts/test_check_light_parity.py # any difference from the full extract is refused  (7 of 7)
+python scripts/test_netlify_changes.py # docs skip the build; data deploys enforce the age limit  (12 of 12)
 python scripts/check_layering.py       # product_id must not appear below staging
 python scripts/check_model_parity.py   # models/ and dbt/models/ must not have drifted
 python scripts/check_determinism.py    # SQL that could return a different answer twice

@@ -1,0 +1,33 @@
+{
+  "snapshot_id": "20260911T200435Z",
+  "path": "full",
+  "captured_utc": "2026-09-11T20:04:35.857298+00:00",
+  "upstream_lastupdated_raw": "2026-09-10 21:30:05.12 (Eastern Time)",
+  "lastupdated_url": "https://jacobfilipp.com/hammerdata/hammer-lastupdated.txt",
+  "archives": [
+    {
+      "url": "https://jacobfilipp.com/hammerdata/hammer-5-csv.zip",
+      "filename": "hammer-5-csv.zip",
+      "download_started_utc": "2026-09-11T20:04:35.857298+00:00",
+      "download_finished_utc": "2026-09-11T20:05:35.855586+00:00",
+      "bytes": 510764644,
+      "sha256": "40de1de254026b3140ff98e58a90b54a9fdd9479faea76edf5b1d5539a6f69fa"
+    },
+    {
+      "url": "https://jacobfilipp.com/hammerdata/hammer-3-compressed.zip",
+      "filename": "hammer-3-compressed.zip",
+      "download_started_utc": "2026-09-11T20:05:35.855586+00:00",
+      "download_finished_utc": "2026-09-11T20:07:00.233473+00:00",
+      "bytes": 974862671,
+      "sha256": "ac6a9b955815e29d36be427553d5ae11cd23987da8746d1f72dbc51e2163e216"
+    }
+  ],
+  "archive_retained": true,
+  "load_filter": null,
+  "extract": {
+    "extract_date": "2026-09-10",
+    "products_shipped": 3465,
+    "built_utc": "2026-09-11T20:20:27.064713+00:00"
+  },
+  "run": null
+}
