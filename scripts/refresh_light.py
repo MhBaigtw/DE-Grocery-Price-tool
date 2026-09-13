@@ -31,6 +31,14 @@ It does NOT run the dbt suite or verify_reproducible, which need the full databa
 with every full rebuild, which also runs check_light_parity.py: the proof that this filter
 drops nothing the extract needs.
 
+TOLERANCE, NOT PERSISTENCE (added 2026-09-13, §11). Every request to upstream is validated: a
+stamp must be a stamp, and an archive must be served as a zip and start with a zip header,
+checked before it is used or recorded. A refused answer, such as the bot-verification challenge
+page one runner received on the first run, is retried at most three times, at 0, +15 and +45
+minutes, and then the run fails and alerts. Never more than that: repeated requests to a
+volunteer's server are their own problem. The client stays the honest user agent; nothing
+disguises it or attempts the challenge.
+
 PROVENANCE, NOT ARCHIVES (CLAUDE.md locked decision 2, amended 2026-09-12). A fetched run records
 the download timestamps, sha256, byte size and upstream's last-updated stamp in
 data/provenance/<snapshot_id>.json, commits it with the extract, and deletes the archive.
@@ -48,7 +56,12 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import fetch_snapshot  # noqa: E402  -- one fetcher: UA, archive URLs, streaming sha256
 
+import http.client  # noqa: E402
+
 PY = sys.executable
+# Attempt start times, in seconds after the first. Capped in code, not just by default.
+DEFAULT_RETRY_AT = "0,900,2700"
+MAX_ATTEMPTS, MAX_SPAN_S = 3, 3600
 # The chains the light load keeps. Asserted, not trusted: see assert_filter_matches_extract().
 LIGHT_VENDORS = ("Metro", "Walmart")
 E1 = ROOT / "analysis" / "phase4" / "E1_tool_extract.sql"
@@ -157,13 +170,45 @@ def assert_filter_matches_extract() -> None:
                   "in E1 and the extract gate")
 
 
+def retry_schedule(spec: str) -> tuple[int, ...]:
+    try:
+        at = tuple(int(x) for x in spec.split(","))
+    except ValueError:
+        raise Stop(f"retry schedule {spec!r} is not a list of seconds")
+    if (not at or at[0] != 0 or list(at) != sorted(at) or len(at) > MAX_ATTEMPTS
+            or at[-1] > MAX_SPAN_S):
+        raise Stop(f"retry schedule {spec!r} refused: at most {MAX_ATTEMPTS} attempts, the first "
+                   f"at 0, all within {MAX_SPAN_S // 60} minutes. Repeated requests to a "
+                   "volunteer's server are their own problem.")
+    return at
+
+
+def with_retries(what: str, fn, at: tuple[int, ...], sleep=time.sleep):
+    """Tolerance for a transient refusal, not persistence: at most len(at) attempts, at the
+    given offsets, then Stop. A refusal is a validated non-answer (UpstreamRefused) or a
+    network error; anything else is a bug and is not retried."""
+    start = time.monotonic()
+    last = None
+    for i, t in enumerate(at, 1):
+        wait = t - (time.monotonic() - start)
+        if wait > 0:
+            say("retry", f"{what}: attempt {i} of {len(at)} in {wait / 60:.1f} min")
+            sleep(wait)
+        try:
+            return fn()
+        except (fetch_snapshot.UpstreamRefused, OSError, http.client.HTTPException) as e:
+            last = e
+            say("refused", f"{what}: attempt {i} of {len(at)}: {e}")
+    raise Stop(f"{what}: upstream refused all {len(at)} attempts; last: {last}")
+
+
 def latest_record() -> dict | None:
     recs = sorted(PROVENANCE.glob("*.json"))
     return json.loads(recs[-1].read_text(encoding="utf-8")) if recs else None
 
 
-def probe() -> tuple[str, bool]:
-    raw = fetch_snapshot.fetch_text(fetch_snapshot.LASTUPDATED_URL).strip()
+def probe(at: tuple[int, ...]) -> tuple[str, bool]:
+    raw = with_retries("probe", fetch_snapshot.fetch_stamp, at)
     say("probe", f"upstream last-updated {raw!r}")
     rec = latest_record()
     have = rec.get("upstream_lastupdated_raw") if rec else None
@@ -179,18 +224,20 @@ def emit(key: str, value: str) -> None:
             fh.write(f"{key}={value}\n")
 
 
-def fetch(workdir: pathlib.Path) -> tuple[pathlib.Path, dict]:
+def fetch(workdir: pathlib.Path, at: tuple[int, ...]) -> tuple[pathlib.Path, dict]:
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     snap = workdir / "snapshot" / stamp
     snap.mkdir(parents=True)
-    lastupdated = fetch_snapshot.fetch_text(fetch_snapshot.LASTUPDATED_URL).strip()
+    lastupdated = with_retries("last-updated stamp", fetch_snapshot.fetch_stamp, at)
+    # Validated before the manifest exists: a refused archive leaves no manifest to record.
+    archive = with_retries("archive", lambda: fetch_snapshot.fetch_archive(
+        fetch_snapshot.ARCHIVES[SQLITE_ARCHIVE], snap / SQLITE_ARCHIVE), at)
     manifest = {
         "snapshot_id": stamp,
         "captured_utc": fetch_snapshot.utcnow(),
         "upstream_lastupdated_raw": lastupdated,
         "lastupdated_url": fetch_snapshot.LASTUPDATED_URL,
-        "archives": [fetch_snapshot.fetch_archive(fetch_snapshot.ARCHIVES[SQLITE_ARCHIVE],
-                                                  snap / SQLITE_ARCHIVE)],
+        "archives": [archive],
     }
     (snap / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return snap, manifest
@@ -282,6 +329,10 @@ def main() -> int:
                          "to compare or measure, never for a deploy")
     ap.add_argument("--measure", action="store_true",
                     help="report wall-clock, peak memory and peak disk per stage (needs psutil)")
+    ap.add_argument("--retry-at", default=DEFAULT_RETRY_AT,
+                    help="attempt start offsets in seconds for each upstream request (default "
+                         "0,900,2700). Capped at 3 attempts within an hour; a longer schedule "
+                         "is refused.")
     args = ap.parse_args()
     for s in (sys.stdout, sys.stderr):
         try:
@@ -293,8 +344,9 @@ def main() -> int:
     meter = None
     try:
         assert_filter_matches_extract()
+        at = retry_schedule(args.retry_at)
         if args.probe_only:
-            _, changed = probe()
+            _, changed = probe(at)
             say("decision", "REFRESH -- upstream has published since the newest record"
                 if changed else "hold -- nothing new upstream")
             emit("changed", "true" if changed else "false")
@@ -315,12 +367,12 @@ def main() -> int:
             manifest = json.loads((snap / "manifest.json").read_text(encoding="utf-8"))
             fetched = False
         else:
-            _, changed = probe()
+            _, changed = probe(at)
             if not changed and not args.force:
                 say("decision", "hold -- nothing new upstream")
                 return 0
             say("decision", "REFRESH" + (" (forced)" if not changed else ""))
-            snap, manifest = meter.stage("download", lambda: fetch(workdir))
+            snap, manifest = meter.stage("download", lambda: fetch(workdir, at))
             fetched = True
 
         say("snapshot", f"{manifest['snapshot_id']}, upstream {manifest['upstream_lastupdated_raw']!r}")

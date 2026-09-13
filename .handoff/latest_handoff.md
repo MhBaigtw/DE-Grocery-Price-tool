@@ -1,4 +1,4 @@
-# Handoff — 2026-09-12, Claude Opus 5
+# Handoff — 2026-09-13, Claude Opus 5
 
 > Rewritten in full at the end of every completed section, at the same time as the
 > commit. Never written in a hurry at the end of a session — a note written while
@@ -15,67 +15,59 @@ below as verified state — verify them.
 
 ## Current phase and section
 
-Phase 4. **The automated refresh is built and committed locally, and NOT pushed.** The owner
-asked for a report before the first automated run goes live. Pushing this commit puts the
-`refresh` workflow on `main`, and its next scheduled probe (05:00 UTC) would refresh straight
-away: upstream published 2026-09-11 22:14 ET, which is newer than the live extract's
-publication. The page fix and the vintage-scope fix ride in the same commit.
+Phase 4, automated refresh. The first run was refused by the upstream host's bot-verification
+challenge. The diagnostic could not reproduce it (0 of 80 requests, four cloud addresses;
+findings §11). Validation, retry and a Task Scheduler fallback are built. This commit is pushed
+immediately before the owner's **watched first run**: the workflow is re-enabled and triggered
+by hand straight after.
 
 ## Last commit
 
-See `git log -1`. **`main` is ahead of `origin/main` by that one commit.** `5032c7a` (the
-findings §3.8 ties and the phone re-measurement) was pushed, deployed and verified live
-earlier the same day.
+See `git log -1`. Written alongside the commit; the tree was clean apart from gitignored logs.
 
 ## What the last session completed
 
-- **Light refresh and trigger:** `scripts/refresh_light.py` and `.github/workflows/refresh.yml`,
-  replacing `probe.yml`.
-- **Parity proof:** `scripts/check_light_parity.py`, wired into `refresh.py`.
-- **Provenance records:** under `data/provenance/`, seeded from the live snapshot.
-- **Locked decision 2** amended in place.
-- **Page:** ages judged against today; the vintage limit applies to data deploys only.
-- **Findings §10** holds the design, measurements, growth, and what is not yet verified.
-- **Tests all passing:**
-  - parity 7 of 7;
-  - Netlify changes 12 of 12;
-  - extract gate 19 of 19;
-  - render test on the new page;
-  - the render test fails the old page.
+- **Validation** (`fetch_snapshot.py`): a stamp must be a stamp; an archive must be served as a
+  zip and start with a zip header, checked before a file or record exists.
+- **Retry** (`refresh_light.py`): at 0, +15 and +45 minutes, then fail and alert; longer
+  schedules are refused in code. `test_upstream_validation.py`, 13 of 13.
+- **Fallback:** `refresh_fallback.py`, plus a Task Scheduler task registered daily at 11:00 local
+  (UTC+3). It runs only while the PC is on and the user is logged on.
+- **Record:** findings §11, and the probe code in `docs/diagnostics/`.
+- **Cleanup:** the temporary Netlify probe site and the diagnostic branch are deleted, the
+  `access-probe` workflow is disabled, and the failed `deploy.yml` run is deleted.
 
 ## Immediate next steps
 
-1. **Wait for the owner's go to push.** Then watch the first scheduled run, or trigger it with
-   `workflow_dispatch`. Check each of these:
-   - the `--measure` table on the runner;
-   - that the commit to `main` succeeds (`contents: write`);
-   - that Netlify builds that push through its gates, with the age limit ENFORCED;
-   - that `verify_deploy.py` passes on the new extract;
-   - that a later documentation-only push is skipped by Netlify's `ignore`.
-2. The owner to delete the failed `deploy.yml` run in the Actions tab, or authorise `gh`.
-3. Later: the custom domain (the owner supplies it), and contacting the maintainer, now also
-   about the automated fetch per publication.
+1. **Watch the first run** and report to the owner:
+   - `--measure` against the Windows figures (269 s / 2.71 GiB / ~5.3 GiB);
+   - whether the Linux-built extract is byte-identical to a Windows build of the same archive
+     (download it locally, check the sha256 against the committed provenance record, build with
+     `refresh_light.py --snapshot`, compare with `check_light_parity.py --light-dir`). Report any
+     diff; do not normalise around it;
+   - whether the commit to `main` succeeded;
+   - Netlify's gated build;
+   - `verify_deploy.py`;
+   - the new extract's date, products and comparability against 3,465 / 55.93%.
+2. If anything fails: stop and report. The site stays on the previous extract.
 
 ## Open questions and blockers
 
-**Blocked on the project owner:** the push; deleting the old failed run (needs GitHub auth);
-the custom domain; whether to refresh the stale four-chain figures in `verify_deploy.py`'s
-comment and failure message (owner earlier said keep that script as is).
+- **Blocked on the owner:** the custom domain; whether to update the stale four-chain figures in
+  `verify_deploy.py`.
+- **Not started:** contacting the maintainer about automated access and the challenge.
 
 ## Known constraints
 
-- **Netlify auto-builds are on.** A push of this commit builds (tool/ changed).
-- **Two databases.** `hammer.duckdb` (snapshot `20260911T200435Z`) is the full tool build.
-  `hammer-20260822T134045Z.duckdb` is the Phase 2/3 analysis build.
+- **Access:** nothing may disguise the client or defeat the bot check. No spoofed user agent,
+  no headless browser, no proxies (owner, 2026-09-13).
+- **This push should be skipped by Netlify's `ignore`.** It changes no path that ships. That
+  is the first real test of the skip on Netlify's builder.
 
 ## Anything the next agent should distrust
 
-- **Runner behaviour is unmeasured.** Every light-path number is from this Windows machine.
-- **Linux and Windows byte identity is not demonstrated.** Parity was judged on one machine.
-- **Netlify's `ignore` and `CACHED_COMMIT_REF` are tested locally against real commits, not on
-  Netlify's builder.**
-- **The page now withholds comparisons as data ages** — 29 of 1,938 one day after an update,
-  all of them after 10 days. That is the intended correction, but it is a visible change for
-  visitors if the automation ever stalls.
-- **Repository growth of 160–200 KB per refresh comes from two intervals only.** The ~60–70
-  MB per year figure is an estimate.
+- **The full 975 MB download from a cloud address has never succeeded.** The diagnostic used
+  4-byte range requests only.
+- **The challenged runner's address is unknown**; the cause of the challenge is not established.
+- **The fallback task has never run.** Its preflight, race handling and alert are untested
+  end to end.

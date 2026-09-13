@@ -1647,7 +1647,103 @@ warn` relaxes nothing but the age limit, and its test shows that too.
 - **Byte identity between a Linux runner and this Windows machine.**
 - **The old workflow run:** the failed run of the removed `deploy.yml` (GitHub Pages was
   never enabled) is still visible in the public Actions history. Deleting it needs an
-  authenticated GitHub session, which this machine does not have.
+  authenticated GitHub session, which this machine does not have. *Deleted 2026-09-13.*
+
+---
+
+# §11 — The upstream host challenged a runner, and the challenge could not be reproduced
+
+*2026-09-13. Sources of every figure: workflow runs 34727228990 (the failure) and 34727622601
+(the diagnostic), and a Netlify Function deployed to a temporary site, deleted the same hour.
+The probe code for both is kept in `docs/diagnostics/`.*
+
+## What failed
+
+The first automated run, 34727228990, was started manually at 00:09 UTC.
+
+**The probe job read the real stamp.** At 00:09:10 its runner got
+`2026-09-11 22:14:30.98 (Eastern Time)`.
+
+**The refresh job, on a different runner 24 seconds later, was challenged.** At 00:09:34 it
+was answered with an HTML page, *"One moment, please… Please wait while your request is being
+verified…"*, for both the last-updated file and the archive. The page is the host's
+bot-verification challenge.
+
+**Two defects in our code let the page get further than it should have:**
+- **The probe treated the page as a new publication.** It compared text for any difference and
+  never checked that the answer was a stamp.
+- **The fetch saved the page as `hammer-3-compressed.zip`.** It checked neither the content type
+  nor the zip header. The load stage refused the file (`BadZipFile`), so nothing was committed,
+  but it refused by accident rather than by design.
+
+**The challenged runner's address was never logged,** so the refusal cannot be tied to an
+address.
+
+## What was tested
+
+- **The client:** the project's honest user agent, as used in production. Nothing disguised the
+  client, and nothing attempted the challenge.
+- **No archive downloaded:** each archive was tested with a **4-byte range request**, aborted
+  before any body if the server had ignored the range.
+- **The request set:** each address made the same 10 requests, twice, a minute apart. That is
+  **80 requests across four cloud addresses on two providers**.
+
+| From | Provider | Egress address |
+|---|---|---|
+| GitHub runner 1 | Azure | 128.24.161.197 |
+| GitHub runner 2 | Azure | 4.246.71.195 |
+| GitHub runner 3 | Azure | 145.132.103.19 |
+| Netlify Function | AWS us-east-2 | 3.135.223.0 |
+
+## What was observed
+
+**No request was challenged: 0 of 80.** Every address got the same answer to every path:
+
+| Path | Answer |
+|---|---|
+| `https://jacobfilipp.com/hammerdata/hammer-lastupdated.txt` | 200, the stamp |
+| `https://www.jacobfilipp.com/hammerdata/hammer-lastupdated.txt` | 200, the stamp |
+| `http://jacobfilipp.com/hammerdata/hammer-lastupdated.txt` | 302 to https |
+| `hammer-3-compressed.zip`, bytes 0-3 | 206, `application/zip`, a zip header |
+| `hammer-5-csv.zip`, bytes 0-3 | 206, `application/zip`, a zip header |
+| `https://projecthammer.org/hammerdata/...` (stamp and archive) | **404** |
+| An image in `/hammerdata/`, and both sites' home pages (controls) | 200 |
+
+**What this establishes:**
+- **There is one source.** projecthammer.org does not serve the data; the archives exist only
+  at `jacobfilipp.com/hammerdata/`. Both hostnames report the same server software, so there is
+  no unprotected second copy to prefer.
+- **The challenge is transient, or tied to conditions not reproduced.** It could not be
+  reproduced on three further Azure addresses or one AWS address. Whether it depends on the
+  address, the request pattern or the host's own heuristics is **not established**.
+
+## What was never tested
+
+**The full archive download.** Every archive request in the diagnostic was a 4-byte range
+request, so whether a 975 MB transfer from a cloud address is treated differently is unknown.
+**The first real run is still that test.**
+
+## What changed in response
+
+- **Validation, before use and before record.**
+  - The probe refuses any answer that is not a date stamp.
+  - The fetch refuses any answer that is not served as a zip *and* does not start with a zip
+    header, checked before a file exists under the archive's name.
+  - A body shorter than its announced length is refused and deleted.
+  - `test_upstream_validation.py` serves a challenge page locally and shows both refusals; a
+    challenged refresh leaves no archive and no manifest (13 of 13).
+- **Tolerance, not persistence.** A refused request is retried at 0, +15 and +45 minutes, then
+  the run fails and opens or updates the refresh issue. A schedule with more attempts, or
+  longer than an hour, is refused in code.
+- **Diagnosis next time.** A failed refresh job now logs its egress address, with one request to
+  an IP echo service, made only on failure.
+- **A fallback, not a second primary.** `scripts/refresh_fallback.py` runs the same light refresh
+  from the owner's PC through Windows Task Scheduler, daily at 11:00 local (08:00 UTC), after the
+  workflow's window. **It runs only while that PC is on and its user is logged on.** It holds if
+  the workflow is mid-run, and it discards its result if the workflow has already committed the
+  same publication.
+- **Rejected on principle:** anything that makes the client look like a browser, attempts the
+  challenge, or routes through a proxy.
 
 ---
 

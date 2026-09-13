@@ -1,0 +1,62 @@
+# DIAGNOSTIC ONLY -- lives on branch diag/access-probe, never merged to main.
+# Tests which access paths to the Project Hammer data are served, and which are challenged, from
+# GitHub-hosted runner addresses. The project's honest user agent is used throughout. Nothing
+# here disguises the client or attempts the challenge. Archives are never downloaded: a 4-byte
+# range request checks for a zip header, and curl aborts before any body is read if the server
+# ignores the range and announces the full file.
+name: access-probe
+on:
+  push:
+    branches: [diag/access-probe]
+permissions:
+  contents: read
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probe access paths with the project's honest user agent
+        shell: bash
+        run: |
+          UA="Mozilla/5.0 (Project Hammer downstream analysis; +https://github.com/MhBaigtw/DE-Grocery-Price-tool)"
+          echo "user agent : $UA"
+          echo "egress IP  : $(curl -sS --max-time 10 https://api.ipify.org)"
+          echo "DNS jacobfilipp.com   : $(dig +short jacobfilipp.com | tr '\n' ' ')"
+          echo "DNS projecthammer.org : $(dig +short projecthammer.org | tr '\n' ' ')"
+          probe() {
+            label="$1"; url="$2"; range="$3"
+            args=(-sS -A "$UA" --max-time 30 --max-filesize 1048576 -D h.txt -o b.bin
+                  -w '%{http_code} bytes=%{size_download} type=%{content_type} redirect=%{redirect_url}')
+            [ -n "$range" ] && args+=(-r "$range")
+            meta=$(curl "${args[@]}" "$url" 2>&1); rc=$?
+            cls=OTHER
+            if [ "$rc" = "63" ]; then cls="TOO-LARGE(range ignored; aborted before body)"
+            elif grep -q "request is being verified" b.bin 2>/dev/null; then cls=CHALLENGE
+            elif [ "$(head -c 2 b.bin 2>/dev/null)" = "PK" ]; then cls=ZIP-HEADER
+            elif grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9:.]+ \(Eastern Time\)' b.bin 2>/dev/null; then cls=STAMP
+            elif grep -qi "<svg" b.bin 2>/dev/null; then cls=SVG
+            elif grep -qi "<html" b.bin 2>/dev/null; then cls=HTML-PAGE
+            fi
+            server=$(grep -i '^server:' h.txt 2>/dev/null | tail -1 | tr -d '\r')
+            echo "RESULT runner=${{ matrix.runner }} pass=$PASS | $label | curl_exit=$rc | $meta | $cls | $server"
+            rm -f h.txt b.bin
+            sleep 3
+          }
+          for PASS in 1 2; do
+            probe jf-stamp       https://jacobfilipp.com/hammerdata/hammer-lastupdated.txt ""
+            probe ph-stamp       https://projecthammer.org/hammerdata/hammer-lastupdated.txt ""
+            probe www-jf-stamp   https://www.jacobfilipp.com/hammerdata/hammer-lastupdated.txt ""
+            probe http-jf-stamp  http://jacobfilipp.com/hammerdata/hammer-lastupdated.txt ""
+            probe jf-sqlite-zip  https://jacobfilipp.com/hammerdata/hammer-3-compressed.zip 0-3
+            probe ph-sqlite-zip  https://projecthammer.org/hammerdata/hammer-3-compressed.zip 0-3
+            probe jf-csv-zip     https://jacobfilipp.com/hammerdata/hammer-5-csv.zip 0-3
+            probe jf-svg         https://jacobfilipp.com/hammerdata/hammer-6-product-plot.svg ""
+            probe ph-home        https://projecthammer.org/ ""
+            probe jf-home        https://jacobfilipp.com/hammer/ ""
+            [ "$PASS" = "1" ] && sleep 60
+          done
+          exit 0

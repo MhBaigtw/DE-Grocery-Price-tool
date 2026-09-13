@@ -15,7 +15,9 @@ overwrites an existing one.
 import argparse
 import datetime
 import hashlib
+import http.client
 import json
+import re
 import pathlib
 import sys
 import urllib.request
@@ -40,6 +42,34 @@ UA = ("Mozilla/5.0 (Project Hammer downstream analysis"
       + (f"; +{REPO_URL}" if REPO_URL else "") + ")")
 CHUNK = 1 << 20
 
+# WHAT A GENUINE ANSWER LOOKS LIKE. On 2026-09-13 the upstream host answered one GitHub runner
+# with a bot-verification challenge page instead of the files, and this script saved that page
+# under the archive's name and recorded its HTML as upstream's last-updated stamp. A later zip
+# check refused it, by accident rather than design. Now both answers are validated before
+# anything is written or recorded: a stamp must look like a stamp, and an archive must be
+# served as a zip AND start with a zip header. Anything else is refused, never retried here, and
+# never disguised around -- the client stays the honest UA above (docs/phase-4-findings.md §11).
+STAMP = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)? \(Eastern Time\)$")
+ZIP_TYPES = ("application/zip", "application/x-zip-compressed")
+ZIP_MAGIC = b"PK\x03\x04"
+
+
+class UpstreamRefused(Exception):
+    """Upstream answered, but not with what was asked for. Nothing was written or recorded."""
+
+
+def describe(body: bytes, ctype: str) -> str:
+    text = body[:8192].decode("utf-8", "replace")
+    if "request is being verified" in text:
+        kind = "a bot-verification challenge page"
+    elif "<html" in text.lower():
+        kind = "an HTML page"
+    elif not body:
+        kind = "an empty body"
+    else:
+        kind = "unexpected content"
+    return f"{kind} (Content-Type {ctype or 'none'}; begins {' '.join(text.split())[:60]!r})"
+
 
 def utcnow() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -51,22 +81,51 @@ def fetch_text(url: str) -> str:
         return r.read().decode("utf-8", "replace")
 
 
+def fetch_stamp(url: str | None = None) -> str:
+    """Upstream's last-updated stamp, or UpstreamRefused. Never returns anything else."""
+    url = url or LASTUPDATED_URL
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        ctype = r.headers.get("Content-Type", "")
+        body = r.read(65536)
+    text = body.decode("utf-8", "replace").strip()
+    if not STAMP.match(text):
+        raise UpstreamRefused(f"{url} did not return a last-updated stamp: got {describe(body, ctype)}")
+    return text
+
+
 def fetch_archive(url: str, dest: pathlib.Path) -> dict:
-    """Stream to disk, hashing as we go. Returns a provenance record."""
+    """Stream to disk, hashing as we go. Returns a provenance record.
+
+    The content type and the first bytes are checked BEFORE the destination file is created,
+    so a page that is not an archive never exists under an archive's name and never reaches a
+    manifest. A body shorter than its announced length is refused and deleted."""
     started = utcnow()
     digest = hashlib.sha256()
     size = 0
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=600) as r, open(dest, "wb") as fh:
-        while True:
-            chunk = r.read(CHUNK)
-            if not chunk:
-                break
-            digest.update(chunk)
-            fh.write(chunk)
-            size += len(chunk)
-            print(f"  {dest.name}: {size/1e6:8.1f} MB", end="\r", flush=True)
+    with urllib.request.urlopen(req, timeout=600) as r:
+        ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        announced = r.headers.get("Content-Length")
+        first = r.read(CHUNK)
+        if ctype not in ZIP_TYPES or not first.startswith(ZIP_MAGIC):
+            raise UpstreamRefused(f"{url} did not return a zip archive: got {describe(first, ctype)}")
+        try:
+            with open(dest, "wb") as fh:
+                chunk = first
+                while chunk:
+                    digest.update(chunk)
+                    fh.write(chunk)
+                    size += len(chunk)
+                    print(f"  {dest.name}: {size/1e6:8.1f} MB", end="\r", flush=True)
+                    chunk = r.read(CHUNK)
+        except http.client.IncompleteRead as e:
+            dest.unlink(missing_ok=True)
+            raise UpstreamRefused(f"{url}: the transfer ended early ({e})") from e
     print()
+    if announced is not None and int(announced) != size:
+        dest.unlink(missing_ok=True)
+        raise UpstreamRefused(f"{url}: received {size:,} bytes of an announced {int(announced):,}")
     dest.chmod(0o444)  # read-only: snapshots are immutable
     return {
         "url": url,
@@ -112,7 +171,7 @@ def main() -> int:
         return 1
     snap.mkdir(parents=True)
 
-    lastupdated = fetch_text(LASTUPDATED_URL).strip()
+    lastupdated = fetch_stamp()
     print(f"upstream last-updated: {lastupdated!r}")
 
     manifest = {
