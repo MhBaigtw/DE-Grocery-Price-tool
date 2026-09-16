@@ -1,0 +1,31 @@
+{
+  "snapshot_id": "20260916T094357Z",
+  "path": "light",
+  "captured_utc": "2026-09-16T09:44:11.897891+00:00",
+  "upstream_lastupdated_raw": "2026-09-15 20:22:09.31 (Eastern Time)",
+  "lastupdated_url": "https://jacobfilipp.com/hammerdata/hammer-lastupdated.txt",
+  "archives": [
+    {
+      "url": "https://jacobfilipp.com/hammerdata/hammer-3-compressed.zip",
+      "filename": "hammer-3-compressed.zip",
+      "download_started_utc": "2026-09-16T09:43:57.994436+00:00",
+      "download_finished_utc": "2026-09-16T09:44:11.897779+00:00",
+      "bytes": 981018473,
+      "sha256": "780579bf50d0e9109dd658b2c160845c18346405e2a58bb4c86bcca2f21a9504"
+    }
+  ],
+  "archive_retained": false,
+  "load_filter": {
+    "load_filter": "vendors=Metro,Walmart",
+    "product_rows_source": 186919,
+    "product_rows_loaded": 63367,
+    "raw_rows_source": 74270772,
+    "raw_rows_loaded": 14916083
+  },
+  "extract": {
+    "extract_date": "2026-09-15",
+    "products_shipped": 3424,
+    "built_utc": "2026-09-16T09:45:15.171587+00:00"
+  },
+  "run": "https://github.com/MhBaigtw/DE-Grocery-Price-tool/actions/runs/35081015591"
+}
