@@ -1,4 +1,4 @@
-# Handoff — 2026-09-13, Claude Opus 5
+# Handoff — 2026-09-27, Claude Opus 5
 
 > Rewritten in full at the end of every completed section, at the same time as the
 > commit. Never written in a hurry at the end of a session — a note written while
@@ -15,59 +15,53 @@ below as verified state — verify them.
 
 ## Current phase and section
 
-Phase 4, automated refresh. The first run was refused by the upstream host's bot-verification
-challenge. The diagnostic could not reproduce it (0 of 80 requests, four cloud addresses;
-findings §11). Validation, retry and a Task Scheduler fallback are built. This commit is pushed
-immediately before the owner's **watched first run**: the workflow is re-enabled and triggered
-by hand straight after.
+Phase 4, live. **The site is stale and the refresh is not at fault.** Netlify has refused every
+deploy since 2026-09-13 (`Skipped due to account credit usage exceeded`), so the public site
+serves the 2026-09-11 extract while `main` holds 2026-09-26. Findings §12 is the record.
 
 ## Last commit
 
-See `git log -1`. Written alongside the commit; the tree was clean apart from gitignored logs.
+See `git log -1`. The automated refresh commits to `main` almost daily as
+`github-actions[bot]`; do not be surprised by commits nobody in the session made.
 
 ## What the last session completed
 
-- **Validation** (`fetch_snapshot.py`): a stamp must be a stamp; an archive must be served as a
-  zip and start with a zip header, checked before a file or record exists.
-- **Retry** (`refresh_light.py`): at 0, +15 and +45 minutes, then fail and alert; longer
-  schedules are refused in code. `test_upstream_validation.py`, 13 of 13.
-- **Fallback:** `refresh_fallback.py`, plus a Task Scheduler task registered daily at 11:00 local
-  (UTC+3). It runs only while the PC is on and the user is logged on.
-- **Record:** findings §11, and the probe code in `docs/diagnostics/`.
-- **Cleanup:** the temporary Netlify probe site and the diagnostic branch are deleted, the
-  `access-probe` workflow is disabled, and the failed `deploy.yml` run is deleted.
+- **Diagnosed** the stale site: pipeline healthy, publish step failing, nothing watching it.
+- **`check_published.py`**: the live site must serve the extract the repository holds. Wired
+  into the probe job daily and after every refresh commit, each with its own alert. Its test
+  covers the exact outage shape (5 of 5).
+- **Findings §12** records the incident, what the page got right, and what is still unfixed.
+- **Prepared but not published:** `_site` assembled from the committed 2026-09-26 extract with
+  the gates passed, ready for a direct upload.
 
 ## Immediate next steps
 
-1. **Watch the first run** and report to the owner:
-   - `--measure` against the Windows figures (269 s / 2.71 GiB / ~5.3 GiB);
-   - whether the Linux-built extract is byte-identical to a Windows build of the same archive
-     (download it locally, check the sha256 against the committed provenance record, build with
-     `refresh_light.py --snapshot`, compare with `check_light_parity.py --light-dir`). Report any
-     diff; do not normalise around it;
-   - whether the commit to `main` succeeded;
-   - Netlify's gated build;
-   - `verify_deploy.py`;
-   - the new extract's date, products and comparability against 3,465 / 55.93%.
-2. If anything fails: stop and report. The site stays on the previous extract.
+1. **Get the site current.** `netlify deploy --prod --dir _site --site 36972e0e-7430-455a-998a-a966c9a0a6a9`
+   — a direct upload does not use Netlify's builder, so it may work while builds are refused.
+   This session's permission rules refused it; the owner has to allow or run it.
+2. **Then `python scripts/check_published.py`** — it should pass once the upload lands.
+3. **Decide the lasting fix** (findings §12): publish a prebuilt `_site` from the workflow with
+   a Netlify token in GitHub secrets, or move hosting to GitHub Pages. Both remove the
+   component that failed; both need a credential or a decision.
+4. **The account question is the owner's:** Netlify refuses deploys for credit usage while
+   reporting 0 of 300 credits used and 1 build minute this period.
 
 ## Open questions and blockers
 
-- **Blocked on the owner:** the custom domain; whether to update the stale four-chain figures in
-  `verify_deploy.py`.
-- **Not started:** contacting the maintainer about automated access and the challenge.
+**Blocked on the owner:** the deploy itself; the hosting decision; the custom domain; whether to
+update the stale four-chain figures in `verify_deploy.py`'s comment.
 
 ## Known constraints
 
-- **Access:** nothing may disguise the client or defeat the bot check. No spoofed user agent,
-  no headless browser, no proxies (owner, 2026-09-13).
-- **This push should be skipped by Netlify's `ignore`.** It changes no path that ships. That
-  is the first real test of the skip on Netlify's builder.
+- **Nothing may disguise the client or defeat upstream's bot check** (owner, 2026-09-13).
+- **This PC converts line endings on checkout** (`core.autocrlf=true`, no `.gitattributes`), so
+  a checked-out `tool/data/` never matches the committed bytes. Compare against
+  `git cat-file blob`, not the working copy, or a parity check fails for no reason.
 
 ## Anything the next agent should distrust
 
-- **The full 975 MB download from a cloud address has never succeeded.** The diagnostic used
-  4-byte range requests only.
-- **The challenged runner's address is unknown**; the cause of the challenge is not established.
-- **The fallback task has never run.** Its preflight, race handling and alert are untested
-  end to end.
+- **"The refresh is broken" is the wrong first guess.** It has been running daily throughout.
+  Check what the site serves before touching the pipeline.
+- **The fallback task on the owner's PC has never done a real refresh** — it holds whenever the
+  workflow got there first, which is most days. Its commit-and-push path is still untested.
+- **`_site` in the working tree is a build artifact** (gitignored) and will go stale.

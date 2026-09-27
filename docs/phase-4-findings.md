@@ -1747,4 +1747,69 @@ request, so whether a 975 MB transfer from a cloud address is treated differentl
 
 ---
 
+# §12 — The refresh worked for two weeks and the site showed none of it
+
+*2026-09-27. Found by the owner looking at the live page, not by any check. Evidence: the
+repository's commit history, GitHub run 36312359200, and Netlify's deploy list for site
+36972e0e.*
+
+## What happened
+
+**The pipeline was healthy the whole time.** The workflow ran daily, upstream published most
+days, every gate passed, and each run committed a fresh extract. On 2026-09-27 `main` held the
+2026-09-26 extract, 3,500 products, committed at 10:23 UTC.
+
+**The site served none of it.** Every Netlify deploy from 2026-09-13 onwards failed with
+`Skipped due to account credit usage exceeded`. The published deploy stayed at `c436000`, the
+2026-09-11 extract, for **fourteen days**.
+
+**Nothing noticed.** Every check in this project runs against the working tree or the extract
+just built. `verify_deploy.py` is the one check that reads the live site, and it was never wired
+into the refresh — it ran only when someone ran it by hand. A publish step that stops is
+invisible to a pipeline that only ever looks at itself.
+
+**The page did do its job.** It stated "16 days old", warned that this is past the 14-day
+horizon over which price movement was measured, and withheld every comparison because no price
+was within seven days of the viewing date (§10). Visitors saw a stale, honest tool rather than
+stale prices under a fresh date. That is the §10 fix working, and it is also what made the
+outage visible to a human at a glance.
+
+**Netlify's own numbers did not agree with its refusal,** and this is not resolved: at the time
+of the failure the account reported `credits: used 0, included 300`, and build minutes for the
+period showed `current: 1`. Why the deploys were refused is a question for the host's billing
+page, not something the repository can answer.
+
+## What changed here
+
+`scripts/check_published.py` asks the live site what extract it is serving and compares it with
+what the repository holds. It is deliberately **not** `verify_deploy.py`: that one asks whether
+the live site is internally sound, this one asks whether it is **current**.
+
+It runs in two places:
+- **In the probe job, daily.** Even on days with no new publication, a site that has fallen
+  behind is caught within a day.
+- **After every refresh commit**, with a 15-minute window for the deploy to complete.
+
+Either failure opens or updates one issue, *The live site is not serving the committed extract*,
+which says plainly that the publish step failed and the pipeline cannot fix it.
+
+`test_check_published.py` serves the exact shape of this outage — a valid, sound, older extract —
+and asserts it is refused, along with a mismatched snapshot and an unreadable site (5 of 5).
+Against the live site on 2026-09-27 the check fails as it should, naming both dates.
+
+## What this does not fix
+
+**The deploy itself.** At the time of writing the site still serves the 2026-09-11 extract. A
+prebuilt upload of the committed extract was assembled and gated locally, but publishing it
+needs the owner: the deploy was refused by this session's permission rules, and the underlying
+account problem is the owner's to resolve.
+
+**The dependency that failed.** Netlify's builder adds nothing the pipeline does not already do
+— the gates run in CI first — but it can refuse, and when it refuses the site freezes. Two ways
+out, neither taken yet: publish a prebuilt `_site` from the workflow with an API token, or move
+hosting to GitHub Pages. Both remove the component that failed; both need a decision and a
+credential.
+
+---
+
 *The underlying data was sourced from ProjectHammer.org.*

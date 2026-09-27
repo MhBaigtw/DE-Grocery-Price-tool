@@ -243,6 +243,18 @@ Read these in order to understand the project from scratch:
 **Depends on:** `scripts/fetch_snapshot.py`, `scripts/refresh_light.py`; standard library only.
 **Notes:** Retry offsets are shortened to seconds for the test; the production schedule and its caps are asserted separately.
 
+### scripts/check_published.py
+**Purpose:** Asks the live site which extract it is serving and compares it with the one the repository holds. Retries while a deploy completes; a mismatch is a failure, naming both dates.
+**Breaks if removed:** A publish step that stops becomes invisible again. Between 2026-09-13 and 2026-09-27 the refresh committed a fresh extract almost daily and the site served none of it for fourteen days, because every other check reads the working tree or the extract just built (findings §12).
+**Depends on:** the live URL; standard library only.
+**Notes:** Deliberately **not** `verify_deploy.py`, which asks whether the live site is internally sound. This asks whether it is **current**. Runs daily in the probe job and after every refresh commit; either failure opens the issue *The live site is not serving the committed extract*.
+
+### scripts/test_check_published.py
+**Purpose:** Proves `check_published.py` refuses the exact shape of the 2026-09-13 outage — a valid, internally sound extract that is simply older than the committed one — plus a mismatched snapshot and an unreadable site, and passes a current one (5 of 5).
+**Breaks if removed:** The only check that watches the publish step becomes an untested assertion.
+**Depends on:** `scripts/check_published.py`; standard library only.
+**Notes:** Serves each case from a local HTTP server, so it needs no network and no live deploy.
+
 ### scripts/refresh_fallback.py
 **Purpose:** The **fallback** refresh from the owner's Windows PC, run by Task Scheduler. It runs the same light refresh as the workflow, then commits and pushes. **Not the primary path.**
 **Breaks if removed:** On days the upstream host refuses the GitHub runner, the site ages until someone intervenes.

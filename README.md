@@ -136,6 +136,7 @@ scripts/
   verify_twice.py               run a query twice: both must succeed and agree
   refresh_light.py              the automated refresh: two chains only, every extract gate
   refresh_fallback.py           FALLBACK refresh from the owner's PC; runs only while it is on
+  check_published.py            the live site must serve the extract the repo holds
   refresh.py                    the full rebuild (manual): keeps archives, proves the light path
   check_light_parity.py         the light extract must equal the full extract, byte for byte
   netlify_changes.sh            skip builds nothing ships from; age limit only on data deploys
@@ -204,6 +205,7 @@ python scripts/test_check_claims.py    # proves the above fails when it should  
 python scripts/test_check_light_parity.py # any difference from the full extract is refused  (7 of 7)
 python scripts/test_netlify_changes.py # docs skip the build; data deploys enforce the age limit  (12 of 12)
 python scripts/test_upstream_validation.py # a challenge page is never used or recorded; retries stop at three  (13 of 13)
+python scripts/test_check_published.py # a live site behind the repository is refused  (5 of 5)
 python scripts/check_layering.py       # product_id must not appear below staging
 python scripts/check_model_parity.py   # models/ and dbt/models/ must not have drifted
 python scripts/check_determinism.py    # SQL that could return a different answer twice
