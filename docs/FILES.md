@@ -255,6 +255,18 @@ Read these in order to understand the project from scratch:
 **Depends on:** `scripts/check_published.py`; standard library only.
 **Notes:** Serves each case from a local HTTP server, so it needs no network and no live deploy.
 
+### scripts/vercel_publish.sh
+**Purpose:** Publishes the already-gated `_site` to Vercel as a **prebuilt** deployment: it writes `.vercel/output` (finished files plus the header rules) and uploads it with the pinned CLI. No build runs on the host.
+**Breaks if removed:** The site has no publish path. The workflow's publish job calls this and nothing else.
+**Depends on:** `_site` assembled by `scripts/netlify_build.sh`, `config/vercel_output_config.json`, `config/vercel_project.json`, `VERCEL_TOKEN`, Node.
+**Notes:** Vercel's Git integration is deliberately **not** used: a hosted builder that can independently refuse is exactly what froze the site for fourteen days in September (findings §12). The gates already run in CI before anything is uploaded. Refuses without a token, without `_site`, with any data file missing, or without the output config. On a first run with no committed project link it links by project name and prints the ids to commit. `--dry-run` assembles the output tree and uploads nothing.
+
+### config/vercel_output_config.json
+**Purpose:** The Build Output API v3 configuration deployed with the site: the response headers, carried over from `netlify.toml` so changing host does not silently drop them — a 300-second cache on `/data/*`, no cache on the page, and the CSP, referrer and nosniff headers.
+**Breaks if removed:** `vercel_publish.sh` refuses. If it were deployed without these rules, the no-trackers rule would go back to being a promise rather than something enforced at the edge, and a visitor could hold a stale `products.json` against a fresh page.
+**Depends on:** nothing; it is data, read at publish time.
+**Notes:** Committed and reviewable rather than set in a host's dashboard, so the headers are in git with everything else. Compression is **not** configured here: it is the host's job, and `verify_deploy.py` checks it against the live URL rather than trusting it.
+
 ### scripts/refresh_fallback.py
 **Purpose:** The **fallback** refresh from the owner's Windows PC, run by Task Scheduler. It runs the same light refresh as the workflow, then commits and pushes. **Not the primary path.**
 **Breaks if removed:** On days the upstream host refuses the GitHub runner, the site ages until someone intervenes.
@@ -310,7 +322,7 @@ Read these in order to understand the project from scratch:
 **Notes:** The lesson generalises: verifying against a server that behaves differently from the deployment is not verification. `verify_deploy.py` now fails a deploy whose large files come back uncompressed, so this failure is caught on the live site rather than only avoided locally.
 
 ### netlify.toml
-**Purpose:** The deployment configuration: build command, publish directory, per-context rules, cache headers and a content-security policy.
+**Purpose:** The deployment configuration for Netlify. **Configured but unused since 2026-09-30**, when hosting moved to Vercel (findings §12, §13): builds are stopped on that site and it keeps serving its last good deploy, because the URL is published on the owner's resume and must not start 404ing. Kept so the move is reversible and the history reads.
 **Breaks if removed:** Netlify falls back to publishing the repository root, which would put `hammer*.duckdb` paths, the briefs and every internal document on a public CDN, and would skip the extract gate entirely.
 **Depends on:** `scripts/netlify_build.sh`.
 **Notes:** The build is **a gate, not a copy** — a refused extract exits non-zero and the previous deploy stays live. Its `ignore` command (`scripts/netlify_changes.sh ignore`) skips the build when nothing that ships changed, so a documentation-only commit neither builds nor meets the age limit. Deploy previews and branch deploys are configured to fail, so only `main` can publish; the build script refuses non-production contexts as a backstop to the UI setting. `/data/*` is served with a short `max-age` because a visitor holding yesterday's `products.json` would see prices the page's own date field contradicts. The CSP is the difference between "no trackers were added" and "none can be added by accident", which matters while the brief's ads non-goal is deferred rather than declined.

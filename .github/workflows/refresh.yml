@@ -27,6 +27,10 @@ on:
         description: Refresh even if upstream's last-updated stamp matches the newest record
         type: boolean
         default: false
+      publish:
+        description: Publish what main already holds, without waiting for a new publication
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -46,6 +50,7 @@ jobs:
       issues: write
     outputs:
       changed: ${{ steps.probe.outputs.changed }}
+      published_ok: ${{ steps.published.outcome }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -184,32 +189,6 @@ jobs:
           git pull --rebase --quiet origin main
           git push origin HEAD:main
 
-      # A refresh is not finished when it is committed; it is finished when it is served.
-      # The deploy takes a few minutes, so this waits before it concludes anything.
-      - name: Is the live site serving what was just committed?
-        id: published
-        continue-on-error: true
-        run: python scripts/check_published.py --wait-minutes 15
-
-      - name: Alert -- committed, but not published
-        if: steps.published.outcome == 'failure'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const title = 'The live site is not serving the committed extract';
-            const body = [
-              '**A refresh passed every gate and was committed, but the site is still serving an older extract.**',
-              'The publish step is what failed; the pipeline cannot fix it. Check the host\'s deploy log.',
-              '', `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-            ].join('\n');
-            const open = (await github.rest.issues.listForRepo({
-              owner: context.repo.owner, repo: context.repo.repo, state: 'open'})).data
-              .find(i => i.title === title);
-            if (open) await github.rest.issues.createComment({owner: context.repo.owner,
-              repo: context.repo.repo, issue_number: open.number, body});
-            else await github.rest.issues.create({owner: context.repo.owner,
-              repo: context.repo.repo, title, body});
-
       # The first run's challenge could not be tied to an address because none was logged
       # (findings §11). One request to an IP echo service, only on failure.
       - name: Record this runner's egress address
@@ -235,10 +214,58 @@ jobs:
             else await github.rest.issues.create({owner: context.repo.owner,
               repo: context.repo.repo, title, body});
 
-      # Last, so the alert above fires for a genuine refresh failure and this one does not
-      # double up on it: the publish alert has already been posted by its own step.
-      - name: Fail the run when the extract was committed but not published
+  # Publishing is its own job so it can run in three situations: after a refresh commits, when
+  # the daily probe finds the live site behind what main holds (the September outage would have
+  # healed itself), and on demand. It re-runs the gates and uploads finished files; no builder
+  # of the host's is involved, because one that could refuse is what froze the site before.
+  publish:
+    needs: [probe, refresh]
+    if: ${{ !cancelled() && (needs.refresh.result == 'success' || inputs.publish == true || needs.probe.outputs.published_ok == 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: main}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '20'}
+
+      - name: Gate and assemble the site
+        run: bash scripts/netlify_build.sh
+
+      - name: Publish to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: bash scripts/vercel_publish.sh
+
+      - name: Is the live site serving what main holds?
+        id: published
+        continue-on-error: true
+        run: python scripts/check_published.py --wait-minutes 10
+
+      - name: Alert -- published, but the site does not serve it
         if: steps.published.outcome == 'failure'
-        run: |
-          echo "Committed, not served. The publish step failed."
-          exit 1
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'The live site is not serving the committed extract';
+            const body = [
+              '**The publish step ran and the site still serves an older extract.**',
+              'The gates passed and the upload reported success, so look at the host: the deployment may not be assigned to the production domain.',
+              '', `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            const open = (await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open'})).data
+              .find(i => i.title === title);
+            if (open) await github.rest.issues.createComment({owner: context.repo.owner,
+              repo: context.repo.repo, issue_number: open.number, body});
+            else await github.rest.issues.create({owner: context.repo.owner,
+              repo: context.repo.repo, title, body});
+
+      - name: Fail the run when the site does not serve what was published
+        if: steps.published.outcome == 'failure'
+        run: exit 1

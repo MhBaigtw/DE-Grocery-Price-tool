@@ -1,0 +1,33 @@
+{
+  "_comment": [
+    "Build Output API v3 configuration for the published site (.vercel/output/config.json).",
+    "It carries the response headers netlify.toml used to set, so moving host does not quietly",
+    "drop them: a short cache on the data files, no cache on the page, and the CSP that keeps",
+    "the no-trackers non-goal enforced at the edge rather than promised.",
+    "Each route sets headers and continues, so it never short-circuits file serving.",
+    "Compression is the host's job and is verified, not assumed: scripts/verify_deploy.py fails",
+    "a deploy whose large JSON comes back uncompressed (findings §8: 3.3 s against 40 s)."
+  ],
+  "version": 3,
+  "routes": [
+    {
+      "src": "^/data/(.*)$",
+      "headers": { "Cache-Control": "public, max-age=300, must-revalidate" },
+      "continue": true
+    },
+    {
+      "src": "^/(index\\.html)?$",
+      "headers": { "Cache-Control": "public, max-age=0, must-revalidate" },
+      "continue": true
+    },
+    {
+      "src": "^/(.*)$",
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "X-Content-Type-Options": "nosniff"
+      },
+      "continue": true
+    }
+  ]
+}
