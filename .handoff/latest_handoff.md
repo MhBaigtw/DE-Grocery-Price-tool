@@ -15,9 +15,11 @@ below as verified state — verify them.
 
 ## Current phase and section
 
-Phase 4, live. **The site is stale and the refresh is not at fault.** Netlify has refused every
-deploy since 2026-09-13 (`Skipped due to account credit usage exceeded`), so the public site
-serves the 2026-09-11 extract while `main` holds 2026-09-26. Findings §12 is the record.
+Phase 4, live and current. **Hosting moved to Vercel on 2026-09-30** (findings §13): the refresh
+workflow publishes the prebuilt site itself, so no hosted builder can freeze it again, as one did
+for fourteen days in September (§12). Live at https://de-grocery-price-tool.vercel.app/. Netlify
+is configured but unused, builds stopped, still serving its last good deploy because that URL is
+published on the owner's resume.
 
 ## Last commit
 
@@ -36,20 +38,16 @@ See `git log -1`. The automated refresh commits to `main` almost daily as
 
 ## Immediate next steps
 
-1. **Get the site current.** `netlify deploy --prod --dir _site --site 36972e0e-7430-455a-998a-a966c9a0a6a9`
-   — a direct upload does not use Netlify's builder, so it may work while builds are refused.
-   This session's permission rules refused it; the owner has to allow or run it.
-2. **Then `python scripts/check_published.py`** — it should pass once the upload lands.
-3. **Decide the lasting fix** (findings §12): publish a prebuilt `_site` from the workflow with
-   a Netlify token in GitHub secrets, or move hosting to GitHub Pages. Both remove the
-   component that failed; both need a credential or a decision.
-4. **The account question is the owner's:** Netlify refuses deploys for credit usage while
-   reporting 0 of 300 credits used and 1 build minute this period.
+1. **The owner should rotate `VERCEL_TOKEN`.** It was pasted into a chat transcript on
+   2026-09-30. Create a replacement in Vercel, update the repository secret, revoke the old one.
+   A Vercel token is account-wide; it cannot be limited to one project.
+2. Nothing else is pending. The next scheduled run refreshes, publishes and verifies on its own.
 
 ## Open questions and blockers
 
-**Blocked on the owner:** the deploy itself; the hosting decision; the custom domain; whether to
-update the stale four-chain figures in `verify_deploy.py`'s comment.
+**Blocked on the owner:** rotating the token; the custom domain; whether to update the stale
+four-chain figures in `verify_deploy.py`'s comment; whether the old Netlify URL should keep
+serving an increasingly old extract or say where the tool moved.
 
 ## Known constraints
 
@@ -62,6 +60,8 @@ update the stale four-chain figures in `verify_deploy.py`'s comment.
 
 - **"The refresh is broken" is the wrong first guess.** It has been running daily throughout.
   Check what the site serves before touching the pipeline.
+- **The publish job re-runs the gates and uploads; it never builds on the host.** If someone
+  connects Vercel's Git integration, the dependency that caused §12 is back.
 - **The fallback task on the owner's PC has never done a real refresh** — it holds whenever the
   workflow got there first, which is most days. Its commit-and-push path is still untested.
 - **`_site` in the working tree is a build artifact** (gitignored) and will go stale.

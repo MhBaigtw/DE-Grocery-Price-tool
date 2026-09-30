@@ -267,6 +267,12 @@ Read these in order to understand the project from scratch:
 **Depends on:** nothing; it is data, read at publish time.
 **Notes:** Committed and reviewable rather than set in a host's dashboard, so the headers are in git with everything else. Compression is **not** configured here: it is the host's job, and `verify_deploy.py` checks it against the live URL rather than trusting it.
 
+### config/vercel_project.json
+**Purpose:** The Vercel `orgId` and `projectId` this repository publishes to, so a deploy never depends on interactive project selection.
+**Breaks if removed:** The publish falls back to linking by project name on every run.
+**Depends on:** nothing; written once from the first link.
+**Notes:** Identifiers, not secrets — the token is the secret, and it lives in GitHub Actions secrets as `VERCEL_TOKEN`.
+
 ### scripts/refresh_fallback.py
 **Purpose:** The **fallback** refresh from the owner's Windows PC, run by Task Scheduler. It runs the same light refresh as the workflow, then commits and pushes. **Not the primary path.**
 **Breaks if removed:** On days the upstream host refuses the GitHub runner, the site ages until someone intervenes.

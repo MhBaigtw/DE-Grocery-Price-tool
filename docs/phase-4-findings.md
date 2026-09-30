@@ -1812,4 +1812,55 @@ credential.
 
 ---
 
+# §13 — Hosting moved to Vercel, published from CI
+
+*2026-09-30. The owner's decision after §12. Evidence: workflow run 36788585677 and the live
+responses quoted below.*
+
+## What changed
+
+**The host no longer gets a vote.** `scripts/vercel_publish.sh` uploads the finished `_site` as
+a **prebuilt** deployment (`vercel deploy --prebuilt`, CLI pinned at 62.0.0), so nothing is
+built on the host's side and nothing there can refuse. Vercel's Git integration is deliberately
+not connected: that is the same dependency that froze the site for fourteen days.
+
+**Publishing is its own job** in the refresh workflow, running after a refresh commits, on
+demand, and when the daily probe finds the live site behind `main` — so the §12 outage would
+now heal itself, and only a site still behind *after* a publish raises an alert.
+
+**Headers moved with the site.** `config/vercel_output_config.json` carries what `netlify.toml`
+set, and they were verified on the live response rather than assumed.
+
+**Netlify stays configured and unused:** builds stopped, the old URL still serving its last good
+deploy (`c436000`), because that URL is published on the owner's resume.
+
+## Verified on the live site
+
+`https://de-grocery-price-tool.vercel.app/`, serving extract 2026-09-28, 3,500 products.
+
+| Check | Result |
+|---|---|
+| `check_published.py` | Live extract and snapshot match `main` |
+| `verify_deploy.py` | Passes: assets load, JSON parses, dates agree, no external resources |
+| Compression, `Accept-Encoding: br, gzip` | `br` — `products.json` 3,855,374 B → **196,485 B** |
+| Compression, gzip only | `gzip` — `products.json` → **212,386 B**; no path returns it uncompressed |
+| `Cache-Control` on `/` | `public, max-age=0, must-revalidate` |
+| `Cache-Control` on `/data/*` | `public, max-age=300, must-revalidate` |
+| CSP, `Referrer-Policy`, `X-Content-Type-Options` | All three present on both the page and the data files |
+| Attribution and scope strip | In the served HTML, before any script runs |
+
+The compression check is not ceremony: uncompressed, that file made the tool 40 seconds to
+usable rather than 3.3 (§8).
+
+## Wrinkles
+
+- **The first attempt refused correctly.** `VERCEL_TOKEN` was not yet a repository secret, so the
+  publish step exited rather than deploying something half-configured.
+- **The project link** (`config/vercel_project.json`) was discovered by the first run and
+  committed, so later deploys never depend on interactive selection.
+- **The token is account-wide.** Vercel tokens cannot be limited to one project, so the secret
+  is as powerful as the account it belongs to.
+
+---
+
 *The underlying data was sourced from ProjectHammer.org.*

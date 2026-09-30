@@ -109,34 +109,15 @@ jobs:
               repo: context.repo.repo, title, body});
 
       # The gap that hid a two-week outage: every other check runs against the working tree or
-      # the freshly built extract, so a publish step that stops is invisible. This asks the
-      # live site what it is serving and compares it with what main holds.
+      # the freshly built extract, so a publish step that stops is invisible. This asks the live
+      # site what it is serving and compares it with what main holds. It reports rather than
+      # alerts: a site found behind here triggers the publish job below, and only a site still
+      # behind AFTER that publish is worth waking someone for.
       - name: Is the live site serving what main holds?
         id: published
         if: ${{ !cancelled() }}
         continue-on-error: true
         run: python scripts/check_published.py --wait-minutes 0
-
-      - name: Alert -- the live site is behind the repository
-        if: ${{ !cancelled() && steps.published.outcome == 'failure' }}
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const title = 'The live site is not serving the committed extract';
-            const body = [
-              '**The refresh is working and the site is not showing it.**',
-              'The extract in `main` passed every gate; the live site is serving an older one, so the publish step is what failed.',
-              'This is not something the pipeline can fix: check the host\'s deploy log.',
-              'Visitors are not being misled -- the page states how old its prices are and withholds comparisons once they pass seven days -- but the tool is stale and increasingly useless.',
-              '', `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-            ].join('\n');
-            const open = (await github.rest.issues.listForRepo({
-              owner: context.repo.owner, repo: context.repo.repo, state: 'open'})).data
-              .find(i => i.title === title);
-            if (open) await github.rest.issues.createComment({owner: context.repo.owner,
-              repo: context.repo.repo, issue_number: open.number, body});
-            else await github.rest.issues.create({owner: context.repo.owner,
-              repo: context.repo.repo, title, body});
 
       - name: Fail the run when the live extract is past its limit
         if: steps.age.outcome == 'failure'
@@ -144,11 +125,6 @@ jobs:
           echo "The live extract no longer passes its own age limit. Deliberately loud."
           exit 1
 
-      - name: Fail the run when the live site is behind the repository
-        if: ${{ !cancelled() && steps.published.outcome == 'failure' }}
-        run: |
-          echo "main holds an extract the live site is not serving. The publish step failed."
-          exit 1
 
   refresh:
     needs: probe
