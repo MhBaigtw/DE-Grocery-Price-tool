@@ -486,6 +486,12 @@ Read these in order to understand the project from scratch:
 **Depends on:** The same queries as `docs/phase-0-findings.md`; every number in it is drawn from that audit.
 **Notes:** Carries a dated **status table** recording which earlier items are verified still-present as of the 2026-08-23 extract, so the maintainer can skip anything already fixed — and stating that our newest snapshot is 16 days old, so a recent fix would be invisible to us. Items 10 and 11 (added 2026-09-08) are Phase 2 results: Galleria's catalogue disjointness and the structural private-label blind spot in UPC matching. Deliberately separate from the Section E bug list. E is "this is wrong"; F is "this is not wrong but it is expensive to consume". Mixing them would bury the correctness bugs. It carries the required attribution wording, includes a "what is already good" section so the feedback is not purely negative, and states one point where we disagree with our own suggestion (§7: deduplicating upstream would destroy real information, so we prefer a `listing_context` column even though it is more work for the maintainer).
 
+### .gitattributes
+**Purpose:** Pins the shipped extract (`tool/data/*.json`) to LF line endings, so what is committed is what is served.
+**Breaks if removed:** On a machine with `core.autocrlf=true` — the owner's — a checkout rewrites every line ending, and a deploy made from there serves bytes that differ from the committed ones. That happened on 2026-09-30: 3,502 carriage returns in `products.json`, 3.5 KB of difference, found only by comparing the live size against the blob. It also made `check_light_parity.py` fail against a checked-out `tool/data` for no real reason.
+**Depends on:** nothing.
+**Notes:** The extract is written with LF by DuckDB on every platform; this keeps it that way through checkout. It does not touch anything else in the repository.
+
 ### config/expected_schema.json
 **Purpose:** The schema contract. Records the column names, types and ordinal positions of `raw` and `product` as they are today, including the **current** `VARCHAR` type of `raw.product_id`.
 **Breaks if removed:** `scripts/check_schema.py` exits 2 and ingest loses its only guard against a silent upstream schema change.

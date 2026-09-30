@@ -1897,7 +1897,32 @@ push, or a direct upload with the alternate path.
 
 ## Verified on the live site
 
-*Measured after the first push-built deploy; see the follow-up commit for the table.*
+Measured 2026-09-30 against `https://de-grocery-project.netlify.app/`, serving extract
+2026-09-28, 3,500 products, built by Netlify from commit `d170002` — the first gated build to
+succeed there since 2026-09-13.
+
+| Check | Result |
+|---|---|
+| `check_published.py` | Live extract and snapshot match `main` |
+| `verify_deploy.py` | Passes: assets load, JSON parses, dates agree, no external resources |
+| Compression offered `br, gzip` | **`br`** — `products.json` 3,855,374 B → **167,137 B** on the wire |
+| Compression, gzip only | **`gzip`** — `products.json` → **198,126 B**; no path returns it uncompressed |
+| Served bytes | `products.json`, `history.json` and `meta.json` are **byte-identical to the committed blobs** |
+| `Cache-Control` on `/` | `public,max-age=0,must-revalidate` |
+| `Cache-Control` on `/data/*` | `public,max-age=300,must-revalidate` |
+| CSP, `Referrer-Policy`, `X-Content-Type-Options` | Present on the page and on the data files |
+| Attribution and scope strip | In the served HTML, before any script runs |
+
+## A deploy from the owner's PC served different bytes
+
+The migration's first upload came from Windows and carried the **CRLF working copy**: 3,502
+carriage returns in `products.json`, 3.5 KB larger than the blob. Every check passed — the JSON
+is equivalent — and it was caught only by comparing the live size against `git cat-file`.
+
+`.gitattributes` now pins `tool/data/*.json` to LF, so a checkout cannot rewrite what ships. The
+figures above are from the push-built deploy, which Netlify builds on Linux from the committed
+blobs, and they match byte for byte. The same conversion is why `check_light_parity.py` failed
+against a checked-out `tool/data` on 2026-09-13 (§10); that trap is gone too.
 
 ---
 

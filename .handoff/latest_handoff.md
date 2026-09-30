@@ -15,11 +15,11 @@ below as verified state — verify them.
 
 ## Current phase and section
 
-Phase 4, live and current. **Hosting moved to Vercel on 2026-09-30** (findings §13): the refresh
-workflow publishes the prebuilt site itself, so no hosted builder can freeze it again, as one did
-for fourteen days in September (§12). Live at https://de-grocery-price-tool.vercel.app/. Netlify
-is configured but unused, builds stopped, still serving its last good deploy because that URL is
-published on the owner's resume.
+Phase 4, live and current on **Netlify** at https://de-grocery-project.netlify.app/. Hosting spent
+one day on Vercel (§13) while this account's deploys were refused (§12); the plan was upgraded and
+hosting returned the same day (§14). Netlify builds on push again through its own gates. The Vercel
+publish path stays in the repository, wired to nothing, as a proven alternate; its project was
+deleted and its token revoked.
 
 ## Last commit
 
@@ -38,30 +38,31 @@ See `git log -1`. The automated refresh commits to `main` almost daily as
 
 ## Immediate next steps
 
-1. **The owner should rotate `VERCEL_TOKEN`.** It was pasted into a chat transcript on
-   2026-09-30. Create a replacement in Vercel, update the repository secret, revoke the old one.
-   A Vercel token is account-wide; it cannot be limited to one project.
-2. Nothing else is pending. The next scheduled run refreshes, publishes and verifies on its own.
+1. Nothing is pending. The next scheduled run refreshes, Netlify builds the push, and the
+   workflow verifies the live site and alerts if it is behind.
+2. If a host refuses again: `scripts/vercel_publish.sh` is the alternate path. It needs a new
+   Vercel project, fresh ids in `config/vercel_project.json` and a token in secrets — the old
+   token was revoked on 2026-09-30 after being pasted in plaintext.
 
 ## Open questions and blockers
 
-**Blocked on the owner:** rotating the token; the custom domain; whether to update the stale
-four-chain figures in `verify_deploy.py`'s comment; whether the old Netlify URL should keep
-serving an increasingly old extract or say where the tool moved.
+**Blocked on the owner:** the custom domain; whether to update the stale four-chain figures in
+`verify_deploy.py`'s comment.
 
 ## Known constraints
 
 - **Nothing may disguise the client or defeat upstream's bot check** (owner, 2026-09-13).
-- **This PC converts line endings on checkout** (`core.autocrlf=true`, no `.gitattributes`), so
-  a checked-out `tool/data/` never matches the committed bytes. Compare against
-  `git cat-file blob`, not the working copy, or a parity check fails for no reason.
+- **`.gitattributes` pins `tool/data/*.json` to LF** (added 2026-09-30). Before it, this PC's
+  checkout rewrote every line ending, and a deploy made from here served bytes that differed from
+  the committed ones. If that file is ever removed, both problems come back.
 
 ## Anything the next agent should distrust
 
 - **"The refresh is broken" is the wrong first guess.** It has been running daily throughout.
   Check what the site serves before touching the pipeline.
-- **The publish job re-runs the gates and uploads; it never builds on the host.** If someone
-  connects Vercel's Git integration, the dependency that caused §12 is back.
+- **The publish job no longer publishes; it watches.** Netlify builds on push, so a host that
+  refuses freezes the site again — the difference from September is that the live check and its
+  alert make it visible within a day. A site found behind is no longer republished automatically.
 - **The fallback task on the owner's PC has never done a real refresh** — it holds whenever the
   workflow got there first, which is most days. Its commit-and-push path is still untested.
 - **`_site` in the working tree is a build artifact** (gitignored) and will go stale.
