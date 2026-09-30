@@ -223,15 +223,27 @@ jobs:
         continue-on-error: true
         run: python scripts/check_published.py --wait-minutes 10
 
-      - name: Alert -- published, but the site does not serve it
-        if: steps.published.outcome == 'failure'
+      # Compression is the host's property, not ours, and it is the difference between a page
+      # usable in 3.3 s and one that takes 40 (findings §8). It is checked on the live response
+      # after every publish, never assumed from configuration.
+      - name: Verify the live site, compression included
+        id: verified
+        continue-on-error: true
+        run: python scripts/verify_deploy.py "$(python -c "import sys; sys.path.insert(0,'scripts'); import check_published; print(check_published.URL)")"
+
+      # failure() covers the step that did not run: if the upload itself fails, `published`
+      # never reports, and an alert conditioned only on its outcome would say nothing at all.
+      # Demonstrated on 2026-09-30 by a rehearsal that failed the upload deliberately.
+      - name: Alert -- the site is behind and publishing did not fix it
+        if: ${{ failure() || steps.published.outcome == 'failure' || steps.verified.outcome == 'failure' }}
         uses: actions/github-script@v7
         with:
           script: |
             const title = 'The live site is not serving the committed extract';
             const body = [
-              '**The publish step ran and the site still serves an older extract.**',
-              'The gates passed and the upload reported success, so look at the host: the deployment may not be assigned to the production domain.',
+              '**The live site is behind what main holds, and the publish that should have fixed it did not.**',
+              'Either the upload failed, or it succeeded and the site still serves an older extract, or the deployed site failed verification (assets, dates, disclosures or compression).',
+              'Read the run log for which of those it was. Visitors are not misled -- the page states how old its prices are -- but the tool is stale.',
               '', `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
             ].join('\n');
             const open = (await github.rest.issues.listForRepo({
@@ -243,5 +255,7 @@ jobs:
               repo: context.repo.repo, title, body});
 
       - name: Fail the run when the site does not serve what was published
-        if: steps.published.outcome == 'failure'
-        run: exit 1
+        if: ${{ steps.published.outcome == 'failure' || steps.verified.outcome == 'failure' }}
+        run: |
+          echo "published: ${{ steps.published.outcome }} | verified: ${{ steps.verified.outcome }}"
+          exit 1

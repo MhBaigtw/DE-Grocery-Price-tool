@@ -243,6 +243,18 @@ Read these in order to understand the project from scratch:
 **Depends on:** `scripts/fetch_snapshot.py`, `scripts/refresh_light.py`; standard library only.
 **Notes:** Retry offsets are shortened to seconds for the test; the production schedule and its caps are asserted separately.
 
+### netlify-landing/
+**Purpose:** What the old Netlify address serves since 2026-09-30: a landing page saying the tool has moved, linking to the Vercel URL, redirecting there after five seconds, and saying in one line why the address still exists. Plus `_redirects`, which forwards any `/data/*` path to the current tool and shows the landing page for anything else.
+**Breaks if removed:** The old address is published on the owner's resume. Without this it served the 2026-09-11 extract forever — working-looking stale data, which is the exact failure this project argues against — or it would 404, which reads as an abandoned project.
+**Depends on:** nothing; uploaded directly to Netlify, whose builds stay stopped.
+**Notes:** A **directory entry**, two files. It reuses the tool's tokens and typography so arriving from a resume feels continuous rather than like a stock redirect page. The redirect is a `<meta http-equiv="refresh">` so it works without JavaScript; the script only counts down. The upload replaces the whole site, so the old extract is gone rather than merely unlinked — no path can return those prices.
+
+### scripts/test_workflow_alerts.py
+**Purpose:** Asserts the refresh workflow cannot leave the live site stale without saying so: something checks daily, a site found behind triggers a publish, the publish job verifies the live site including compression, an alert fires when the **publish itself fails** (not only when the check reports), and that path fails the run.
+**Breaks if removed:** The alerting arrangement is load-bearing and easy to break while fixing something else — removing the probe's noisy alert on 2026-09-30 created exactly such a blind spot, caught by this test and then demonstrated with a deliberate upload failure.
+**Depends on:** `.github/workflows/refresh.yml`, `pyyaml`.
+**Notes:** Reads the workflow rather than the intent, so a quiet edit fails it. Verified against the previous version of the workflow, where it reports 5 of 7.
+
 ### scripts/check_published.py
 **Purpose:** Asks the live site which extract it is serving and compares it with the one the repository holds. Retries while a deploy completes; a mismatch is a failure, naming both dates.
 **Breaks if removed:** A publish step that stops becomes invisible again. Between 2026-09-13 and 2026-09-27 the refresh committed a fresh extract almost daily and the site served none of it for fourteen days, because every other check reads the working tree or the extract just built (findings §12).

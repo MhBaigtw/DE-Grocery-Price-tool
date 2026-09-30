@@ -206,6 +206,7 @@ python scripts/test_check_light_parity.py # any difference from the full extract
 python scripts/test_netlify_changes.py # docs skip the build; data deploys enforce the age limit  (12 of 12)
 python scripts/test_upstream_validation.py # a challenge page is never used or recorded; retries stop at three  (13 of 13)
 python scripts/test_check_published.py # a live site behind the repository is refused  (5 of 5)
+python scripts/test_workflow_alerts.py # a stale site is always reported, however publishing fails  (7 of 7)
 python scripts/check_layering.py       # product_id must not appear below staging
 python scripts/check_model_parity.py   # models/ and dbt/models/ must not have drifted
 python scripts/check_determinism.py    # SQL that could return a different answer twice

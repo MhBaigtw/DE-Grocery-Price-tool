@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moved — Metro or Walmart? Price check · North York, Toronto</title>
+<meta name="robots" content="noindex">
+<!-- The automatic redirect is a meta refresh so it works without JavaScript. Five seconds,
+     because the link below must stay clickable for anyone who wants to read first. -->
+<meta http-equiv="refresh" content="5; url=https://de-grocery-price-tool.vercel.app">
+<link rel="canonical" href="https://de-grocery-price-tool.vercel.app">
+<style>
+  /* The tool's own tokens and typography, so arriving from a resume feels continuous. */
+  :root{
+    --bg:#fbfaf8; --fg:#1b1b1a; --muted:#5f5f5b; --rule:#e2ded7; --card:#fff;
+    --accent:#1f5f4e; --win:#e7f3ee;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme=light]){
+      --bg:#16171a; --fg:#e9e7e3; --muted:#a4a29d; --rule:#33353a; --card:#1e2024;
+      --accent:#6fc0a6; --win:#1d2f29;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 14px 48px;background:var(--bg);color:var(--fg);
+       font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+  .wrap{max-width:640px;margin:0 auto}
+  header{padding:32px 0 10px}
+  h1{font-size:1.05rem;margin:0;font-weight:700}
+  .sub{margin:2px 0 0;color:var(--muted);font-size:.9rem}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:12px;
+        padding:16px;margin:18px 0 0}
+  .lead{margin:0 0 12px;font-size:1.05rem;font-weight:700;line-height:1.3}
+  .go{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;
+      border-radius:10px;padding:12px 16px;font-weight:700;font-size:1rem;line-height:1.2}
+  .go:hover,.go:focus{filter:brightness(1.08);outline:2px solid var(--accent);outline-offset:2px}
+  .url{display:block;margin:10px 0 0;font-size:.85rem;color:var(--muted);word-break:break-all}
+  .small{font-size:.82rem;color:var(--muted);margin:14px 0 0;line-height:1.45}
+  footer{font-size:.8rem;color:var(--muted);margin:18px 2px 0}
+  a{color:var(--accent)}
+  @media (min-width:640px){ h1{font-size:1.25rem} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Metro or Walmart?</h1>
+  <p class="sub">North York, Toronto · in-store pickup prices</p>
+</header>
+
+<div class="card">
+  <p class="lead">This tool has moved.</p>
+  <p><a class="go" href="https://de-grocery-price-tool.vercel.app">Open the price tool →</a></p>
+  <span class="url">https://de-grocery-price-tool.vercel.app</span>
+  <p class="small" id="auto">Taking you there in <span id="n">5</span> seconds. The link stays
+    clickable if you would rather read first.</p>
+  <p class="small"><b>Why this address still exists:</b> it was published on a resume before the
+    move, so it stays up and points at the current tool rather than breaking.</p>
+  <p class="small">Prices are not served from this address any more. The tool at the link above
+    refreshes automatically whenever the upstream dataset is published, and states on every
+    screen how old its prices are.</p>
+</div>
+
+<footer>
+  <p><a href="https://github.com/MhBaigtw/DE-Grocery-Price-tool">The project, and what it can and
+    cannot tell you</a>.</p>
+  <p>The underlying data was sourced from ProjectHammer.org</p>
+</footer>
+</div>
+
+<script>
+"use strict";
+/* Only the countdown text. The redirect itself is the meta refresh above, so it happens with
+   JavaScript switched off too, and nothing here can leave a visitor stranded. */
+(function(){
+  var n = 5, el = document.getElementById("n");
+  var t = setInterval(function(){
+    n -= 1;
+    if (el) el.textContent = String(Math.max(0, n));
+    if (n <= 0) clearInterval(t);
+  }, 1000);
+})();
+</script>
+</body>
+</html>
