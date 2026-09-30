@@ -243,12 +243,6 @@ Read these in order to understand the project from scratch:
 **Depends on:** `scripts/fetch_snapshot.py`, `scripts/refresh_light.py`; standard library only.
 **Notes:** Retry offsets are shortened to seconds for the test; the production schedule and its caps are asserted separately.
 
-### netlify-landing/
-**Purpose:** What the old Netlify address serves since 2026-09-30: a landing page saying the tool has moved, linking to the Vercel URL, redirecting there after five seconds, and saying in one line why the address still exists. Plus `_redirects`, which forwards any `/data/*` path to the current tool and shows the landing page for anything else.
-**Breaks if removed:** The old address is published on the owner's resume. Without this it served the 2026-09-11 extract forever — working-looking stale data, which is the exact failure this project argues against — or it would 404, which reads as an abandoned project.
-**Depends on:** nothing; uploaded directly to Netlify, whose builds stay stopped.
-**Notes:** A **directory entry**, two files. It reuses the tool's tokens and typography so arriving from a resume feels continuous rather than like a stock redirect page. The redirect is a `<meta http-equiv="refresh">` so it works without JavaScript; the script only counts down. The upload replaces the whole site, so the old extract is gone rather than merely unlinked — no path can return those prices.
-
 ### scripts/test_workflow_alerts.py
 **Purpose:** Asserts the refresh workflow cannot leave the live site stale without saying so: something checks daily, a site found behind triggers a publish, the publish job verifies the live site including compression, an alert fires when the **publish itself fails** (not only when the check reports), and that path fails the run.
 **Breaks if removed:** The alerting arrangement is load-bearing and easy to break while fixing something else — removing the probe's noisy alert on 2026-09-30 created exactly such a blind spot, caught by this test and then demonstrated with a deliberate upload failure.
@@ -271,16 +265,16 @@ Read these in order to understand the project from scratch:
 **Purpose:** Publishes the already-gated `_site` to Vercel as a **prebuilt** deployment: it writes `.vercel/output` (finished files plus the header rules) and uploads it with the pinned CLI. No build runs on the host.
 **Breaks if removed:** The site has no publish path. The workflow's publish job calls this and nothing else.
 **Depends on:** `_site` assembled by `scripts/netlify_build.sh`, `config/vercel_output_config.json`, `config/vercel_project.json`, `VERCEL_TOKEN`, Node.
-**Notes:** Vercel's Git integration is deliberately **not** used: a hosted builder that can independently refuse is exactly what froze the site for fourteen days in September (findings §12). The gates already run in CI before anything is uploaded. Refuses without a token, without `_site`, with any data file missing, or without the output config. On a first run with no committed project link it links by project name and prints the ids to commit. `--dry-run` assembles the output tree and uploads nothing.
+**Notes:** **Not in use since 2026-09-30** (findings §14), when hosting returned to Netlify. Kept, wired to nothing, as a **working alternate publish path**: it was written and proven in production, and rebuilding it under pressure — which is when a host tends to fail — would be wasted work. Nothing runs it; the workflow no longer calls it. Vercel's Git integration is deliberately **not** used: a hosted builder that can independently refuse is exactly what froze the site for fourteen days in September (findings §12). The gates already run in CI before anything is uploaded. Refuses without a token, without `_site`, with any data file missing, or without the output config. On a first run with no committed project link it links by project name and prints the ids to commit. `--dry-run` assembles the output tree and uploads nothing.
 
 ### config/vercel_output_config.json
 **Purpose:** The Build Output API v3 configuration deployed with the site: the response headers, carried over from `netlify.toml` so changing host does not silently drop them — a 300-second cache on `/data/*`, no cache on the page, and the CSP, referrer and nosniff headers.
 **Breaks if removed:** `vercel_publish.sh` refuses. If it were deployed without these rules, the no-trackers rule would go back to being a promise rather than something enforced at the edge, and a visitor could hold a stale `products.json` against a fresh page.
 **Depends on:** nothing; it is data, read at publish time.
-**Notes:** Committed and reviewable rather than set in a host's dashboard, so the headers are in git with everything else. Compression is **not** configured here: it is the host's job, and `verify_deploy.py` checks it against the live URL rather than trusting it.
+**Notes:** Part of the alternate publish path (see `scripts/vercel_publish.sh`), unused while Netlify hosts. Committed and reviewable rather than set in a host's dashboard, so the headers are in git with everything else. Compression is **not** configured here: it is the host's job, and `verify_deploy.py` checks it against the live URL rather than trusting it.
 
 ### config/vercel_project.json
-**Purpose:** The Vercel `orgId` and `projectId` this repository publishes to, so a deploy never depends on interactive project selection.
+**Purpose:** The Vercel `orgId` and `projectId` the alternate publish path deploys to, so a deploy never depends on interactive project selection. **Stale since 2026-09-30:** the project it names was deleted when hosting returned to Netlify, so reusing this path means creating a project and replacing these ids.
 **Breaks if removed:** The publish falls back to linking by project name on every run.
 **Depends on:** nothing; written once from the first link.
 **Notes:** Identifiers, not secrets — the token is the secret, and it lives in GitHub Actions secrets as `VERCEL_TOKEN`.

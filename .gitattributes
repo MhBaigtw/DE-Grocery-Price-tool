@@ -1,0 +1,8 @@
+# The shipped data files are served as they are committed.
+#
+# Without this, a checkout on Windows (core.autocrlf=true) rewrites every line ending, so a
+# deploy made from that machine serves bytes that differ from the committed ones -- 3,502
+# carriage returns in products.json, found on 2026-09-30 when the live size did not match the
+# blob. It also made scripts/check_light_parity.py fail against a checked-out tool/data for no
+# real reason. The extract is generated with LF by DuckDB on every platform; this keeps it so.
+tool/data/*.json text eol=lf

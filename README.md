@@ -20,7 +20,7 @@ repo carries that qualifier.
 **→ [The writeup](docs/writeup.md)** — the argument, for a reader who will never open this
 repo. *The hard part of comparing grocery prices isn't getting the prices.*
 
-**→ [The price tool](https://de-grocery-price-tool.vercel.app)** — what one product costs at
+**→ [The price tool](https://de-grocery-project.netlify.app)** — what one product costs at
 Metro and Walmart, in-store pickup in North York, Toronto, across 3,465 national-brand
 barcodes. For 44% of them only one store, or neither, has a recent price, and the tool says so
 rather than guessing. Its 3,465 products are slightly fewer than the analysis basket's 3,477

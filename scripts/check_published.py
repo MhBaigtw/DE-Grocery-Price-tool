@@ -27,7 +27,7 @@ from __future__ import annotations
 import argparse, json, pathlib, sys, time, urllib.error, urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-URL = "https://de-grocery-price-tool.vercel.app/"
+URL = "https://de-grocery-project.netlify.app/"
 UA = ("Mozilla/5.0 (Project Hammer downstream analysis; "
       "+https://github.com/MhBaigtw/DE-Grocery-Price-tool)")
 

@@ -1814,6 +1814,9 @@ credential.
 
 # §13 — Hosting moved to Vercel, published from CI
 
+*Superseded 2026-09-30 by §14: the account's deploys were unblocked and hosting returned to
+Netlify. What this section records stands as what was true for that fortnight.*
+
 *2026-09-30. The owner's decision after §12. Evidence: workflow run 36788585677 and the live
 responses quoted below.*
 
@@ -1860,6 +1863,41 @@ usable rather than 3.3 (§8).
   committed, so later deploys never depend on interactive selection.
 - **The token is account-wide.** Vercel tokens cannot be limited to one project, so the secret
   is as powerful as the account it belongs to.
+
+---
+
+# §14 — Hosting returned to Netlify, and what that costs
+
+*2026-09-30, the same day as §13. The owner upgraded the account plan; Netlify deploys work
+again. Every figure below is read from the live response.*
+
+## What changed back
+
+- **Netlify hosts again.** `stop_builds` is `false`, so a push to `main` builds through
+  `netlify.toml` → `scripts/netlify_build.sh` (gates first, then assemble) with
+  `scripts/netlify_changes.sh` deciding what is worth building. All three were still intact and
+  wired; the change detection was re-tested (12 of 12).
+- **`check_published.py` and `verify_deploy.py` point at the Netlify URL** and stay wired into
+  the workflow, including the alert path proved by the deliberate upload failure in §13.
+- **The Vercel publish path is kept and disconnected:** `scripts/vercel_publish.sh`,
+  `config/vercel_output_config.json` and `config/vercel_project.json` stay in the repository as
+  a working alternate, unused. The Vercel project itself was deleted so there are not two live
+  copies of the tool at different URLs, which makes the committed project id stale by design.
+
+## What it costs, stated rather than discovered later
+
+**The dependency that caused §12 is back.** The host builds again, so a host that refuses again
+freezes the site again. What is different is the alarm: the live check runs daily and after
+every refresh, and a site behind what `main` holds raises an issue and a red run within a day
+instead of going unnoticed for a fortnight.
+
+**Self-healing is gone.** While the site was published from CI, a site found behind was
+republished automatically. Now the same finding alerts and waits for a person. Recovery is a
+push, or a direct upload with the alternate path.
+
+## Verified on the live site
+
+*Measured after the first push-built deploy; see the follow-up commit for the table.*
 
 ---
 

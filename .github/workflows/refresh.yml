@@ -190,10 +190,15 @@ jobs:
             else await github.rest.issues.create({owner: context.repo.owner,
               repo: context.repo.repo, title, body});
 
-  # Publishing is its own job so it can run in three situations: after a refresh commits, when
-  # the daily probe finds the live site behind what main holds (the September outage would have
-  # healed itself), and on demand. It re-runs the gates and uploads finished files; no builder
-  # of the host's is involved, because one that could refuse is what froze the site before.
+  # Hosting returned to Netlify on 2026-09-30, which builds and publishes on push through its
+  # own gates (netlify.toml -> scripts/netlify_build.sh). So this job no longer uploads; it
+  # WATCHES. It runs after a refresh commits, when the daily probe finds the live site behind
+  # what main holds, and on demand, and it is the thing that makes a silent publish failure
+  # visible -- the failure that went unseen for fourteen days in September (findings §12).
+  #
+  # KNOWN COST OF THE RETURN: it can no longer heal what it finds. While the site was published
+  # from here, a site found behind was republished automatically; now the same finding raises an
+  # alert and waits for a person. scripts/vercel_publish.sh is kept as an alternate publish path.
   publish:
     needs: [probe, refresh]
     if: ${{ !cancelled() && (needs.refresh.result == 'success' || inputs.publish == true || needs.probe.outputs.published_ok == 'failure') }}
@@ -210,18 +215,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '20'}
 
-      - name: Gate and assemble the site
-        run: bash scripts/netlify_build.sh
-
-      - name: Publish to Vercel
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: bash scripts/vercel_publish.sh
-
       - name: Is the live site serving what main holds?
         id: published
         continue-on-error: true
-        run: python scripts/check_published.py --wait-minutes 10
+        # Longer than the host's usual build, so a slow deploy is not read as a failed one.
+        run: python scripts/check_published.py --wait-minutes 15
 
       # Compression is the host's property, not ours, and it is the difference between a page
       # usable in 3.3 s and one that takes 40 (findings §8). It is checked on the live response
