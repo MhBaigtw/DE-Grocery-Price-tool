@@ -9,7 +9,8 @@ There are two build paths for the same models:
     Every Phase 0/1 query, `run_query.py` and `verify_reproducible.py` use this path,
     and none of them has dbt in it.
   * `dbt/models/**/*.sql` wraps the same SELECTs so dbt's ref/source graph can attach
-    lineage and tests, which is what CLAUDE.md commits to for the modelling layer.
+    lineage and tests. dbt runs tests, not the build -- CLAUDE.md's Stack section said
+    otherwise until it was corrected on 2026-10-08.
 
 `dbt/dbt_project.yml` originally claimed "dbt does not own a second copy". It does. The
 bodies are duplicated, and a duplicated definition drifts -- somebody fixes a parse rule

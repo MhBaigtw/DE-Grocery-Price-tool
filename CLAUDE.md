@@ -302,11 +302,23 @@ can be studied later, file by file, by someone who did not write it.
 
 ## Stack
 
-- Python for ingest
-- DuckDB as the analysis engine
-- dbt for the modelling layer (staging → intermediate → marts)
-- Airflow for scheduled refresh (later phase, not Phase 0)
-- Static dashboard, single-page, deployed as a static site
+- **Python** for ingest, and for every gate and check under `scripts/`.
+- **DuckDB** as the embedded analysis engine. No server, no warehouse.
+- **SQL macros and models** (`models/*.sql`) for all transformation, materialised by
+  `scripts/build_models.py`, which owns the build.
+- **dbt for tests only** — 31 generic and 9 singular, run with `dbt test`. `dbt run` is not in
+  the pipeline: a second build path would put the two out of step.
+- **GitHub Actions** for scheduling, triggered by upstream publishing rather than by a clock.
+- **Netlify** for static hosting, building through the repository's own gates.
+
+**Corrected 2026-10-08.** This section was written in Phase 0 and never revised, so it
+described plans as though they were built. It claimed **"dbt for the modelling layer (staging →
+intermediate → marts)"** and **"Airflow for scheduled refresh (later phase, not Phase 0)"**.
+Airflow was never built — GitHub Actions does the scheduling. There is no marts layer:
+`dbt/models/` holds staging and intermediate only. And dbt never performed the transformations;
+`build_models.py` has owned the build since Phase 1, as `dbt/dbt_project.yml` says. The section
+also promised a **"static dashboard, single-page"**; the dashboard was retired on 2026-09-12
+(`dashboard/RETIRED.md`) and the static site is the price tool.
 
 No Kafka. This is a daily batch dataset; streaming infrastructure here would be
 decoration.

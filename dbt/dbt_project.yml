@@ -1,4 +1,6 @@
-# dbt project for the modelling layer.
+# dbt project: TESTS ONLY -- 31 generic and 9 singular, run with `dbt test`.
+# It is not the modelling layer. scripts/build_models.py owns the build; `dbt run` is not
+# part of the pipeline (CLAUDE.md Stack, corrected 2026-10-08).
 #
 # DUPLICATION, STATED HONESTLY. The bodies here are a SECOND COPY of ../models/*.sql,
 # differing only in that sources resolve through dbt's ref/source graph so lineage and
