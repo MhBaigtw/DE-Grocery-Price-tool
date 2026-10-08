@@ -1,4 +1,4 @@
-# dbt project: TESTS ONLY -- 31 generic and 9 singular, run with `dbt test`.
+# dbt project: TESTS ONLY, run with `dbt test`.
 # It is not the modelling layer. scripts/build_models.py owns the build; `dbt run` is not
 # part of the pipeline (CLAUDE.md Stack, corrected 2026-10-08).
 #

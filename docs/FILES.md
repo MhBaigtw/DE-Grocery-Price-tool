@@ -28,8 +28,8 @@ Read these in order to understand the project from scratch:
 ---
 
 ### CLAUDE.md
-**Purpose:** Project constitution. Locked decisions (no scraping, snapshot immutability, Toronto-pickup scope, data-range discipline, derived product identity) and seven non-negotiable honesty rules.
-**Breaks if removed:** Nothing executable, but the project loses the standard that every other file is written against. Honesty rules #1 (missing day ≠ unchanged price) and #3 (every number has a query) are load-bearing for the whole design.
+**Purpose:** Project constitution. Locked decisions (no scraping, snapshot immutability, North York Toronto pickup scope — and for Save-On-Foods not Toronto at all, data-range discipline, derived product identity) and ten non-negotiable honesty rules, plus the three rules governing how that list may change.
+**Breaks if removed:** Nothing executable, but the project loses the standard that every other file is written against. Rule 1 (a missing day is not an unchanged price) and rule 4 (every published number is reproducible) are load-bearing for the whole design. *Until 2026-10-08 this entry cited that second one as "#3", which it stopped being when the ambiguous-parse rule took that number — this entry was an instance of the failure its own Notes describe.*
 **Depends on:** Nothing.
 **Notes:** Its honesty rules are cited **by name as well as number** throughout the repo, because rules have twice been inserted mid-list and each insertion invalidates every bare "rule N" reference — the second renumbering left stale references in four files before they were caught. Two statements in it are contradicted by the data and are flagged in `docs/phase-0-findings.md` §2.1 and §2.2 — the small-basket end date (Jul 10/11 vs the actual 2024-06-11) and the claim that `product.id` changes daily. Neither was silently worked around. Its "File manifest (mandatory)" section is what requires this file, and requires `scripts/check_manifest.py` to pass before any phase is reported complete. Its "Upstream volatility" section is what requires `config/expected_schema.json` and `scripts/check_schema.py`.
 

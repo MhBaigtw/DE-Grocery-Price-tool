@@ -306,8 +306,8 @@ can be studied later, file by file, by someone who did not write it.
 - **DuckDB** as the embedded analysis engine. No server, no warehouse.
 - **SQL macros and models** (`models/*.sql`) for all transformation, materialised by
   `scripts/build_models.py`, which owns the build.
-- **dbt for tests only** — 31 generic and 9 singular, run with `dbt test`. `dbt run` is not in
-  the pipeline: a second build path would put the two out of step.
+- **dbt for tests only**, run with `dbt test`. `dbt run` is not in the pipeline: a second build
+  path would put the two out of step.
 - **GitHub Actions** for scheduling, triggered by upstream publishing rather than by a clock.
 - **Netlify** for static hosting, building through the repository's own gates.
 
