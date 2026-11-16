@@ -20,6 +20,23 @@ models:
           - relationships:
               to: ref('stg_product')
               field: product_key
+      - name: nowtime_raw
+        description: >
+          `raw.nowtime` exactly as upstream sent it. An integer, YYYYMMDD, since upstream's
+          unannounced change of 2026-11 (a 'YYYY-MM-DD' string before it). Kept so that a
+          row whose date could not be decoded still shows what the source said.
+      - name: observed_date
+        description: >
+          The calendar date of the observation, decoded strictly from `nowtime_raw`. NULL
+          only when the source value is not a real 8-digit calendar date: 3 rows on a full
+          load, 0 on the light Metro + Walmart load. Those rows are excluded from
+          date-filtered headline numbers, kept, and counted -- the count is pinned by
+          tests/assert_null_observed_date_count_is_pinned.sql, so there is deliberately no
+          not_null test here. This column had no test of any kind until 2026-11-16
+          (docs/incident-nowtime-type-change.md).
+        data_tests:
+          - date_within_snapshot_window:
+              min_date: '2024-02-28'
       - name: offer_type
         description: The commercial offer, not the encoding. See models/price_parse_macros.sql.
         data_tests:

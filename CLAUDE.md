@@ -133,6 +133,42 @@ archive; see locked decision 2 as amended.
 - **Save-On-Foods is not priced in Toronto.** 97% of its products point at store 2210 in
   Kamloops, BC (see locked decision 3). It may appear in within-chain results with that
   location attached, and never in a cross-chain comparison with a Toronto chain.
+- **`raw.nowtime` is an integer date since 2026-11, and three of its values are not
+  dates.** *(Appended 2026-11-16; not from upstream docs — upstream did not announce it.)*
+  Archives up to upstream's 2026-11-04 publication carry `nowtime` as text, `'YYYY-MM-DD'`;
+  from the next one it is an INTEGER, `YYYYMMDD`, archive-wide, historical rows included.
+  It is a calendar date with no time of day, not an epoch, and decoding it as a plain date
+  reproduces the old dates exactly (905 of 907 overlapping dates identical, 0 at ±1 day;
+  the other 2 gained 5 rows). Three Loblaws rows hold `2202`, `2202` and `20222602`. Their
+  `observed_date` is **NULL: excluded from date-filtered headline numbers, kept, and
+  counted**, the same treatment honesty rules 3 and 6 give a value that cannot be trusted.
+  The count is pinned by `dbt/tests/assert_null_observed_date_count_is_pinned.sql`. The
+  light refresh (Metro + Walmart) never loads those rows; only a full rebuild sees them.
+  The timezone upstream uses to assign the calendar date is undocumented, as it always
+  was. Evidence: `docs/incident-nowtime-type-change.md`.
+- **Upstream rewrites history. A snapshot is no longer the truth for its period across
+  snapshots.** *(Appended 2026-11-16.)* The release that changed `nowtime` also changed
+  rows that already existed, with no notice and no schema change to trip the gate.
+  Comparing the 2026-09-10 archive with the 2026-11-14 one over the same period
+  (2024-02-28 to 2026-09-10, 907 dates):
+  - **prices repaired:** `current_price` text differs on 901 of 907 dates (`'0..99'` is now
+    `'0.99'`, and the like);
+  - **`product_id` re-keyed** on 361 dates (2024-02-28 to 2026-07-28), e.g. name-based
+    Metro ids replaced by code-based ones;
+  - **orphan rows** (a price row with no product row) down from 886,107 to 255,533;
+  - **the 8 undated rows** (Phase 0 E1) given dates: 5 real, 3 invalid as above.
+
+  Two snapshots can therefore disagree about the same day, and neither is wrong about what
+  upstream published. Every figure in this project describes **the snapshot it was
+  computed from**, which is what the build stamp (honesty rule 5) already records; none
+  describes "the data" independent of a snapshot. The three archives under
+  `data/snapshots/` are the only surviving copy of the history as it stood before this
+  rewrite. **Honesty rule 6's figures — 878,559 orphan rows and the 15,936 sale-flagged
+  rows D2 loses — describe an archive upstream has since rewritten. They are correct for
+  snapshot 1 and are pending restatement** against the rewritten archive, along with every
+  other stamped figure a full rebuild moves (Stage 3 of the incident; it needs a machine
+  with room for a full load). Until then they must not be quoted as describing the current
+  archive.
 
 ## Honesty rules (non-negotiable)
 

@@ -16,5 +16,15 @@ sources:
               Upstream row id. Announced to change from string to number. It appears in the
               staging layer and NOWHERE BELOW IT -- scripts/check_layering.py enforces that,
               so the type change stays an ingest-layer event.
+          - name: nowtime
+            description: >
+              The observation date. An INTEGER written as digits, YYYYMMDD, since upstream's
+              unannounced change first seen on 2026-11-06; a 'YYYY-MM-DD' string before it.
+              Not an epoch and no time of day. config/expected_schema.json asserts the type.
       - name: product
         description: Product metadata. Updated only when a new product is discovered.
+      - name: _snapshot_provenance
+        description: >
+          Key/value provenance written by scripts/load_snapshot.py: the snapshot id, the
+          archive hash, and on a filtered (light) load a `load_filter` row. The date tests
+          on stg_price read the snapshot date and the load kind from it.

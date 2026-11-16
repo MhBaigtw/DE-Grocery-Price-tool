@@ -64,15 +64,24 @@ SELECT * FROM (VALUES
 
 CREATE OR REPLACE TABLE raw AS
 SELECT * FROM (VALUES
-  ('MetroA',   '2026-08-01 10:00:00', '3.29',    'was',    '$3.29/500g', ''),
-  ('MetroA',   '2026-08-02 10:00:00', '2/$7.00', NULL,     NULL,         'salepricefound'),
-  ('GalleriaB','2026-08-01 10:00:00', '4.99',    NULL,     NULL,         ''),
-  ('SaveOnC',  '2026-08-01 10:00:00', '36.90/kg',NULL,     NULL,         ''),
-  ('LoblawsD', '2026-08-01 10:00:00', '329$',    '4.99',   NULL,         'salepricefound'),
-  ('WalmartE', '2026-08-01 10:00:00', 'Now$298', '99¢', NULL,       'salepricefound'),
-  ('VoilaF',   '2026-08-01 10:00:00', '',        NULL,     NULL,         ''),
-  ('MissingXX','2026-08-01 10:00:00', '1.99',    NULL,     NULL,         '')
+  ('MetroA',   20260801::BIGINT, '3.29',    'was',    '$3.29/500g', ''),
+  ('MetroA',   20260802, '2/$7.00', NULL,     NULL,         'salepricefound'),
+  ('GalleriaB',20260801, '4.99',    NULL,     NULL,         ''),
+  ('SaveOnC',  20260801, '36.90/kg',NULL,     NULL,         ''),
+  ('LoblawsD', 20260801, '329$',    '4.99',   NULL,         'salepricefound'),
+  ('WalmartE', 20260801, 'Now$298', '99¢', NULL,       'salepricefound'),
+  ('VoilaF',   20260801, '',        NULL,     NULL,         ''),
+  ('MissingXX',20260801, '1.99',    NULL,     NULL,         ''),
+  -- the three values upstream ships that are not dates, with their real multiplicity: the
+  -- decode must leave them NULL, and the pinned-count test must accept exactly these
+  ('LoblawsD', 2202,     '2.49',    NULL,     NULL,         ''),
+  ('LoblawsD', 2202,     '5.99',    NULL,     NULL,         ''),
+  ('LoblawsD', 20222602, '1.49',    NULL,     NULL,         '')
 ) AS t(product_id, nowtime, current_price, old_price, price_per_unit, other);
+
+-- What scripts/load_snapshot.py writes on a FULL load: a snapshot id, no load_filter row.
+CREATE OR REPLACE TABLE _snapshot_provenance AS
+SELECT * FROM (VALUES ('snapshot_id', '20260803T120000Z')) AS t(k, v);
 """
 
 
@@ -130,6 +139,9 @@ INJECTIONS = {
     "assert_reliable_only_excludes_fuzzy":
         "UPDATE int_upc_match SET is_reliable_only = true "
         "WHERE gtin14 = '00098765432109'",
+    "assert_null_observed_date_count_is_pinned":
+        # the 2026-11 failure itself: a decode that turns a real date into NULL
+        "UPDATE stg_price SET observed_date = NULL WHERE current_price_raw = '3.29'",
     # --- generic (schema.yml) tests --------------------------------------------------
     "unique_stg_product_product_key":
         "INSERT INTO stg_product SELECT * FROM stg_product LIMIT 1",
@@ -139,6 +151,9 @@ INJECTIONS = {
         "INSERT INTO stg_price SELECT * FROM stg_price LIMIT 1",
     "not_null_stg_price_src_rowid":
         "UPDATE stg_price SET src_rowid = NULL WHERE current_price_raw = '3.29'",
+    "date_within_snapshot_window_stg_price_observed_date__2024_02_28":
+        # 20261104 read as epoch seconds lands in 1970
+        "UPDATE stg_price SET observed_date = DATE '1970-08-23' WHERE current_price_raw = '3.29'",
     "accepted_values_stg_price_offer_type__scalar__multibuy__per_weight__unparsed__blank":
         "UPDATE stg_price SET offer_type = 'mystery' WHERE current_price_raw = '3.29'",
     "accepted_values_stg_price_price_basis__each__per_100g__per_100ml":

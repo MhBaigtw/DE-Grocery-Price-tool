@@ -8,12 +8,29 @@
 --   * EVERY row in `raw` produces exactly one row here. Nothing is filtered.
 --   * Unparseable text keeps its raw value with offer_type='unparsed'.
 --   * A multibuy is NEVER stripped to its total; a cents-form is NEVER read as dollars.
+--
+-- observed_date (changed 2026-11-16): raw.nowtime was TEXT 'YYYY-MM-DD' until upstream's
+-- 2026-11-04 publication and is INTEGER YYYYMMDD since, unannounced. The decode is strict
+-- integer arithmetic into make_date -- no string round trip, no try_cast -- and returns
+-- NULL only for a value that is not a real 8-digit calendar date. Those rows are kept and
+-- counted (3 on a full load, 0 on the light Metro + Walmart load, which never loads them);
+-- the count is pinned by tests/assert_null_observed_date_count_is_pinned.sql. The full
+-- account is in the header of ../../models/stg_price.sql.
 SELECT
     r.rowid                                     AS src_rowid,
     product_key(pr.vendor, pr.sku, pr.concatted) AS product_key,
     r.product_id                                AS product_id,
     r.nowtime                                   AS nowtime_raw,
-    try_cast(substr(r.nowtime, 1, 10) AS DATE)  AS observed_date,
+    CASE WHEN r.nowtime BETWEEN 10000101 AND 99991231
+              AND (r.nowtime // 100) % 100 BETWEEN 1 AND 12
+         THEN CASE WHEN r.nowtime % 100 BETWEEN 1 AND day(last_day(make_date(
+                            (r.nowtime // 10000)::INTEGER,
+                            ((r.nowtime // 100) % 100)::INTEGER, 1)))
+                   THEN make_date((r.nowtime // 10000)::INTEGER,
+                                  ((r.nowtime // 100) % 100)::INTEGER,
+                                  (r.nowtime % 100)::INTEGER)
+              END
+    END                                         AS observed_date,
 
     r.current_price                             AS current_price_raw,
     p_offer_type(r.current_price)               AS offer_type,
