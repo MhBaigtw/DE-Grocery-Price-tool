@@ -67,6 +67,9 @@ LIGHT_VENDORS = ("Metro", "Walmart")
 E1 = ROOT / "analysis" / "phase4" / "E1_tool_extract.sql"
 PROVENANCE = ROOT / "data" / "provenance"
 SQLITE_ARCHIVE = "hammer-3-compressed.zip"
+# The current schema contract. Older versions are kept beside it (expected_schema.v1.json) for
+# the retained snapshots; --schema names one explicitly, nothing picks a version from the data.
+DEFAULT_SCHEMA = str(ROOT / "config" / "expected_schema.json")
 
 
 class Stop(Exception):
@@ -244,14 +247,14 @@ def fetch(workdir: pathlib.Path, at: tuple[int, ...]) -> tuple[pathlib.Path, dic
 
 
 def build(snap: pathlib.Path, out: pathlib.Path, workdir: pathlib.Path, vintage: str,
-          into_repo: bool, meter: Meter) -> pathlib.Path:
+          into_repo: bool, meter: Meter, schema: str = DEFAULT_SCHEMA) -> pathlib.Path:
     db = workdir / "light.duckdb"
     (out / "tool" / "data").mkdir(parents=True, exist_ok=True)
     meter.stage("filtered load", lambda: run("load", [
         PY, "scripts/load_snapshot.py", snap, "--db", db, "--workdir", workdir,
         "--vendors", ",".join(LIGHT_VENDORS), "--drop-sqlite"]))
     meter.stage("schema contract", lambda: run("schema gate", [
-        PY, "scripts/check_schema.py", "--db", db]))
+        PY, "scripts/check_schema.py", "--db", db, "--schema", schema]))
     meter.stage("build models", lambda: run("build models", [
         PY, "scripts/build_models.py", "--db", db, "--materialize", "table"]))
     meter.stage("code checks", lambda: [
@@ -327,6 +330,8 @@ def main() -> int:
     ap.add_argument("--vintage", choices=["fail", "warn"], default="fail",
                     help="passed to check_extract.py; 'warn' only for building an old snapshot "
                          "to compare or measure, never for a deploy")
+    ap.add_argument("--schema", default=DEFAULT_SCHEMA,
+                    help="the schema contract to assert (default: config/expected_schema.json, the current version). The snapshots retained from before 2026-11-06 are in the old form and need config/expected_schema.v1.json")
     ap.add_argument("--measure", action="store_true",
                     help="report wall-clock, peak memory and peak disk per stage (needs psutil)")
     ap.add_argument("--retry-at", default=DEFAULT_RETRY_AT,
@@ -376,7 +381,7 @@ def main() -> int:
             fetched = True
 
         say("snapshot", f"{manifest['snapshot_id']}, upstream {manifest['upstream_lastupdated_raw']!r}")
-        db = build(snap, out, workdir, args.vintage, into_repo, meter)
+        db = build(snap, out, workdir, args.vintage, into_repo, meter, args.schema)
 
         if fetched:
             archive = snap / SQLITE_ARCHIVE

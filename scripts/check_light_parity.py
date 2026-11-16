@@ -81,6 +81,9 @@ def main() -> int:
                     help="an already-built light extract; skips the build")
     ap.add_argument("--workdir", default=None,
                     help="scratch directory for the light build (default: a temporary directory)")
+    ap.add_argument("--schema", default=None,
+                    help="schema contract passed to the light build (default: its own default, "
+                         "the current version)")
     args = ap.parse_args()
     for s in (sys.stdout, sys.stderr):
         try:
@@ -112,7 +115,8 @@ def main() -> int:
         print(f"building the light extract for {sid} under {work} ...", flush=True)
         p = subprocess.run([PY, "scripts/refresh_light.py", "--snapshot", str(snap),
                             "--out", str(work / "out"), "--workdir", str(work / "work"),
-                            "--vintage", "warn"], cwd=ROOT)
+                            "--vintage", "warn"]
+                           + (["--schema", args.schema] if args.schema else []), cwd=ROOT)
         if p.returncode != 0:
             print("FAIL - the light build itself refused, so parity could not be established.")
             return 1

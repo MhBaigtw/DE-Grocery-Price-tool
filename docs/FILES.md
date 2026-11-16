@@ -493,21 +493,27 @@ Read these in order to understand the project from scratch:
 **Notes:** The extract is written with LF by DuckDB on every platform; this keeps it that way through checkout. It does not touch anything else in the repository.
 
 ### config/expected_schema.json
-**Purpose:** The schema contract. Records the column names, types and ordinal positions of `raw` and `product` as they are today, including the **current** `VARCHAR` type of `raw.product_id`.
+**Purpose:** The **current** schema contract, version 2. Records the column names, types and ordinal positions of `raw` and `product` as upstream publishes them today: `raw.nowtime` is `BIGINT` (a date written as digits, `YYYYMMDD`) and `raw.product_id` is still `VARCHAR`.
 **Breaks if removed:** `scripts/check_schema.py` exits 2 and ingest loses its only guard against a silent upstream schema change.
-**Depends on:** A loaded snapshot to have been captured from; consumed by `scripts/check_schema.py`.
-**Notes:** Exists because the maintainer has announced that `raw.product_id` will change from string to number. The type recorded here is the current one on purpose — this file is a tripwire, not a wish. When the change lands it is updated **deliberately, in its own commit, with a note**, never as a side effect of making a failing run pass. The `_comment` array at the top of the file says this too, so the warning travels with the file rather than living only here.
+**Depends on:** A loaded snapshot to have been captured from; consumed by `scripts/check_schema.py`, and by `refresh.py`, `refresh_light.py` and `test_check_schema.py` as their default `--schema`.
+**Notes:** Version 2 since 2026-11-16. Upstream changed `raw.nowtime` from text to an integer without announcing it; the gate refused every run from 2026-11-06 until this file was updated, which is the gate doing its job (`docs/incident-nowtime-type-change.md`). The change that *was* announced — `raw.product_id` from string to number — has still not landed, and the type recorded here is the current one on purpose: this file is a tripwire, not a wish. Every change to it is made **deliberately, in its own commit, with a note**, never as a side effect of making a failing run pass, and the outgoing version is kept beside it rather than overwritten. The `_comment` array at the top of the file says all of this too, so the warning travels with the file rather than living only here.
+
+### config/expected_schema.v1.json
+**Purpose:** Schema contract version 1, byte-for-byte what `expected_schema.json` was until 2026-11-16: `raw.nowtime` as `VARCHAR` (`'YYYY-MM-DD'`). It is the contract for the three snapshots retained under `data/snapshots/`, all downloaded before upstream's change.
+**Breaks if removed:** The retained snapshots can no longer pass a schema gate at all, and they are the only surviving copy of the history as it stood before upstream rewrote it in the same release (CLAUDE.md, Known contamination). Overwriting version 1 with version 2 would have made that history unverifiable to keep one file name tidy.
+**Depends on:** consumed by `scripts/check_schema.py --schema config/expected_schema.v1.json`.
+**Notes:** Passing this gate is necessary for building an old snapshot and **not sufficient**. `models/stg_price.sql` decodes the integer form only, so `build_models.py` fails on a version-1 database — loudly, with a binder error, never with wrong dates. Until that is resolved (Stage 3 of the incident) an old snapshot is rebuilt from the commit before the decode changed. The version is always named by the caller with `--schema`; nothing selects a contract by looking at the data, because a gate that picks whichever contract matches is not a gate.
 
 ### scripts/check_schema.py
-**Purpose:** Validates a loaded snapshot against `config/expected_schema.json`. Reports missing columns, unexpected columns, type mismatches, position drift and absent tables. Exits non-zero on any difference.
+**Purpose:** Validates a loaded snapshot against a schema contract — `config/expected_schema.json` by default, or the version named with `--schema` (`config/expected_schema.v1.json` for the snapshots retained from before 2026-11-06). Reports missing columns, unexpected columns, type mismatches, position drift and absent tables. Exits non-zero on any difference.
 **Breaks if removed:** An upstream schema change lands silently. The announced `product_id` string→number change would flow into the analysis layer as a type surprise rather than a loud ingest failure.
-**Depends on:** `duckdb`, `config/expected_schema.json`, a database built by `load_snapshot.py`.
+**Depends on:** `duckdb`, `config/expected_schema.json` or the version named with `--schema`, a database built by `load_snapshot.py`.
 **Notes:** CLAUDE.md requires ingest to *fail loudly* and never cast, coerce, or infer — so this deliberately has no `--fix` and no auto-update mode. The failure message says what to do (update the expected-schema file in its own commit) rather than offering to do it. Position drift is opt-in via `--strict-position`, because a reordered column is not by itself a correctness problem and defaulting to failure there would train people to ignore the check.
 
 ### scripts/test_check_schema.py
 **Purpose:** Proves `check_schema.py` actually fails when the schema differs. Six cases, including the announced `product_id` string→number change. Exits non-zero if any case does not behave as expected.
 **Breaks if removed:** The schema check becomes an untested assertion. The brief's point stands: a check that has never failed has not been tested.
-**Depends on:** `scripts/check_schema.py`, `config/expected_schema.json`, `hammer.duckdb`.
+**Depends on:** `scripts/check_schema.py`, a schema contract and a database **of the same version** — `config/expected_schema.json` and `hammer.duckdb` by default, both overridable with `--schema` and `--db`. The local `hammer.duckdb` built from a pre-2026-11-06 snapshot needs `--schema config/expected_schema.v1.json`; against the current contract its control case fails, correctly.
 **Notes:** Mutates a **copy of the expected-schema file**, not the database — equivalent to the database having changed in the opposite direction, and it avoids building a corrupted 880 MB DuckDB file for each case. The real database is opened read-only and never touched. Includes a control case asserting the unmodified schema still passes; without it, a checker that failed on everything would score a perfect 5 of 5. This is the only real test suite in the repo, which is why the findings document says "6 of 6" refers to this file alone and is not a pass rate for the phase.
 
 ### .gitignore

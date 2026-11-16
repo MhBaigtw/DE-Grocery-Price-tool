@@ -12,9 +12,18 @@ corrupted 880MB DuckDB file. The real database is opened read-only and never tou
 The headline case is `product_id_becomes_number`: the maintainer has stated
 raw.product_id will change from string to number, and this asserts we would catch it.
 
+THE CONTRACT IS VERSIONED (2026-11-16). raw.nowtime changed from VARCHAR to BIGINT, so a
+database and the contract it is tested against must be named together. The control case can
+only pass when they match:
+  * a database loaded from an archive in the current form: the defaults.
+  * hammer.duckdb / hammer2.duckdb built from the snapshots retained before 2026-11-06:
+      python scripts/test_check_schema.py --schema config/expected_schema.v1.json
+A mismatch fails the control, loudly, which is the checker working.
+
 Exit codes: 0 all cases behaved as expected, 1 one or more did not, 2 environment error.
-No third-party dependencies. Run: python scripts/test_check_schema.py
+No third-party dependencies. Run: python scripts/test_check_schema.py [--db DB] [--schema FILE]
 """
+import argparse
 import json
 import pathlib
 import subprocess
@@ -72,6 +81,15 @@ def run_checker(schema_path: pathlib.Path, extra: list[str]):
 
 
 def main() -> int:
+    global SCHEMA, DB
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--db", default=str(DB))
+    ap.add_argument("--schema", default=str(SCHEMA))
+    args = ap.parse_args()
+    SCHEMA, DB = pathlib.Path(args.schema), pathlib.Path(args.db)
+    print(f"schema   : {SCHEMA}")
+    print(f"database : {DB}")
+    print()
     if not SCHEMA.exists():
         print(f"error: {SCHEMA} not found", file=sys.stderr)
         return 2

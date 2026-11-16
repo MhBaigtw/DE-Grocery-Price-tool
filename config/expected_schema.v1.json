@@ -1,0 +1,42 @@
+{
+  "_comment": [
+    "Expected schema of a loaded Project Hammer snapshot. Ingest asserts against this",
+    "and FAILS LOUDLY on any difference -- it never silently casts, coerces, or infers.",
+    "",
+    "KNOWN PENDING CHANGE: the maintainer has stated that raw.product_id will change",
+    "from a string to a number, to reduce SQLite file size. The type recorded below is",
+    "the CURRENT one (VARCHAR). When the change lands, this file is updated in its own",
+    "commit with a note -- deliberately, never as a side effect of a failing run.",
+    "",
+    "Types are DuckDB type names as reported by information_schema.columns after",
+    "scripts/load_snapshot.py has copied the SQLite tables in."
+  ],
+  "schema_version": 1,
+  "captured_from_snapshot": "20260822T134045Z",
+  "captured_utc": "2026-08-22T14:05:00Z",
+  "tables": {
+    "product": {
+      "columns": [
+        { "name": "id",           "type": "VARCHAR", "position": 1 },
+        { "name": "concatted",    "type": "VARCHAR", "position": 2 },
+        { "name": "vendor",       "type": "VARCHAR", "position": 3 },
+        { "name": "product_name", "type": "VARCHAR", "position": 4 },
+        { "name": "units",        "type": "VARCHAR", "position": 5 },
+        { "name": "brand",        "type": "VARCHAR", "position": 6 },
+        { "name": "detail_url",   "type": "VARCHAR", "position": 7 },
+        { "name": "sku",          "type": "VARCHAR", "position": 8 },
+        { "name": "upc",          "type": "VARCHAR", "position": 9 }
+      ]
+    },
+    "raw": {
+      "columns": [
+        { "name": "nowtime",        "type": "VARCHAR", "position": 1 },
+        { "name": "current_price",  "type": "VARCHAR", "position": 2 },
+        { "name": "old_price",      "type": "VARCHAR", "position": 3 },
+        { "name": "price_per_unit", "type": "VARCHAR", "position": 4 },
+        { "name": "other",          "type": "VARCHAR", "position": 5 },
+        { "name": "product_id",     "type": "VARCHAR", "position": 6 }
+      ]
+    }
+  }
+}

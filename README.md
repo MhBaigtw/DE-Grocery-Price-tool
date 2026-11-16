@@ -108,6 +108,7 @@ LICENSE                         MIT, for the code only -- not the data
 netlify.toml                    deploy config: gated build, headers, only main publishes
 config/
   expected_schema.json          asserted column names + types of raw and product
+  expected_schema.v1.json       the same contract as it stood before 2026-11-16, for the retained snapshots
 docs/
   RESUME.md                     how to pick this project up without prior context
   FILES.md                      file manifest (what each file is for)

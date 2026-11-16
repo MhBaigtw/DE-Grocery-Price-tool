@@ -127,7 +127,7 @@ def verify_steps(args) -> int:
     checks = [
         ("fetch",         [PY, "scripts/fetch_snapshot.py"],                 ["--dry-run"]),
         ("load",          [PY, "scripts/load_snapshot.py"],                  ["--db"]),
-        ("schema gate",   [PY, "scripts/check_schema.py"],                   ["--db"]),
+        ("schema gate",   [PY, "scripts/check_schema.py"],                   ["--db", "--schema"]),
         ("build models",  [PY, "scripts/build_models.py"],                   ["--db", "--materialize"]),
         ("layering",      [PY, "scripts/check_layering.py"],                 []),
         ("determinism",   [PY, "scripts/check_determinism.py"],              []),
@@ -138,7 +138,7 @@ def verify_steps(args) -> int:
         ("extract gate",  [PY, "scripts/check_extract.py"],                  ["--dir"]),
         ("render gate",   ["node", "scripts/test_tool_render.js"],           []),
         ("manifest",      [PY, "scripts/check_manifest.py"],                 []),
-        ("light parity",  [PY, "scripts/check_light_parity.py"],             ["--workdir"]),
+        ("light parity",  [PY, "scripts/check_light_parity.py"],             ["--workdir", "--schema"]),
     ]
     bad = 0
     for name, cmd, flags in checks:
@@ -185,6 +185,8 @@ def main() -> int:
                     help="rebuild from the newest snapshot already on disk")
     ap.add_argument("--db", default=str(ROOT / "hammer.duckdb"))
     ap.add_argument("--dbt-target", default="dev", choices=["dev", "snapshot2", "all"])
+    ap.add_argument("--schema", default=str(ROOT / "config" / "expected_schema.json"),
+                    help="the schema contract to assert (default: config/expected_schema.json, the current version). The snapshots retained from before 2026-11-06 are in the old form and need config/expected_schema.v1.json")
     ap.add_argument("--verify-steps", action="store_true",
                     help="check that every step's command exists and accepts the flags "
                          "this script passes it, then stop")
@@ -225,7 +227,11 @@ def main() -> int:
         # site keeps serving the last good extract rather than deploying something
         # unverified. This is the announced raw.product_id change, among others.
         run("load", [PY, "scripts/load_snapshot.py", snap, "--db", args.db], args.dry_run)
-        run("schema gate", [PY, "scripts/check_schema.py", "--db", args.db], args.dry_run)
+        # The contract is versioned (config/expected_schema.v1.json is the pre-2026-11-06 form).
+        # The version is named by the caller, never inferred from the data: a gate that picks
+        # whichever contract happens to match is not a gate.
+        run("schema gate", [PY, "scripts/check_schema.py", "--db", args.db,
+                            "--schema", args.schema], args.dry_run)
         run("build models", [PY, "scripts/build_models.py", "--db", args.db,
                              "--materialize", "table"], args.dry_run)
 
@@ -257,7 +263,8 @@ def main() -> int:
         # light extract from this same snapshot and require it to be byte-identical to the one
         # this full rebuild just produced. A mismatch means the filter drops or changes rows the
         # extract needs, so every automated refresh since the last passing check is suspect.
-        run("light parity", [PY, "scripts/check_light_parity.py", snap], args.dry_run)
+        run("light parity", [PY, "scripts/check_light_parity.py", snap,
+                             "--schema", args.schema], args.dry_run)
 
         # Record what this rebuild consumed. The automated light refresh starts only when
         # upstream's last-updated stamp differs from the newest record, so without this it
